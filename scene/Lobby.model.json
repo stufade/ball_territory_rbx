@@ -1,0 +1,39 @@
+{
+ "className": "Folder",
+ "children": [
+  {
+   "name": "Pad",
+   "className": "Part",
+   "properties": {
+    "Size": [
+     60,
+     1,
+     60
+    ],
+    "CFrame": [
+     0,
+     0.25,
+     0,
+     1,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "Color": [
+     0.666667,
+     0.686275,
+     0.72549
+    ],
+    "Material": "SmoothPlastic",
+    "Anchored": true,
+    "TopSurface": "Smooth",
+    "BottomSurface": "Smooth"
+   }
+  }
+ ]
+}

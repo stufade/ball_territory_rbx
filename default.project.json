@@ -4,17 +4,53 @@
 		"$className": "DataModel",
 		"ReplicatedStorage": {
 			"$className": "ReplicatedStorage",
-			"Shared": { "$path": "src/shared" }
+			"Shared": {
+				"$path": "src/shared"
+			}
 		},
 		"ServerScriptService": {
 			"$className": "ServerScriptService",
-			"Server": { "$path": "src/server" }
+			"Server": {
+				"$path": "src/server"
+			}
 		},
 		"StarterPlayer": {
 			"$className": "StarterPlayer",
 			"StarterPlayerScripts": {
 				"$className": "StarterPlayerScripts",
-				"Client": { "$path": "src/client" }
+				"Client": {
+					"$path": "src/client"
+				}
+			}
+		},
+		"Workspace": {
+			"$className": "Workspace",
+			"$ignoreUnknownInstances": true,
+			"Arenas": {
+				"$path": "scene/Arenas.model.json"
+			},
+			"Lobby": {
+				"$path": "scene/Lobby.model.json"
+			}
+		},
+		"Lighting": {
+			"$className": "Lighting",
+			"$ignoreUnknownInstances": true,
+			"$properties": {
+				"ClockTime": 14,
+				"Brightness": 3,
+				"GeographicLatitude": 30,
+				"GlobalShadows": true,
+				"Ambient": [
+					0.54902,
+					0.568627,
+					0.607843
+				],
+				"OutdoorAmbient": [
+					0.588235,
+					0.607843,
+					0.647059
+				]
 			}
 		}
 	}
