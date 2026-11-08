@@ -13,6 +13,7 @@ export type Stats = {
 	firstError: string?,
 	steps: number,
 	stepTime: number,
+	maxStep: number,
 	reactions: number,
 	powers: number,
 	kos: number,
@@ -40,6 +41,7 @@ function Sim.newStats(): Stats
 		firstError = nil,
 		steps = 0,
 		stepTime = 0,
+		maxStep = 0,
 		reactions = 0,
 		powers = 0,
 		kos = 0,
@@ -65,10 +67,16 @@ function Sim.play(st: Stats, els: { number }, opts: Rules.Options): Rules.State?
 		Rules.drain(S)
 		local fp = -1
 		local clock = os.clock
-		local t0 = clock()
 		local n = 0
+		local total, worst = 0, 0
 		while not S.done do
+			local t0 = clock()
 			Rules.step(S)
+			local dt = clock() - t0
+			total += dt
+			if dt > worst then
+				worst = dt
+			end
 			n += 1
 			for _, ev in Rules.drain(S) do
 				if ev.kind == "power" then
@@ -81,7 +89,8 @@ function Sim.play(st: Stats, els: { number }, opts: Rules.Options): Rules.State?
 				end
 			end
 		end
-		st.stepTime += clock() - t0
+		st.stepTime += total
+		st.maxStep = math.max(st.maxStep, worst)
 		st.steps += n
 		if fp >= 0 then
 			st.firstPower += fp
@@ -164,6 +173,47 @@ function Sim.pairs(reps: number, layout: string, pace: { [number]: number }, see
 	return st
 end
 
+-- R full bot duels: draft 1-2-2-1, bot ball choice, rounds until one side is out. Returns stats and round count.
+function Sim.duels(R: number, pace: { [number]: number }, seed: number): (Stats, number)
+	local Duel = Rules.Duel
+	local st = Sim.newStats()
+	local rounds = 0
+	local rand = Rules.Rng.new(seed)
+	for r = 1, R do
+		local ok, err = pcall(function()
+			local d = Duel.newDraft(rand() < 0.5)
+			while not Duel.draftDone(d) do
+				local side = Duel.draftTurn(d)
+				assert(Duel.draftPick(d, side, Duel.botDraft(d, side, rand)), "bad draft pick")
+			end
+			local duel = Duel.new(d.teams, { nil, nil })
+			while not duel.done do
+				for _, side in Duel.need(duel) do
+					assert(Duel.choose(duel, side, Duel.botChoose(duel, side, rand)), "bad choice")
+				end
+				local els = { duel.cur[1], duel.cur[2] }
+				local S = Sim.play(st, els, {
+					layout = "duel",
+					pace = pace,
+					round = Config.DUEL_ROUND,
+					seed = seed * 7919 + r * 16 + duel.round,
+				})
+				assert(S, "round failed")
+				duel.round += 1
+				duel.game = S
+				Duel.endRound(duel)
+				rounds += 1
+				assert(duel.round < 10, "duel too long")
+			end
+		end)
+		if not ok then
+			st.errors += 1
+			st.firstError = st.firstError or tostring(err)
+		end
+	end
+	return st, rounds
+end
+
 function Sim.rates(st: Stats): { number }
 	local out = {}
 	for e = 1, NEL do
@@ -244,14 +294,15 @@ end
 function Sim.summary(st: Stats): string
 	local R = st.matches
 	return string.format(
-		"matches %d  errors %d  reactions/match %.2f  powers/match %.2f  KOs/match %.2f  first power %.2f s  step %.3f ms",
+		"matches %d  errors %d  reactions/match %.2f  powers/match %.2f  KOs/match %.2f  first power %.2f s  step %.3f ms (max %.2f ms)",
 		R,
 		st.errors,
 		st.reactions / R,
 		st.powers / R,
 		st.kos / R,
 		st.firstPower / math.max(1, st.firstPowerN),
-		1000 * st.stepTime / math.max(1, st.steps)
+		1000 * st.stepTime / math.max(1, st.steps),
+		1000 * st.maxStep
 	)
 end
 

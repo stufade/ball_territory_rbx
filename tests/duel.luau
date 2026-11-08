@@ -6,47 +6,12 @@ local process = require("@lune/process")
 local Rules = require("@rules")
 local Sim = require("./Sim")
 
-local Config, Duel = Rules.Config, Rules.Duel
+local Config = Rules.Config
 local NEL = Config.NEL
 local R = tonumber(process.args[1]) or 1000
 local REPS = tonumber(process.args[2]) or 10
 
-local st = Sim.newStats()
-local rounds = 0
-local rand = Rules.Rng.new(4242)
-for r = 1, R do
-	local ok, err = pcall(function()
-		local d = Duel.newDraft(rand() < 0.5)
-		while not Duel.draftDone(d) do
-			local side = Duel.draftTurn(d)
-			assert(Duel.draftPick(d, side, Duel.botDraft(d, side, rand)), "bad draft pick")
-		end
-		local duel = Duel.new(d.teams, { nil, nil })
-		local n = 0
-		while not duel.done do
-			for _, side in Duel.need(duel) do
-				assert(Duel.choose(duel, side, Duel.botChoose(duel, side, rand)), "bad choice")
-			end
-			n += 1
-			local els = { duel.cur[1], duel.cur[2] }
-			local S = Sim.play(
-				st,
-				els,
-				{ layout = "duel", pace = Config.DUEL_PACE, round = Config.DUEL_ROUND, seed = r * 100 + n }
-			)
-			assert(S, "round failed")
-			duel.round += 1
-			duel.game = S
-			Duel.endRound(duel)
-			rounds += 1
-			assert(n < 10, "duel too long")
-		end
-	end)
-	if not ok then
-		st.errors += 1
-		st.firstError = st.firstError or tostring(err)
-	end
-end
+local st, rounds = Sim.duels(R, Config.DUEL_PACE, 4242)
 
 local rates = Sim.rates(st)
 print(`duels {R}, rounds {rounds} ({string.format("%.2f", rounds / R)} per duel)`)
