@@ -6,7 +6,7 @@
 
 **Текущий milestone:** M0 Окружение, в работе. План одобрен пользователем 2026-11-09.
 
-**Следующий шаг:** T0.1 запущена (luau-coder, Orca run `run_c3066fce111a`, dispatch `ctx_1393dce70ecb`). После приёмки — push и T0.2 (scene-builder: Rojo-плагин и Studio MCP).
+**Следующий шаг:** T0.1 принята (коммит 09a83c3, запушен). Идут параллельно: T0.2 scene-builder Sonnet (`ctx_bcbb5bb95886`) и T1.1 luau-coder Opus (`ctx_8d5454e39e73`), Orca run `run_c3066fce111a`. Studio: место «Element vs Element» (placeId 96446158283661), подтверждено пользователем. Модели: Opus для T1.1 и T1.2, остальное Sonnet.
 
 **Блокеры и риски:**
 - macOS может молча не пускать Rojo и lune в `~/Desktop`. Нужно разрешить доступ в системном окне или работать из копии.
