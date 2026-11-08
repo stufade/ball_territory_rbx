@@ -4,9 +4,9 @@
 
 **Репозиторий:** `~/Desktop/new-game/ball_territory_rbx`, GitHub `stufade/ball_territory_rbx`, ветка `main`. Документы перенесены сюда из `new-game/docs`.
 
-**Текущий milestone:** M0 Окружение, не начат. План ждёт согласия пользователя.
+**Текущий milestone:** M0 Окружение, в работе. План одобрен пользователем 2026-11-09.
 
-**Следующий шаг:** после согласия — T0.1 (luau-coder: rokit, Rojo, lune, структура `src/`), затем T0.2 (scene-builder: Rojo-плагин и Studio MCP).
+**Следующий шаг:** T0.1 запущена (luau-coder, Orca run `run_c3066fce111a`, dispatch `ctx_1393dce70ecb`). После приёмки — push и T0.2 (scene-builder: Rojo-плагин и Studio MCP).
 
 **Блокеры и риски:**
 - macOS может молча не пускать Rojo и lune в `~/Desktop`. Нужно разрешить доступ в системном окне или работать из копии.
