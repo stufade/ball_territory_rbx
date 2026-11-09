@@ -68,6 +68,7 @@ function UI.start()
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
 	gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- children always over their parent (overlays with ZIndex)
 	gui.DisplayOrder = 10
 	gui.Parent = player:WaitForChild("PlayerGui")
 
@@ -229,11 +230,17 @@ function UI.start()
 	local inject = Instance.new("BindableEvent")
 	inject.Name = "Inject"
 	inject.Parent = gui
-	inject.Event:Connect(function(st: Net.State)
-		local hold = workspace:GetAttribute("BTHold")
-		workspace:SetAttribute("BTHold", nil)
-		onState(st)
-		workspace:SetAttribute("BTHold", hold)
+	local onMatch: (kind: string, data: any) -> ()
+	inject.Event:Connect(function(kind: string, data: any)
+		if kind == "State" then
+			local hold = workspace:GetAttribute("BTHold")
+			workspace:SetAttribute("BTHold", nil)
+			onState(data)
+			workspace:SetAttribute("BTHold", hold)
+		elseif typeof(data) == "table" then
+			data.id = data.id or matchId
+			onMatch(kind, data)
+		end
 	end)
 	workspace:GetAttributeChangedSignal("BTHold"):Connect(function()
 		local st = held
@@ -243,7 +250,7 @@ function UI.start()
 		end
 	end)
 
-	Remotes.Match.OnClientEvent:Connect(function(kind: string, data: any)
+	function onMatch(kind: string, data: any)
 		if typeof(data) ~= "table" then
 			return
 		end
@@ -289,6 +296,24 @@ function UI.start()
 			end
 		elseif kind == Net.MatchKind.finish then
 			ctx.lastEnd = data
+		end
+	end
+	-- debug hold: the held screen must not be replaced by the next round; replay the events on release
+	local heldMatch: { { kind: string, data: any } } = {}
+	Remotes.Match.OnClientEvent:Connect(function(kind: string, data: any)
+		if workspace:GetAttribute("BTHold") == true then
+			table.insert(heldMatch, { kind = kind, data = data })
+		else
+			onMatch(kind, data)
+		end
+	end)
+	workspace:GetAttributeChangedSignal("BTHold"):Connect(function()
+		if workspace:GetAttribute("BTHold") ~= true then
+			local list = heldMatch
+			heldMatch = {}
+			for _, m in list do
+				onMatch(m.kind, m.data)
+			end
 		end
 	end)
 

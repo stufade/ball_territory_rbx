@@ -83,6 +83,7 @@ export type Hud = {
 	final: boolean,
 	timeLeft: number,
 	overlay: Frame?,
+	mid: number,
 	input: (kind: number, dx: number?, dy: number?) -> (),
 }
 
@@ -178,7 +179,7 @@ local function makePlate(self: Hud, seat: Net.Seat, slot: number, right: boolean
 			24,
 			UDim2.fromOffset(212, 28),
 			UDim2.fromOffset(mx(right, 82, 212), 88),
-			{ color = Look.NAMECOL[e + 1], align = align }
+			{ color = Theme.nameColor(e), align = align }
 		)
 		pct = Theme.text(
 			f,
@@ -221,7 +222,7 @@ local function makePlate(self: Hud, seat: Net.Seat, slot: number, right: boolean
 			20,
 			UDim2.fromOffset(80, 24),
 			UDim2.fromOffset(mx(right, 214, 80), 42),
-			{ color = Look.NAMECOL[e + 1], align = align }
+			{ color = Theme.nameColor(e), align = align }
 		)
 		local bar = Theme.frame(f, UDim2.fromOffset(204, 10), UDim2.fromOffset(mx(right, 84, 204), 80), Theme.INK)
 		Theme.round(bar, 5)
@@ -377,6 +378,7 @@ function Hud.new(
 		input = input,
 		hintToken = 0,
 		final = false,
+		mid = 460,
 		timeLeft = start.round,
 	} :: any
 	-- plates: duel side 0 left, 1 right; ffa sides 0, 2 left and 1, 3 right (Stand1, Stand3 / Stand2, Stand4)
@@ -432,12 +434,17 @@ function Hud.layout(self: Hud, canvas: Vector2, topbar: Vector2)
 		p.frame.Position = if p.right then UDim2.new(1, -6, 0, y) else UDim2.fromOffset(6, y)
 	end
 	local mid = canvas.X - 2 * col
+	self.mid = mid
 	self.landBar.Size = UDim2.fromOffset(math.clamp(mid - 24, 240, 440), 36)
 	local pw = self.power
 	if pw then
-		local k = math.min(1, col / (Look.POWER_W + Look.POWER_PAD * 2))
+		-- a narrow column narrows the plate but keeps its height (>= 80 px on a 390 px phone); scale only below 220
+		local w = math.clamp(col - Look.POWER_PAD - 4, 220, Look.POWER_W)
+		local k = math.min(1, col / (220 + Look.POWER_PAD + 4))
+		pw.btn.Size = UDim2.fromOffset(w, Look.POWER_H)
+		pw.holder.Size = UDim2.fromOffset(w + Look.POWER_PAD, Look.POWER_H + Look.POWER_PAD)
 		pw.holderScale.Scale = k
-		self.hintArrow.Position = UDim2.new(1, -(Look.POWER_W + Look.POWER_PAD) * k, 1, -(Look.POWER_H / 2 + 14) * k)
+		self.hintArrow.Position = UDim2.new(1, -(w + Look.POWER_PAD) * k, 1, -(Look.POWER_H / 2 + 14) * k)
 	end
 	self.hint.Size = UDim2.fromOffset(math.max(240, mid - 20), 44)
 end
@@ -573,13 +580,15 @@ function Hud.roundEnd(self: Hud, data: Net.RoundEnd, ctx: Ctx)
 	if self.overlay then
 		self.overlay:Destroy()
 	end
-	local o = Theme.frame(self.gui, UDim2.fromScale(1, 1), nil, Color3.fromHex("#0b0c22"))
+	-- covers the board only: the side columns stay visible, the avatars cheer and hang their heads there
+	local W = self.mid
+	local o = Theme.frame(self.gui, UDim2.new(0, W, 1, 0), UDim2.fromScale(0.5, 0), Color3.fromHex("#0b0c22"))
+	o.AnchorPoint = Vector2.new(0.5, 0)
 	o.Name = "RoundEnd"
 	o.ZIndex = 20
 	o.BackgroundTransparency = 1
 	self.overlay = o
-	TweenService:Create(o, TweenInfo.new(0.25), { BackgroundTransparency = 0.18 }):Play()
-	local box = Theme.clear(o, UDim2.fromOffset(820, 540), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	TweenService:Create(o, TweenInfo.new(0.25), { BackgroundTransparency = 0.06 }):Play()
 	local mine = ctx.mySide
 	local w = data.win
 	local rounds = math.max(ctx.rounds, 1)
@@ -590,47 +599,48 @@ function Hud.roundEnd(self: Hud, data: Net.RoundEnd, ctx: Ctx)
 		elseif w == mine then "ROUND WON!"
 		else "ROUND LOST"
 	local tcol = if w < 0 then Theme.TEXT elseif spectator or w == mine then Theme.YELLOW_TXT else Theme.BAD_TXT
-	Theme.text(box, `ROUND {rounds}`, 32, UDim2.fromOffset(400, 40), UDim2.new(0.5, 0, 0, 30), {
-		anchor = Vector2.new(0.5, 0),
+	local top = Vector2.new(0.5, 0)
+	Theme.text(o, `ROUND {rounds}`, 28, UDim2.fromOffset(W - 20, 34), UDim2.fromOffset(W / 2, 40), {
+		anchor = top,
 		color = Theme.DIM,
 	})
-	local tl = Theme.text(box, title, 72, UDim2.fromOffset(760, 84), UDim2.new(0.5, 0, 0, 70), {
-		anchor = Vector2.new(0.5, 0),
+	local tl = Theme.text(o, title, 60, UDim2.fromOffset(W - 20, 70), UDim2.fromOffset(W / 2, 74), {
+		anchor = top,
 		color = tcol,
-		stroke = 7,
+		stroke = 6,
 	})
 	Theme.pop(tl, 0.05, 0.3)
 	local nameBySide: { [number]: string } = {}
 	for _, seat in self.start.seats do
 		nameBySide[seat.side] = if seat.e == self.you then "YOU" else string.upper(seat.name)
 	end
+	local cw = W * 0.46
 	for side = 0, 1 do
 		local e = if side == 0 then data.a else data.b
 		local p = if side == 0 then data.pa else data.pb
-		local x = if side == 0 then 0.5 - 0.27 else 0.5 + 0.27
-		local cell = Theme.clear(box, UDim2.fromOffset(240, 300), UDim2.new(x, 0, 0, 170), Vector2.new(0.5, 0))
-		local ball = Theme.ball(cell, e, 130, UDim2.fromOffset(120, 90))
-		local lostIt = w ~= side
-		if lostIt then
+		local cx = if side == 0 then W * 0.26 else W * 0.74
+		local cell = Theme.clear(o, UDim2.fromOffset(cw, 280), UDim2.fromOffset(cx, 160), top)
+		local ball = Theme.ball(cell, e, 110, UDim2.fromOffset(cw / 2, 108))
+		if w ~= side then
 			ball.ImageTransparency = 0.45
-			cross(ball, 140, 0.5)
+			cross(ball, 120, 0.5)
 		else
-			local c = Theme.crown(cell, 100, UDim2.fromOffset(120, 0))
+			local c = Theme.crown(cell, 84, UDim2.fromOffset(cw / 2, 24))
 			Theme.pop(c, 0.3, 0)
 		end
 		Theme.text(
 			cell,
 			string.format("%d%%", math.floor(p + 0.5)),
-			44,
-			UDim2.fromOffset(200, 50),
-			UDim2.fromOffset(20, 160)
+			40,
+			UDim2.fromOffset(cw, 46),
+			UDim2.fromOffset(0, 172)
 		)
-		Theme.text(cell, nameBySide[side] or "", 26, UDim2.fromOffset(240, 32), UDim2.fromOffset(0, 212), {
+		Theme.text(cell, nameBySide[side] or "", 24, UDim2.fromOffset(cw, 30), UDim2.fromOffset(0, 220), {
 			color = if side == mine and not spectator then Theme.YELLOW_TXT else Theme.DIM,
 		})
 	end
-	Theme.text(box, "VS", 52, UDim2.fromOffset(120, 60), UDim2.new(0.5, 0, 0, 230), {
-		anchor = Vector2.new(0.5, 0),
+	Theme.text(o, "VS", 40, UDim2.fromOffset(80, 46), UDim2.fromOffset(W / 2, 244), {
+		anchor = top,
 		color = Theme.MUTED,
 	})
 	local done = false
@@ -644,8 +654,8 @@ function Hud.roundEnd(self: Hud, data: Net.RoundEnd, ctx: Ctx)
 		elseif w < 0 then "BOTH CHOOSE THE NEXT BALL"
 		elseif not spectator and w ~= mine then "YOU CHOOSE YOUR NEXT BALL"
 		else `{nameBySide[1 - w] or "RIVAL"} CHOOSES NEXT`
-	local nl = Theme.text(box, next, 34, UDim2.fromOffset(760, 44), UDim2.new(0.5, 0, 1, -64), {
-		anchor = Vector2.new(0.5, 0),
+	local nl = Theme.text(o, next, 30, UDim2.fromOffset(W - 20, 40), UDim2.new(0, W / 2, 1, -58), {
+		anchor = top,
 	})
 	Theme.pop(nl, 0.9, 0.6)
 end

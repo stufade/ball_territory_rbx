@@ -132,26 +132,26 @@ local function card(
 	local border = if tag > 0 then Theme.GOOD elseif tag < 0 then Theme.BAD else Theme.FRAME
 	local st = Theme.stroke(b, if tag ~= 0 then 5 else 2.5, border)
 	st.Name = "Border"
-	Theme.text(b, name(e), 34, UDim2.new(1, -16, 0, 40), UDim2.fromOffset(8, 12), { color = Look.NAMECOL[e + 1] })
-	local box = Theme.frame(b, UDim2.fromOffset(132, 132), UDim2.new(0.5, 0, 0, 60), Theme.SLOT, TOP_MID)
+	Theme.text(b, name(e), 34, UDim2.new(1, -16, 0, 40), UDim2.fromOffset(8, 12), { color = Theme.nameColor(e) })
+	local box = Theme.frame(b, UDim2.fromOffset(112, 112), UDim2.new(0.5, 0, 0, 58), Theme.SLOT, TOP_MID)
 	Theme.round(box, 10)
 	Theme.stroke(box, 2, Theme.RING)
-	local art = Theme.ball(box, e, 104, UDim2.fromScale(0.5, 0.5))
+	local art = Theme.ball(box, e, 90, UDim2.fromScale(0.5, 0.5))
 	if not Theme.reduced() then
 		local s = Instance.new("UIScale")
 		s.Parent = art
 		local ph = e * 0.7
 		art:SetAttribute("ph", ph)
 	end
-	Theme.text(b, "POWER: " .. (WORD[e] or ""), 22, UDim2.new(1, -16, 0, 26), UDim2.fromOffset(8, 198), {
+	Theme.text(b, "POWER: " .. (WORD[e] or ""), 22, UDim2.new(1, -16, 0, 26), UDim2.fromOffset(8, 176), {
 		color = Theme.YELLOW_TXT,
 	})
 	Theme.text(
 		b,
 		ABOUT[e] or "",
 		20,
-		UDim2.new(1, -20, 0, h - 228 - (if tag ~= 0 then 36 else 4)),
-		UDim2.fromOffset(10, 226),
+		UDim2.new(1, -20, 0, h - 206 - (if tag ~= 0 then 36 else 4)),
+		UDim2.fromOffset(10, 204),
 		{
 			bold = true,
 			color = Theme.DIM,
@@ -187,7 +187,8 @@ local function cardRow(
 	y: number,
 	foes: { number },
 	pick: (number) -> (),
-	disabled: { number }?
+	disabled: { number }?,
+	offText: string?
 )
 	local n = #elems
 	local avail = ctx.canvas.X - 40
@@ -204,7 +205,7 @@ local function cardRow(
 			e,
 			w,
 			h,
-			foes,
+			if off then {} else foes,
 			if off
 				then nil
 				else function()
@@ -224,7 +225,12 @@ local function cardRow(
 		c.Position = UDim2.fromOffset(x0 + (i - 1) * (w + 18), y)
 		if off then
 			c.BackgroundTransparency = 0.6
-			Theme.text(c, "TAKEN", 34, UDim2.new(1, 0, 0, 40), UDim2.fromScale(0.5, 0.42), {
+			for _, d in c:GetDescendants() do
+				if d:IsA("ImageLabel") then
+					d.ImageTransparency = 0.55
+				end
+			end
+			Theme.text(c, offText or "TAKEN", 34, UDim2.new(1, 0, 0, 40), UDim2.fromScale(0.5, 0.42), {
 				anchor = MID,
 				color = Theme.MUTED,
 			}).Rotation =
@@ -284,7 +290,7 @@ local function grid(root: Instance, o: GridOpts): Grid
 			local col, num = o.mark(e)
 			local tag = matchup(e, o.foes)
 			local can = o.can(e)
-			c.art.ImageTransparency = if can or col then 0 else 0.6
+			c.art.ImageTransparency = if can or (col and num) then 0 else 0.6
 			c.glow.Visible = can and tag ~= 0
 			c.glow.BackgroundColor3 = if tag > 0 then Theme.GOOD else Theme.BAD
 			c.ring.Visible = col ~= nil or (can and tag ~= 0)
@@ -344,7 +350,7 @@ local function grid(root: Instance, o: GridOpts): Grid
 end
 
 -- Web drawInfo: ball name, power, about, strong/weak 1v1 lists.
-local function info(parent: Instance, x: number, y: number, w: number, h: number): (number) -> ()
+local function info(parent: Instance, x: number, y: number, w: number, h: number, duel: boolean): (number) -> ()
 	local f = Theme.frame(parent, UDim2.fromOffset(w, h), UDim2.fromOffset(x, y), Theme.PANEL)
 	Theme.round(f, 10)
 	local function show(e: number)
@@ -369,7 +375,7 @@ local function info(parent: Instance, x: number, y: number, w: number, h: number
 		Theme.round(stripe, 5)
 		local tx = 26
 		Theme.text(f, name(e), 30, UDim2.fromOffset(200, 34), UDim2.fromOffset(tx, 6), {
-			color = Look.NAMECOL[e + 1],
+			color = Theme.nameColor(e),
 			align = Enum.TextXAlignment.Left,
 		})
 		Theme.text(f, "Power: " .. (WORD[e] or ""), 22, UDim2.new(1, -240, 0, 30), UDim2.fromOffset(tx + 210, 9), {
@@ -382,6 +388,9 @@ local function info(parent: Instance, x: number, y: number, w: number, h: number
 			stroke = 0,
 			align = Enum.TextXAlignment.Left,
 		})
+		if not duel then
+			return
+		end
 		Theme.text(
 			f,
 			"Strong 1v1 vs " .. names(Config.DSTRONG[e]),
@@ -626,11 +635,12 @@ local function gridPicker(
 		send: (number) -> (),
 		active: boolean,
 		waitText: string?,
+		duel: boolean,
 	}
 ): Grid
-	local infoH, btnW = 150, 250
+	local infoH, btnW = if opts.duel then 150 else 100, 250
 	local g: Grid
-	local show = info(root, x, y + h - infoH, w - btnW - 14, infoH)
+	local show = info(root, x, y + h - infoH, w - btnW - 14, infoH, opts.duel)
 	local pickBtn: TextButton? = nil
 	local chosen = -1
 	local function setBtn()
@@ -709,7 +719,7 @@ local function pickFfa(root: Frame, st: Net.State, ctx: Ctx)
 	local options: { number } = st.options or {}
 	local taken: { number } = st.taken or {}
 	local t = timedTitle(root, ctx, "CHOOSE YOUR BALL", st.endsAt, 10, 10)
-	local y = t.Position.Y.Offset + 60
+	local y = t.Position.Y.Offset + 54
 	local w = math.min(ctx.canvas.X - 40, 860)
 	gridPicker(root, ctx, (ctx.canvas.X - w) / 2, y, w, ctx.canvas.Y - y - 50, {
 		can = function(e)
@@ -723,6 +733,7 @@ local function pickFfa(root: Frame, st: Net.State, ctx: Ctx)
 			ctx.act(Net.Action.pick, e)
 		end,
 		active = true,
+		duel = false,
 	})
 end
 
@@ -848,6 +859,7 @@ local function draft(root: Frame, st: Net.State, ctx: Ctx)
 		end,
 		active = myTurn,
 		waitText = "WAIT",
+		duel = true,
 	})
 	if myTurn and st.any then
 		local any = Theme.button(
@@ -906,7 +918,7 @@ local function choose(root: Frame, st: Net.State, ctx: Ctx)
 		local holder = Theme.clear(line, UDim2.fromOffset(40, 40))
 		holder.LayoutOrder = 3
 		Theme.ball(holder, rival, 36, UDim2.fromScale(0.5, 0.5))
-		piece(name(rival), Look.NAMECOL[rival + 1], 4)
+		piece(name(rival), Theme.nameColor(rival), 4)
 	else
 		piece(sideName(ctx, 1 - me) .. "'S BALL IS HIDDEN", Theme.DIM, 2)
 	end
@@ -917,7 +929,7 @@ local function choose(root: Frame, st: Net.State, ctx: Ctx)
 	local all = if #team > 0 then team else left
 	cardRow(root, ctx, all, y + 50, foes, function(e)
 		ctx.act(Net.Action.choose, e)
-	end, lost)
+	end, lost, "OUT")
 	Theme.text(
 		root,
 		"Tap a ball. Time is up: a random one goes.",
@@ -1154,7 +1166,11 @@ local function result(root: Frame, st: Net.State, ctx: Ctx)
 	local who = ""
 	if en and en.places[1] then
 		local seat = ctx.seats[we]
-		who = if we == ctx.you then "YOU" elseif seat then string.upper(seat.name) else ""
+		who = if we == ctx.you
+			then "YOU"
+			elseif seat and seat.userId <= 0 and not duel then `BOT {seat.side + 1}`
+			elseif seat then string.upper(seat.name)
+			else ""
 	end
 	Theme.text(
 		root,
@@ -1164,7 +1180,7 @@ local function result(root: Frame, st: Net.State, ctx: Ctx)
 		UDim2.fromOffset(rx + rw / 2, 176),
 		{
 			anchor = TOP_MID,
-			color = Look.NAMECOL[we + 1],
+			color = Theme.nameColor(we),
 			stroke = 4,
 		}
 	)
@@ -1262,7 +1278,11 @@ local function result(root: Frame, st: Net.State, ctx: Ctx)
 			local seat = ctx.seats[p.e]
 			Theme.text(
 				row,
-				if mine then "YOU" elseif seat then string.upper(seat.name) else name(p.e),
+				if mine
+					then "YOU"
+					elseif seat and seat.userId <= 0 then `BOT {seat.side + 1}`
+					elseif seat then string.upper(seat.name)
+					else name(p.e),
 				22,
 				UDim2.fromOffset(120, 30),
 				UDim2.new(1, -12, 0, 15),
@@ -1300,7 +1320,7 @@ local function result(root: Frame, st: Net.State, ctx: Ctx)
 			end
 		end
 	end
-	local back = Theme.text(root, "", 22, UDim2.fromOffset(400, 28), UDim2.new(0.5, 0, 1, -34), {
+	local back = Theme.text(root, "", 22, UDim2.fromOffset(400, 28), UDim2.new(0, cx, 1, -34), {
 		anchor = TOP_MID,
 		color = Theme.DIM,
 		bold = true,

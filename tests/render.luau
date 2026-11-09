@@ -74,7 +74,7 @@ check(near(fov, math.deg(2 * math.atan(15 / 30)), 1e-6), "fov exact on width")
 do
 	local sm = Smooth.new(0.1)
 	check(sm:update(0.016) == nil, "no head before a frame")
-	local t, arrive = 0, 0
+	local t = 0
 	local prevHead = -1
 	local worstLag, minLag = 0, 1e9
 	local dtReal = 1 / 60

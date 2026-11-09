@@ -6,9 +6,9 @@
 
 **Текущий milestone:** M1.5 «Ощущение веба». M1 (логика, сервер, сеть) функционально принят, но вид отвергнут пользователем. Плейтест M1 отложен.
 
-**Сейчас:** V1 — поле, шары, эффекты как в вебе (Orca, Opus). Потом V2 — арена, HUD, меню как в Ball vs Ball.
+**Сейчас:** V1 (поле, шары, эффекты) принят. V2 — арена, HUD, все экраны как в Ball vs Ball и вебе — сделан, ждёт приёмки: снимки `docs/shots/v2/`, описание `docs/ui.md`, сцена `docs/scene.md`.
 
-**Проверка вида:** `tools/shot.sh <имя>` снимает окно Studio и в Play (MCP screen_capture в Play не работает). Каждый шаг сравнивается со скриншотами веба `ball_territory_web/out/v4/screens/` и референсами `../references/ui/Ball vs Ball/`.
+**Проверка вида:** `tools/shot.sh <имя>` снимает окно Studio и в Play (MCP screen_capture в Play не работает). Телефон: на клиенте `workspace:SetAttribute("BTEmulate", "844x390")`; короткие экраны держит `BTHold` (docs/ui.md). Каждый шаг сравнивается со скриншотами веба `ball_territory_web/out/v4/screens/` и референсами `../references/ui/Ball vs Ball/`.
 
 **Режим:** автономно, пользователь проверит потом. Rojo и Studio не перезапускать.
 

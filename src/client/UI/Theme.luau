@@ -276,6 +276,13 @@ function Theme.button(
 	return b
 end
 
+-- Ball name colour (web NAMECOL), lifted to the light tint when it is too dark to read on the navy panels.
+function Theme.nameColor(e: number): Color3
+	local c = Look.NAMECOL[e + 1] or Theme.TEXT
+	local l = 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
+	return if l < 0.4 then Look.light(e) else c
+end
+
 -- Readable text colour on a ball-coloured button (web ON_COL).
 function Theme.onColor(c: Color3): Color3
 	local l = 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
