@@ -10,6 +10,8 @@ export type Arena = {
 	name: string,
 	mode: string,
 	stands: { BasePart },
+	-- middle of the board (spectator distance)
+	focus: Vector3,
 	session: any?,
 }
 
@@ -43,7 +45,14 @@ local function add(inst: Instance)
 		name = inst.Name,
 		mode = mode,
 		stands = stands(inst),
+		focus = Vector3.zero,
 	}
+	local board = inst:FindFirstChild("Board")
+	if board and board:IsA("BasePart") then
+		a.focus = board.Position
+	elseif a.stands[1] then
+		a.focus = a.stands[1].Position
+	end
 	byModel[inst] = a
 	nextAid += 1
 	a.aid = nextAid

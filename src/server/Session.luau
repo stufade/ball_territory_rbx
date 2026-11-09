@@ -9,9 +9,11 @@ local Arenas = require("./Arenas")
 local Avatars = require("./Avatars")
 local Config = require("./Config")
 local Net = require(ReplicatedStorage.Shared.Net)
+local Party = require("./Party")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Roster = require("./Roster")
 local Runner = require("./Runner")
+local Watch = require("./Watch")
 
 local Session = {}
 
@@ -88,6 +90,8 @@ function Session.new(mode: Net.ModeName, arena: Arenas.Arena, recs: { Roster.Rec
 	}
 	arena.session = s
 	table.insert(active, s)
+	-- who plays here, for the arena sign on the plaza
+	arena.model:SetAttribute("Live", table.concat(Session.names(s), if mode == "ffa" then " · " else " vs "))
 	for _, m in members do
 		local r = m.rec
 		if r then
@@ -177,6 +181,7 @@ function Session.detach(s: Session, rec: Roster.Rec)
 		rec.session = nil
 		Avatars.release(rec.player)
 		Roster.lobby(rec)
+		Party.refresh(rec)
 	end
 	local m = Session.member(s, rec)
 	if m then
@@ -196,12 +201,12 @@ function Session.close(s: Session)
 			m.rec = nil
 		end
 	end
-	for v in s.viewers do
-		v.watching = nil
-		Roster.lobby(v)
+	for v in table.clone(s.viewers) do
+		Watch.stop(v)
 	end
 	s.viewers = {}
 	s.arena.session = nil
+	s.arena.model:SetAttribute("Live", nil)
 	local i = table.find(active, s)
 	if i then
 		table.remove(active, i)

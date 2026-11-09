@@ -1,5 +1,6 @@
 --!strict
--- People outside matches: first-entry starter pick, mode queue, watching, and starting sessions on free arenas.
+-- People outside matches: first-entry starter pick, mode queue (alone or as a party), and starting sessions on free
+-- arenas. Watching from the plaza: Watch.luau; party rules: Party.luau.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -10,11 +11,13 @@ local Config = require("./Config")
 local Guard = require("./Logic/Guard")
 local Modes = require("./Modes")
 local Net = require(ReplicatedStorage.Shared.Net)
+local Party = require("./Party")
 local Queue = require("./Logic/Queue")
 local Roster = require("./Roster")
 local Rules = require(ReplicatedStorage.Shared.Rules)
 local Runner = require("./Runner")
 local Session = require("./Session")
+local Watch = require("./Watch")
 
 local A = Net.Action
 local NEL = Rules.Config.NEL
@@ -45,26 +48,38 @@ function Lobby.join(r: Roster.Rec)
 	sendIntroPick(r)
 end
 
-local function unwatch(r: Roster.Rec)
-	local s = r.watching
-	if s then
-		s.viewers[r] = nil
-		r.watching = nil
+-- Takes the person's whole queue entry out (a party leaves together); everyone of it goes back to the lobby.
+local function unqueue(r: Roster.Rec)
+	local ids: { number } = Queue.leave(queue, r.id) or {}
+	for _, id in ids do
+		local m = byId[id]
+		if m then
+			Roster.lobby(m)
+		end
 	end
 end
 
 function Lobby.leave(r: Roster.Rec, now: number)
-	Queue.leave(queue, r.id)
-	unwatch(r)
+	unqueue(r)
+	Watch.stop(r)
 	local s = r.session
 	if s and not s.closed then
 		Modes[s.mode].leave(s, r, now)
 	end
+	Party.removed(r)
 	byId[r.id] = nil
 end
 
-local function queueJoin(r: Roster.Rec, mode: string, now: number)
-	if Queue.join(queue, r.id, mode, now) then
+-- One person or a party joins the queue of `mode` as one entry.
+local function queueJoin(recs: { Roster.Rec }, mode: string, now: number)
+	local ids = {}
+	for _, r in recs do
+		table.insert(ids, r.id)
+	end
+	if not Queue.join(queue, ids, mode, now) then
+		return
+	end
+	for _, r in recs do
 		r.queuedAt = now
 		Roster.send(r, {
 			ph = "queue",
@@ -74,6 +89,14 @@ local function queueJoin(r: Roster.Rec, mode: string, now: number)
 		}, true)
 	end
 end
+
+Party.init({
+	queue = queueJoin,
+	unqueue = unqueue,
+	queued = function(r)
+		return Queue.mode(queue, r.id) ~= nil
+	end,
+})
 
 local function hello(r: Roster.Rec, now: number)
 	if not r.readyAt then
@@ -91,11 +114,16 @@ local function hello(r: Roster.Rec, now: number)
 	if s and s.runner and s.st == "round" then
 		Runner.join(s.runner, r.player)
 	end
+	Party.send(r)
 end
 
 function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 	if verb == A.hello then
 		hello(r, now)
+		return
+	end
+	-- party verbs work anywhere (in a match too); a queue request of a party member is the host's party search
+	if verb ~= A.queue and Party.action(r, verb, arg, now) then
 		return
 	end
 	local s = r.session
@@ -115,44 +143,36 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 		end
 		return
 	end
-	if r.introE then
+	if r.introE or (verb == A.queue and Party.action(r, verb, arg, now)) then
 		return
 	end
 	if verb == A.queue then
 		local mode = MODE_OF[arg :: any]
 		if mode then
-			unwatch(r)
-			queueJoin(r, mode, now)
+			queueJoin({ r }, mode, now)
 		end
 	elseif verb == A.cancel then
-		if Queue.leave(queue, r.id) then
-			Roster.lobby(r)
-		end
+		unqueue(r)
 	elseif verb == A.watch then
+		-- debug: watch an arena from anywhere until the plaza check (Watch.tick) picks by distance again
 		local a = Arenas.byId(Guard.int(arg, 1, 255) or 0)
-		local target = a and a.session
-		if target and not Queue.mode(queue, r.id) then
-			unwatch(r)
-			target.viewers[r] = true
-			r.watching = target
-			if target.runner and target.st == "round" then
-				Runner.join(target.runner, r.player)
-			end
+		if a and a.session then
+			Watch.start(r, a.session)
 		end
 	elseif verb == A.leave then
-		if r.watching then
-			unwatch(r)
-			Roster.lobby(r)
-		end
+		Watch.stop(r)
 	end
 end
 
 local function startSession(mode: Net.ModeName, arena: Arenas.Arena, recs: { Roster.Rec }, debug: boolean, now: number)
 	for _, r in recs do
-		unwatch(r)
+		Watch.stop(r)
 	end
 	local s = Session.new(mode, arena, recs, debug)
 	Modes[mode].start(s, now)
+	for _, r in recs do
+		Party.refresh(r)
+	end
 end
 
 -- Starts what can start: first rounds, then queue groups, then debug bot matches.

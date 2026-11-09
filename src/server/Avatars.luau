@@ -1,5 +1,7 @@
 --!strict
--- Avatars stand still on their arena's Stand during a session, then go back to the lobby pad.
+-- Avatars stand still on their arena's Stand during a session, then run on the lobby plaza (faster than default).
+local Config = require("./Config")
+
 local Avatars = {}
 
 local function root(player: Player): (BasePart?, Humanoid?)
@@ -29,18 +31,57 @@ function Avatars.place(player: Player, stand: BasePart?)
 	end
 end
 
+-- A spot on the lobby plaza near the spawn (scene: Workspace.Lobby.Spawn, else Lobby.Pad).
+local function lobbySpot(): Vector3?
+	local lobby = workspace:FindFirstChild("Lobby")
+	local at = lobby and (lobby:FindFirstChild("Spawn") or lobby:FindFirstChild("Pad"))
+	if at and at:IsA("BasePart") then
+		return at.Position + Vector3.new(math.random(-6, 6), at.Size.Y / 2, math.random(-4, 4))
+	end
+	return nil
+end
+
+-- Plaza walk speed (faster than the Roblox default).
+function Avatars.walk(player: Player)
+	local _, hum = root(player)
+	if hum then
+		hum.WalkSpeed = Config.LOBBY_WALK
+	end
+end
+
+-- After a match: free to run on the plaza again.
 function Avatars.release(player: Player)
 	local hrp, hum = root(player)
 	if not hrp then
 		return
 	end
 	hrp.Anchored = false
-	local lobby = workspace:FindFirstChild("Lobby")
-	local pad = lobby and lobby:FindFirstChild("Pad")
-	if pad and pad:IsA("BasePart") then
-		local off = Vector3.new(math.random(-3, 3), pad.Size.Y / 2 + standHeight(hrp, hum), math.random(-3, 3))
+	local spot = lobbySpot()
+	if spot then
 		local ch = player.Character :: Model
-		ch:PivotTo(CFrame.new(pad.Position + off))
+		ch:PivotTo(CFrame.new(spot + Vector3.new(0, standHeight(hrp, hum), 0)))
+	end
+	Avatars.walk(player)
+end
+
+-- New character outside a match: plaza speed; a spawn off the plaza (old SpawnLocation) is moved onto it.
+function Avatars.spawned(player: Player)
+	local hrp = root(player)
+	local lobby = workspace:FindFirstChild("Lobby")
+	local spawn = lobby and lobby:FindFirstChild("Spawn")
+	if hrp and spawn and spawn:IsA("BasePart") and (hrp.Position - spawn.Position).Magnitude > 120 then
+		Avatars.release(player)
+	else
+		Avatars.walk(player)
+	end
+end
+
+-- Characters respawn on the plaza spawn of the scene.
+function Avatars.home(player: Player)
+	local lobby = workspace:FindFirstChild("Lobby")
+	local spawn = lobby and lobby:FindFirstChild("Spawn")
+	if spawn and spawn:IsA("SpawnLocation") then
+		player.RespawnLocation = spawn
 	end
 end
 

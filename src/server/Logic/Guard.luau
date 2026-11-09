@@ -73,6 +73,22 @@ function Guard.action(verb: any, arg: any, verbs: { [string]: string }): (string
 	return verb, arg
 end
 
+-- Roblox UserId (Studio test players are negative): a non-zero integer.
+function Guard.userId(v: any): number?
+	local id = Guard.int(v, -2 ^ 53, 2 ^ 53)
+	return if id and id ~= 0 then id else nil
+end
+
+-- At most one call per `gap` seconds for each key of `last` (key -> time of the last allowed call).
+function Guard.cooldown(last: { [any]: number }, key: any, now: number, gap: number): boolean
+	local t = last[key]
+	if t and now - t < gap then
+		return false
+	end
+	last[key] = now
+	return true
+end
+
 -- Element id 0..nel-1.
 function Guard.element(v: any, nel: number): number?
 	return Guard.int(v, 0, nel - 1)

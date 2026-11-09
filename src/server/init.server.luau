@@ -7,29 +7,41 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Analytics = require("@self/Analytics")
 local Arenas = require("@self/Arenas")
+local Avatars = require("@self/Avatars")
 local Config = require("@self/Config")
 local Guard = require("@self/Logic/Guard")
 local Lobby = require("@self/Lobby")
 local Modes = require("@self/Modes")
 local Net = require(ReplicatedStorage.Shared.Net)
+local Party = require("@self/Party")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Roster = require("@self/Roster")
 local Runner = require("@self/Runner")
 local Session = require("@self/Session")
+local Watch = require("@self/Watch")
 
 print("[BT] server boot")
 Arenas.init()
+Party.start()
 
 local function onPlayer(player: Player)
 	local r = Roster.add(player)
-	player.CharacterAdded:Connect(function(ch)
+	Avatars.home(player)
+	local function spawned(ch: Model)
 		local hrp = ch:WaitForChild("HumanoidRootPart", 10)
 		local s = r.session
 		if hrp and s and not s.closed then
 			Session.place(s, r)
+		elseif hrp then
+			Avatars.spawned(player)
 		end
-	end)
+	end
+	player.CharacterAdded:Connect(spawned)
+	if player.Character then
+		task.spawn(spawned, player.Character)
+	end
 	Lobby.join(r)
+	Party.joined(r)
 end
 
 Players.PlayerAdded:Connect(onPlayer)
@@ -111,6 +123,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local t0 = os.clock()
 	local now = Roster.now()
 	Lobby.tick(now)
+	Watch.tick(dt)
 	for _, s in table.clone(Session.active()) do
 		if s.closed then
 			continue

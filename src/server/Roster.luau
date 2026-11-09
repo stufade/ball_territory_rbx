@@ -28,6 +28,8 @@ export type Rec = {
 	action: Guard.Bucket,
 	lastTap: number?,
 	state: Net.State?,
+	-- M1.6: arena session watched from the lobby (proximity), party cooldowns
+	cool: { [string]: number },
 }
 
 local recs: { [Player]: Rec } = {}
@@ -56,6 +58,7 @@ function Roster.add(player: Player): Rec
 		action = Guard.bucket(L.actionRate, L.actionBurst, os.clock()),
 		lastTap = nil,
 		state = nil,
+		cool = {},
 	}
 	recs[player] = r
 	return r
@@ -67,6 +70,20 @@ end
 
 function Roster.remove(player: Player)
 	recs[player] = nil
+end
+
+function Roster.find(userId: number): Rec?
+	for _, r in recs do
+		if r.id == userId then
+			return r
+		end
+	end
+	return nil
+end
+
+-- Busy: in a match or in the first-entry pick; party play waits for such members.
+function Roster.busy(r: Rec): boolean
+	return r.session ~= nil or r.introPick ~= nil or r.introE ~= nil
 end
 
 function Roster.all(): { [Player]: Rec }

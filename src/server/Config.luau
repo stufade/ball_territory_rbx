@@ -31,4 +31,14 @@ return {
 	WEAK_FINAL_AIM = { 1.2, 2.4 },
 	-- server stats print period with DebugBotMatches
 	STAT_EVERY = 10,
+	-- M1.6 lobby: walk speed on the plaza (Roblox default 16)
+	LOBBY_WALK = 26,
+	-- spectators: a person on the plaza watches the nearest live arena within WATCH_ENTER studs (flat distance to
+	-- the board), keeps it up to WATCH_LEAVE; at most WATCH_MAX viewers per arena; checked every WATCH_EVERY s
+	WATCH_ENTER = 55,
+	WATCH_LEAVE = 68,
+	WATCH_MAX = 6,
+	WATCH_EVERY = 0.25,
+	-- a friend invite link lets friends join the party this long after the host opened the invite prompt
+	FRIENDS_OPEN = 600,
 }

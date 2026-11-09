@@ -112,6 +112,9 @@ local function sendStart(r: Runner, p: Player, key: buffer)
 	if you and r.phase == "aim" then
 		data.aim = aimOf(r, you)
 	end
+	if you == nil then
+		data.view = true
+	end
 	data.id = r.session.id
 	Remotes.Match:FireClient(p, Net.MatchKind.start, data)
 end

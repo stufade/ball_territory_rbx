@@ -47,6 +47,7 @@ V3.new = function(x: number?, y: number?, z: number?)
 end
 V3.zero = v3(0, 0, 0)
 V3.zAxis = v3(0, 0, 1)
+Mock.Vector3 = V3
 local CF = {
 	new = function(p: any)
 		return { Position = p }
@@ -149,6 +150,15 @@ function Inst.PivotTo(self: any, cf: any)
 	self._pivot = cf
 end
 function Inst.Move(_self: any, _v: any) end
+function Inst.GetJoinData(self: any)
+	return self._join
+end
+function Inst.IsFriendsWithAsync(self: any, id: number)
+	return self._friends[id] == true
+end
+function Inst.SetTeleportData(self: any, data: any)
+	self._teleportData = data
+end
 -- Remotes record what the server sends.
 function Inst.FireClient(self: any, player: any, ...: any)
 	table.insert(player._inbox, { remote = self.Name, args = table.pack(...) })
@@ -232,6 +242,19 @@ function Mock.world(): any
 	end
 
 	local ServerScriptService = new("ServerScriptService")
+	local HttpService = new("HttpService")
+	function HttpService.JSONDecode(_self: any, s: string)
+		return (require("@lune/serde") :: any).decode("json", s)
+	end
+	function HttpService.JSONEncode(_self: any, v: any)
+		return (require("@lune/serde") :: any).encode("json", v)
+	end
+	local teleports = {} :: { any }
+	local TeleportService = new("TeleportService")
+	TeleportService.TeleportInitFailed = signal()
+	function TeleportService.TeleportAsync(_self: any, placeId: number, players: { any }, options: any)
+		table.insert(teleports, { placeId = placeId, players = players, options = options })
+	end
 	local services = {
 		Players = Players,
 		ReplicatedStorage = ReplicatedStorage,
@@ -239,8 +262,10 @@ function Mock.world(): any
 		ServerScriptService = ServerScriptService,
 		CollectionService = CollectionService,
 		AnalyticsService = AnalyticsService,
+		HttpService = HttpService,
+		TeleportService = TeleportService,
 	}
-	local game = new("DataModel", "game")
+	local game = new("DataModel", "game", { PlaceId = 96446158283661, JobId = "job-here" })
 	function game.GetService(_self: any, name: string)
 		return services[name] or error("no service " .. name)
 	end
@@ -250,6 +275,7 @@ function Mock.world(): any
 		services = services,
 		analytics = analytics,
 		arenas = list,
+		teleports = teleports,
 	}
 end
 
@@ -257,6 +283,9 @@ function Mock.player(_world: any, id: number, name: string): any
 	local p = new("Player", name, { UserId = id, DisplayName = name })
 	rawget(p, "_p")._inbox = {}
 	p.CharacterAdded = signal()
+	-- join data of an invite link or teleport; friends of this player (by UserId)
+	rawget(p, "_p")._join = {}
+	rawget(p, "_p")._friends = {}
 	local ch = new("Model", name .. "Char")
 	part("HumanoidRootPart", V3.zero, V3.new(2, 2, 1)).Parent = ch
 	new("Humanoid", "Humanoid", { HipHeight = 2 }).Parent = ch
@@ -310,6 +339,10 @@ function Mock.loader(world: any, logs: { string }, warns: { string })
 			f(...)
 		end,
 		defer = function(f: any, ...: any)
+			f(...)
+		end,
+		-- delays run at once (the flow tests do not wait for them)
+		delay = function(_t: number, f: any, ...: any)
 			f(...)
 		end,
 	}

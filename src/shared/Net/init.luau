@@ -16,6 +16,7 @@ Net.Remote = {
 	State = "State", -- RemoteEvent S->C (st: State)
 	Input = "Input", -- RemoteEvent C->S (kind: number, dx: number?, dy: number?)
 	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?)
+	Party = "Party", -- RemoteEvent S->C (view: PartyView), M1.6
 }
 
 Net.Input = {
@@ -35,6 +36,15 @@ Net.Action = {
 	watch = "watch",
 	leave = "leave",
 	hello = "hello",
+	-- party (M1.6): arg is a UserId where one is needed
+	pcreate = "pcreate",
+	pinvite = "pinvite", -- (userId) invite a player of this server
+	paccept = "paccept", -- (host userId) accept an invite
+	pdecline = "pdecline", -- (host userId)
+	pleave = "pleave",
+	pkick = "pkick", -- (userId), host only
+	pplay = "pplay", -- (Net.Mode) host starts: duel = the two members against each other, ffa = all together
+	pfriends = "pfriends", -- host opened the Roblox friend invite prompt
 }
 
 -- Action "queue" argument.
@@ -53,6 +63,8 @@ Net.MatchKind = {
 	finish = "end",
 	-- own aim before launch, only to its owner: {id, dx, dy}
 	aim = "aim",
+	-- M1.6: the viewer no longer gets this match (walked away or the arena closed): {id}
+	unview = "unview",
 }
 
 -- Hints of the first round (Match "hint" k).
@@ -76,6 +88,13 @@ Net.Limits = {
 	finalTap = 0.2,
 	-- direction components are clamped to this
 	dirMax = 50,
+	-- party: people per party, seconds an invite lives, seconds between invites to the same person,
+	-- seconds between friend invite prompts, invites a party may have pending
+	partyMax = 4,
+	inviteTtl = 30,
+	inviteGap = 3,
+	friendsGap = 5,
+	invitesMax = 6,
 }
 
 Net.SNAP_HZ = 15
@@ -100,6 +119,21 @@ export type MatchStart = {
 	key: buffer,
 	-- own aim direction in the aim phase (rivals' aims are hidden until launch)
 	aim: { number }?,
+	-- M1.6: true for a viewer near the arena (no seat, no HUD, no camera)
+	view: boolean?,
+}
+
+-- Party remote (M1.6): the whole party view of one player, sent on every change.
+export type PartyMember = { userId: number, name: string, busy: boolean }
+export type PartyInvite = { from: number, name: string, endsAt: number }
+export type PartyView = {
+	-- nil when not in a party
+	id: number?,
+	host: number?,
+	members: { PartyMember },
+	invites: { PartyInvite },
+	-- short message to show once ("Party is full", "Couldn't reach your friend's server")
+	note: string?,
 }
 
 export type RulesEvent = { kind: string, d: { [string]: any } }
