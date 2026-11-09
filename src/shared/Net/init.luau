@@ -34,6 +34,7 @@ Net.Action = {
 	choose = "choose",
 	watch = "watch",
 	leave = "leave",
+	hello = "hello",
 }
 
 -- Action "queue" argument.
@@ -101,7 +102,18 @@ export type RulesEvent = { kind: string, d: { [string]: any } }
 export type MatchEvents = { id: number, list: { RulesEvent } }
 export type MatchPhase = { id: number, ph: "aim" | "play" | "rend", endsAt: number }
 export type MatchHint = { id: number, k: string }
-export type RoundEnd = { id: number, win: number, a: number, b: number, pa: number, pb: number, lost: { { number } } }
+export type RoundEnd = {
+	id: number,
+	win: number,
+	-- balls of sides 0 and 1 this round, their land in % of the arena
+	a: number,
+	b: number,
+	pa: number,
+	pb: number,
+	lost: { { number } },
+	-- rounds won by side 0 and side 1
+	score: { number },
+}
 export type Place = { e: number, pct: number, kills: number, powers: number }
 export type MatchEnd = { id: number, mode: ModeName, winner: number, places: { Place } }
 
