@@ -10,6 +10,7 @@ local Remotes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("N
 local Screen = require("./Screen")
 local Hud = require("@self/Hud")
 local Menus = require("@self/Menus")
+local Plaza = require("@self/Plaza")
 local Theme = require("@self/Theme")
 
 local UI = {}
@@ -118,13 +119,18 @@ function UI.start()
 	menu.Visible = false
 	menu.Parent = canvas
 	local lastState: Net.State? = nil
+	-- lobby and search: compact buttons over the running avatar (M1.6), not a full-screen menu
+	local plaza = Plaza.new(canvas, ctx :: any)
 
 	local function rebuild()
 		table.clear(ctx.tickers)
 		table.clear(ctx.frames)
 		menu:ClearAllChildren()
 		local st = lastState
-		if st and st.ph ~= "match" then
+		if st then
+			Plaza.setState(plaza, st)
+		end
+		if st and st.ph ~= "match" and st.ph ~= "lobby" and st.ph ~= "queue" then
 			menu.Visible = true
 			Menus.build(menu, st, ctx)
 		else
@@ -168,6 +174,8 @@ function UI.start()
 			fit()
 			if before ~= ctx.canvas and menu.Visible then
 				rebuild()
+			elseif before ~= ctx.canvas then
+				Plaza.render(plaza)
 			end
 		end)
 	end
@@ -198,6 +206,7 @@ function UI.start()
 		end
 		lastState = st
 		if st.ph == "match" then
+			Plaza.setState(plaza, st)
 			table.clear(ctx.tickers)
 			table.clear(ctx.frames)
 			menu:ClearAllChildren()
@@ -251,7 +260,8 @@ function UI.start()
 	end)
 
 	function onMatch(kind: string, data: any)
-		if typeof(data) ~= "table" then
+		-- a match watched from the plaza has no HUD (Render draws its board)
+		if typeof(data) ~= "table" or data.view == true or kind == Net.MatchKind.unview then
 			return
 		end
 		if kind == Net.MatchKind.start then
@@ -317,6 +327,12 @@ function UI.start()
 		end
 	end)
 
+	Remotes.Party.OnClientEvent:Connect(function(v: Net.PartyView)
+		if typeof(v) == "table" and typeof(v.members) == "table" and typeof(v.invites) == "table" then
+			Plaza.setParty(plaza, v)
+		end
+	end)
+
 	Remotes.Snap.OnClientEvent:Connect(function(buf: buffer)
 		local f = Net.Snap.decode(dec, buf)
 		if f and hud then
@@ -340,6 +356,7 @@ function UI.start()
 		for _, t in ctx.tickers do
 			t()
 		end
+		Plaza.step(plaza)
 	end)
 end
 

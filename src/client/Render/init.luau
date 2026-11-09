@@ -17,6 +17,7 @@ local Field = require(script.Field)
 local Fx = require(script.Fx)
 local Input = require(script.Input)
 local Sfx = require(script.Sfx)
+local Signs = require(script.Signs)
 local Smooth = require(script.Smooth)
 local Stage = require(script.Stage)
 
@@ -45,6 +46,8 @@ type Session = {
 	conns: { RBXScriptConnection },
 	stopInput: (() -> ())?,
 	ended: boolean,
+	-- M1.6: watched from the plaza (no camera, no input, no sounds)
+	view: boolean,
 }
 
 local Render = {}
@@ -76,7 +79,7 @@ local function applyChanges(s: Session, animate: boolean)
 	for _, c in Snap.takeChanged(s.dec) do
 		Cells.set(s.cells, c, s.dec.cells[c + 1], animate)
 	end
-	if Cells.takeCaptured(s.cells) > 0 then
+	if Cells.takeCaptured(s.cells) > 0 and not s.view then
 		Sfx.capture()
 	end
 end
@@ -169,16 +172,19 @@ local function startSession(data: Net.MatchStart)
 		Board.close(board)
 		return
 	end
-	local cam: Cam.Cam? = Cam.start(board)
+	local view = data.view == true
+	local cam: Cam.Cam? = if view then nil else Cam.start(board)
+	Signs.inMatch(not view)
 	local s: Session
 	local field = Field.new(board)
 	local names: { [number]: string } = {}
 	for _, seat in data.seats do
-		if seat.userId > 0 and seat.e ~= data.you then
+		-- a viewer sees every name (bots too): who plays whom
+		if (seat.userId ~= 0 or view) and seat.e ~= data.you then
 			names[seat.e] = seat.name
 		end
 	end
-	local fx = Fx.new(field, Sfx.play, function(amount)
+	local fx = Fx.new(field, if view then function(_: string) end else Sfx.play, function(amount)
 		if s.cam then
 			Cam.addShake(s.cam, amount)
 		end
@@ -208,6 +214,7 @@ local function startSession(data: Net.MatchStart)
 		conns = {},
 		stopInput = nil,
 		ended = false,
+		view = view,
 	}
 	session = s
 	s.actors.aim = data.aim
@@ -224,7 +231,7 @@ local function startSession(data: Net.MatchStart)
 	RunService:BindToRenderStep("BTRender", Enum.RenderPriority.Camera.Value + 2, function(dt)
 		render(s, dt)
 	end)
-	if data.you then
+	if data.you and not view then
 		s.stopInput = Input.start({
 			board = board,
 			you = data.you,
@@ -270,7 +277,7 @@ end
 local function endMatch(s: Session, data: Net.MatchEnd)
 	s.ended = true
 	local won = if s.mode == "duel" then data.winner == s.yourSide else s.you ~= nil and data.winner == s.you
-	if won then
+	if won and not s.view then
 		Sfx.play("win")
 	end
 	Stage.react(s.stage, function(seat)
@@ -296,7 +303,20 @@ local function onMatch(kind: string, data: any)
 		return
 	end
 	local s = session
+	if kind == Net.MatchKind.unview then
+		if s and s.view and s.id == data.id then
+			opening += 1
+			destroy(s)
+		end
+		return
+	end
 	if kind == Net.MatchKind.start then
+		if s and s.view and data.view ~= true and s.id ~= data.id then
+			-- own match replaces the watched one at once
+			opening += 1
+			destroy(s)
+			s = nil
+		end
 		if s and s.id == data.id and s.board.model.Name == data.arena then
 			restartRound(s, data)
 		else
@@ -335,14 +355,19 @@ local function onState(st: any)
 		return
 	end
 	local s = session
-	if s and type(st) == "table" and st.ph ~= "match" and st.ph ~= "result" then
+	-- a watched match lives by Match start / unview, not by own screens
+	if s and not s.view and type(st) == "table" and st.ph ~= "match" and st.ph ~= "result" then
 		opening += 1
 		destroy(s)
+	end
+	if type(st) == "table" and (st.ph == "lobby" or st.ph == "queue") then
+		Signs.inMatch(false)
 	end
 end
 
 function Render.start()
 	Sfx.start()
+	Signs.start()
 	Remotes.Match.OnClientEvent:Connect(onMatch)
 	Remotes.State.OnClientEvent:Connect(onState)
 	workspace:GetAttributeChangedSignal("BTHold"):Connect(function()

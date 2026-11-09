@@ -70,6 +70,8 @@ type ArenaSpec = {
 	gh: number,
 	cs: number,
 	camZ: number,
+	-- floor slot width: arenas stand side by side in one row facing the plaza (+Z)
+	fw: number,
 	-- stands: { x offset from cx, z, top y }
 	stands: { { number } },
 }
@@ -79,11 +81,12 @@ local function arena(a: ArenaSpec): Node
 	local bw, bh = a.gw * a.cs + 1.5, a.gh * a.cs + 1.5
 	local by = 203 + bh / 2
 	local kids: { Node } = {}
-	-- island floor with neon lanes
-	table.insert(kids, part("Floor", { 110, 1, 70 }, { cx, 199.5, -6 }, NAVY))
-	table.insert(kids, neon("LaneFront", { 110, 0.2, 0.8 }, { cx, 200.1, 14 }))
-	table.insert(kids, neon("LaneBack", { 110, 0.2, 0.8 }, { cx, 200.1, -14 }, NEON_PINK))
-	table.insert(kids, part("Edge", { 112, 1.6, 72 }, { cx, 198.6, -6 }, NAVY_DARK))
+	-- floor slot of the arena row (z -20..30) with neon lanes; the plaza continues it in front
+	local fw = a.fw
+	table.insert(kids, part("Floor", { fw, 1, 50 }, { cx, 199.5, 5 }, NAVY))
+	table.insert(kids, neon("LaneFront", { fw, 0.2, 0.8 }, { cx, 200.1, 14 }))
+	table.insert(kids, neon("LaneBack", { fw, 0.2, 0.8 }, { cx, 200.1, -14 }, NEON_PINK))
+	table.insert(kids, part("Edge", { fw, 1.6, 51 }, { cx, 198.6, 4.5 }, NAVY_DARK))
 	-- board with a dark rim and neon edges, on a pedestal
 	local board = part("Board", { bw, bh, 1 }, { cx, by, 0 }, BOARD)
 	board.children = {
@@ -133,6 +136,8 @@ end
 local DUEL_STANDS = { { -14.1, 8, 210.9 }, { 14.1, 8, 210.9 } }
 local FFA_STANDS = { { -19.2, 10, 211.0 }, { 19.2, 10, 211.0 }, { -16.8, 6, 210.2 }, { 16.8, 6, 210.2 } }
 
+-- Arena row (x): Duel1..3 every 52 studs, FFA1 in a 64-stud slot; all boards face the plaza (+Z).
+local ROW = { -78, -26, 26, 84 }
 local arenas: Node = { className = "Folder", children = {} }
 for i = 1, 3 do
 	table.insert(
@@ -140,36 +145,70 @@ for i = 1, 3 do
 		arena({
 			name = `Duel{i}`,
 			mode = "duel",
-			cx = (i - 1) * 300,
+			cx = ROW[i],
 			gw = 16,
 			gh = 14,
 			cs = 1.5,
 			camZ = 22,
+			fw = 52,
 			stands = DUEL_STANDS,
 		})
 	)
 end
 table.insert(
 	arenas.children,
-	arena({ name = "FFA1", mode = "ffa", cx = 900, gw = 24, gh = 20, cs = 1.25, camZ = 26, stands = FFA_STANDS })
+	arena({
+		name = "FFA1",
+		mode = "ffa",
+		cx = ROW[4],
+		gw = 24,
+		gh = 20,
+		cs = 1.25,
+		camZ = 26,
+		fw = 64,
+		stands = FFA_STANDS,
+	})
 )
 
--- Lobby: blue pad with neon border, two light pylons and a dark display board behind the spawn.
+-- Lobby plaza in front of the arena row (y 200, z 30..74, x -104..116). People run here (faster than usual) and
+-- watch the boards; an invisible wall at the rail keeps them out of the match cameras (camera z 22..26).
+local PX0, PX1, PZ0, PZ1 = -104, 116, 30, 74
+local PW, PD = PX1 - PX0, PZ1 - PZ0
+local PCX, PCZ = (PX0 + PX1) / 2, (PZ0 + PZ1) / 2
+local WALL = { Transparency = 1, CanQuery = false, CanTouch = false, CastShadow = false }
+local function wall(name: string, size: { number }, pos: { number }): Node
+	return part(name, size, pos, "#ffffff", nil, WALL)
+end
 local lobbyKids: { Node } = {
-	part("Pad", { 60, 1, 60 }, { 0, 0.25, 0 }, "#1d3a7a"),
-	neon("BorderN", { 60, 0.2, 0.8 }, { 0, 0.85, -29.6 }),
-	neon("BorderS", { 60, 0.2, 0.8 }, { 0, 0.85, 29.6 }),
-	neon("BorderW", { 0.8, 0.2, 60 }, { -29.6, 0.85, 0 }),
-	neon("BorderE", { 0.8, 0.2, 60 }, { 29.6, 0.85, 0 }),
-	neon("Lane", { 3, 0.12, 50 }, { 0, 0.81, 0 }, NEON_PINK),
-	part("Display", { 26, 15, 1 }, { 0, 11, -24 }, BOARD),
-	part("DisplayRim", { 28, 17, 1 }, { 0, 11, -24.6 }, RIM),
-	neon("DisplayEdge", { 27, 0.3, 0.3 }, { 0, 19.05, -23.45 }),
-	part("PylonW", { 3, 10, 3 }, { -22, 5.75, -16 }, PILLAR),
-	neon("PylonWTop", { 3.4, 0.5, 3.4 }, { -22, 10.5, -16 }, NEON_PINK),
-	part("PylonE", { 3, 10, 3 }, { 22, 5.75, -16 }, PILLAR),
-	neon("PylonETop", { 3.4, 0.5, 3.4 }, { 22, 10.5, -16 }),
+	part("Pad", { PW, 1, PD }, { PCX, 199.5, PCZ }, "#1d3a7a"),
+	part("PadEdge", { PW, 1.6, PD }, { PCX, 198.6, PCZ }, NAVY_DARK),
+	-- rail between the plaza and the arenas
+	neon("Rail", { PW, 0.5, 0.5 }, { PCX, 202.2, PZ0 + 0.4 }),
+	part("RailBase", { PW, 1.6, 0.8 }, { PCX, 200.8, PZ0 + 0.4 }, PILLAR),
+	wall("WallFront", { PW, 16, 1 }, { PCX, 208, PZ0 }),
+	wall("WallBack", { PW, 16, 1 }, { PCX, 208, PZ1 + 0.5 }),
+	wall("WallW", { 1, 16, PD + 50 }, { PX0 - 0.5, 208, PCZ - 22 }),
+	wall("WallE", { 1, 16, PD + 50 }, { PX1 + 0.5, 208, PCZ - 22 }),
+	neon("BorderS", { PW, 0.2, 0.8 }, { PCX, 200.1, PZ1 - 0.4 }, NEON_PINK),
+	neon("BorderW", { 0.8, 0.2, PD }, { PX0 + 0.4, 200.1, PCZ }),
+	neon("BorderE", { 0.8, 0.2, PD }, { PX1 - 0.4, 200.1, PCZ }),
+	-- a ring around the spawn and two lanes towards the arenas
+	neon("SpawnRing", { 16, 0.15, 16 }, { 0, 200.05, 56 }, NEON_PINK),
+	neon("LaneW", { 0.6, 0.12, 22 }, { -40, 200.06, 52 }),
+	neon("LaneE", { 0.6, 0.12, 22 }, { 52, 200.06, 52 }),
+	-- light pylons at the back corners
+	part("PylonW", { 3, 10, 3 }, { PX0 + 4, 205, PZ1 - 4 }, PILLAR),
+	neon("PylonWTop", { 3.4, 0.5, 3.4 }, { PX0 + 4, 210.2, PZ1 - 4 }, NEON_PINK),
+	part("PylonE", { 3, 10, 3 }, { PX1 - 4, 205, PZ1 - 4 }, PILLAR),
+	neon("PylonETop", { 3.4, 0.5, 3.4 }, { PX1 - 4, 210.2, PZ1 - 4 }),
 }
+-- Spawn: faces the arenas (-Z). Server sets Player.RespawnLocation to it (src/server/Avatars.luau).
+local spawn = part("Spawn", { 12, 1, 12 }, { 0, 199.6, 56 }, "#2a4fa8")
+spawn.className = "SpawnLocation"
+spawn.properties.Neutral = true
+spawn.properties.Duration = 0
+spawn.properties.CanCollide = true
+table.insert(lobbyKids, spawn)
 local lobby: Node = { className = "Folder", children = lobbyKids }
 
 local function write(path: string, node: Node)
