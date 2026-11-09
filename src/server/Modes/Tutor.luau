@@ -8,6 +8,7 @@
 --   D the final, played alone: 15 s of FINAL vs a rookie bot (Logic/TutorBot), the player starts with more land.
 -- Overlay cues go as Match "tut" (docs/net.md); the end is the usual result screen and Tutorial.complete (T2.2 hook).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local Analytics = require("../Analytics")
 local Config = require("../Config")
@@ -46,6 +47,8 @@ export type Data = {
 	wildAt: number?,
 	first: boolean,
 	evs: { Net.RulesEvent },
+	-- tutorial time (real time times the debug speed); scene timers run on it
+	clock: number,
 	last: { [string]: any }?,
 }
 
@@ -214,7 +217,7 @@ function filter(
 	if seat.rec == nil or d.step == "out" then
 		return false
 	end
-	local now = Roster.now()
+	local now = (s.data :: Data).clock
 	if d.scene == "B" then
 		if kind == IN.power and d.step == "wait" then
 			grab(s, now)
@@ -335,6 +338,7 @@ function Tutor.start(s: Session.Session, now: number)
 		wildAt = nil,
 		first = not Tutorial.isDone(rec.player),
 		evs = {},
+		clock = now,
 		last = nil,
 	}
 	s.data = d
@@ -346,9 +350,18 @@ function Tutor.start(s: Session.Session, now: number)
 	scene(s, "A", now)
 end
 
-function Tutor.tick(s: Session.Session, dt: number, now: number)
+-- Debug: ServerScriptService attribute DebugTutorSpeed (0-4, 1 by default) slows or stops the tutorial (screenshots).
+local function speed(): number
+	local v = ServerScriptService:GetAttribute("DebugTutorSpeed")
+	return if type(v) == "number" and v == v then math.clamp(v, 0, 4) else 1
+end
+
+function Tutor.tick(s: Session.Session, dt: number, realNow: number)
 	if s.st == "round" then
 		local d: Data = s.data
+		dt *= speed()
+		d.clock += dt
+		local now = d.clock
 		local over = Runner.tick(s.runner :: Runner.Runner, dt, now)
 		local evs = d.evs
 		d.evs = {}
@@ -366,14 +379,15 @@ function Tutor.tick(s: Session.Session, dt: number, now: number)
 		else
 			step(s, now)
 		end
-	elseif s.st == "result" and now >= s.endsAt then
+	elseif s.st == "result" and realNow >= s.endsAt then
 		Session.close(s)
 	end
 end
 
 -- "tut" (cue number): the player tapped through the waiting cue.
-function Tutor.action(s: Session.Session, _rec: Roster.Rec, verb: string, arg: number?, now: number)
+function Tutor.action(s: Session.Session, _rec: Roster.Rec, verb: string, arg: number?, _now: number)
 	local d: Data = s.data
+	local now = d.clock
 	if verb ~= Net.Action.tut or s.st ~= "round" or d.wait == 0 or arg ~= d.wait then
 		return
 	end

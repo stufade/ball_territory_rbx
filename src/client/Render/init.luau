@@ -195,6 +195,12 @@ local function startSession(data: Net.MatchStart)
 	for e, word in Rules.Config.WORD do
 		fx.words[e] = word
 	end
+	if data.mode == "tutor" then
+		-- the tutorial overlay (UI/Tutor) draws its own big formula; the board one would repeat it
+		for _, k in Rules.Config.REACTIONS do
+			fx.seen[k] = true
+		end
+	end
 	fx.you = data.you
 	s = {
 		id = data.id,
@@ -350,6 +356,26 @@ local function onMatch(kind: string, data: any)
 	elseif kind == Net.MatchKind.finish then
 		endMatch(s, data)
 	end
+end
+
+-- Viewport point (px) of field coordinates on the own match board, nil without one (T2.1 tutorial overlay).
+function Render.toScreen(x: number, y: number): Vector2?
+	local s = session
+	local cam = workspace.CurrentCamera
+	if not s or s.view or not cam then
+		return nil
+	end
+	local v = cam:WorldToViewportPoint(Board.cframe(s.board, x, y, 0.5).Position)
+	return Vector2.new(v.X, v.Y)
+end
+
+-- Drawn position (field cells) of ball e in the own match.
+function Render.ballPos(e: number): (number?, number?)
+	local s = session
+	if not s or s.view then
+		return nil, nil
+	end
+	return Actors.ballPos(s.actors, e)
 end
 
 -- State leaves the match: anything but match/result tears the world down.

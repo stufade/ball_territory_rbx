@@ -12,6 +12,7 @@ local Hud = require("@self/Hud")
 local Menus = require("@self/Menus")
 local Plaza = require("@self/Plaza")
 local Theme = require("@self/Theme")
+local Tutor = require("@self/Tutor")
 
 local UI = {}
 
@@ -136,6 +137,8 @@ function UI.start()
 	local lastState: Net.State? = nil
 	-- lobby and search: compact buttons over the running avatar (M1.6), not a full-screen menu
 	local plaza = Plaza.new(canvas, ctx :: any)
+	-- T2.1 tutorial overlay over the HUD
+	local tutor = Tutor.new(canvas, ctx :: any)
 
 	local function rebuild()
 		table.clear(ctx.tickers)
@@ -229,6 +232,7 @@ function UI.start()
 			return
 		end
 		-- the result screen draws over the arena; everything else closes the HUD
+		Tutor.stop(tutor)
 		clearHud()
 		if st.ph == "queue" or st.ph == "lobby" then
 			ctx.score = { 0, 0 }
@@ -298,12 +302,19 @@ function UI.start()
 			end)
 			hud = h
 			Hud.layout(h, ctx.canvas, ctx.topbar)
+			if data.mode == "tutor" then
+				Tutor.begin(tutor, h, data)
+			else
+				Tutor.stop(tutor)
+			end
 			return
 		end
 		if data.id ~= matchId then
 			return
 		end
-		if kind == Net.MatchKind.hint and hud then
+		if kind == Net.MatchKind.tut then
+			Tutor.cue(tutor, data)
+		elseif kind == Net.MatchKind.hint and hud then
 			Hud.showHint(hud, data.k)
 		elseif kind == Net.MatchKind.round then
 			local sc: { number }? = data.score
@@ -360,6 +371,7 @@ function UI.start()
 		if hud then
 			Hud.step(hud, dt)
 		end
+		Tutor.step(tutor, dt)
 		for _, f in ctx.frames do
 			f(dt)
 		end

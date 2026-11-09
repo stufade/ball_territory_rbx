@@ -3,6 +3,7 @@
 -- bottom left, jump bottom right stay free). PLAY opens DUEL / 4 PLAYERS (in a party: the host's party modes),
 -- PARTY creates or opens the party (PartyPanel). Search is a small pill at the top. Spec: docs/ui.md.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local PartyPanel = require("./PartyPanel")
@@ -46,6 +47,29 @@ local function small(parent: Instance, text: string, w: number, h: number, x: nu
 	return Theme.button(parent, text, UDim2.fromOffset(w, h), UDim2.fromOffset(x, y), color, nil, 28, RIGHT)
 end
 
+-- After the tutorial (State lobby glow = "play"): PLAY pulses inside a yellow ring and a hand points at it.
+local function glow(layer: Frame, play: TextButton, x: number, y: number)
+	local reduced = Theme.reduced()
+	local ring = Theme.frame(layer, UDim2.fromOffset(196, 98), UDim2.fromOffset(x + 10, y - 10), Theme.YELLOW, RIGHT)
+	ring.BackgroundTransparency = 1
+	Theme.round(ring, 18)
+	Theme.stroke(ring, 6, Theme.YELLOW)
+	local hand = Theme.text(layer, "👉", 84, UDim2.fromOffset(96, 96), UDim2.fromOffset(x - 186, y + 39), {
+		anchor = V2(1, 0.5),
+		stroke = 0,
+	})
+	if reduced then
+		return
+	end
+	local info = TweenInfo.new(0.45, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+	for _, o in { ring :: GuiObject, play } do
+		local s = Instance.new("UIScale")
+		s.Parent = o
+		TweenService:Create(s, info, { Scale = 1.08 }):Play()
+	end
+	TweenService:Create(hand, info, { Position = UDim2.fromOffset(x - 172, y + 39) }):Play()
+end
+
 -- PLAY and its choices, PARTY under it (right edge, above the jump button).
 local function buttons(p: Plaza, layer: Frame)
 	local cv, act = p.ctx.canvas, p.ctx.act
@@ -55,6 +79,10 @@ local function buttons(p: Plaza, layer: Frame)
 	local host = isHost(p)
 	local play =
 		Theme.button(layer, "PLAY", UDim2.fromOffset(176, 78), UDim2.fromOffset(x, y), Theme.GO, Theme.INK, 44, RIGHT)
+	local st = p.st
+	if st and st.glow == "play" and not p.playOpen then
+		glow(layer, play, x, y)
+	end
 	play.Activated:Connect(function()
 		p.playOpen = not p.playOpen
 		Plaza.render(p)
@@ -95,6 +123,11 @@ local function buttons(p: Plaza, layer: Frame)
 	local v = p.party
 	local n = if v and v.id then #v.members else 0
 	local partyBtn = small(layer, if n > 0 then `PARTY {n}/4` else "PARTY +", 176, 56, x, y + 88, Theme.PURPLE)
+	local how = small(layer, "HOW TO PLAY", 176, 50, x, y + 152, Theme.SLOT)
+	how.Activated:Connect(function()
+		p.playOpen = false
+		act(Net.Action.tutor)
+	end)
 	partyBtn.Activated:Connect(function()
 		if n == 0 then
 			act(Net.Action.pcreate)
