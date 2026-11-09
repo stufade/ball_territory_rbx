@@ -12,6 +12,8 @@ local GOLD = Color3.fromHex("#ffd63c")
 local LIVE = Color3.fromHex("#ff4f6a")
 local signs: { [Model]: BillboardGui } = {}
 local hidden = false
+-- arena drawn here as a viewer: its sign drops the "walk up" hint
+local watched: Model? = nil
 
 local function label(parent: Instance, name: string, y: number, h: number, color: Color3, font: Font): TextLabel
 	local t = Instance.new("TextLabel")
@@ -37,7 +39,7 @@ local function refresh(model: Model, gui: BillboardGui)
 	local mode = if model:GetAttribute("Mode") == "ffa" then "4 PLAYERS" else "DUEL"
 	if top and who then
 		if type(live) == "string" and live ~= "" then
-			top.Text = `● LIVE · {mode}`
+			top.Text = if watched == model then `● LIVE · {mode}` else `● LIVE · {mode} · WALK UP TO WATCH`
 			top.TextColor3 = LIVE
 			who.Text = string.upper(live)
 		else
@@ -73,6 +75,14 @@ local function add(inst: Instance)
 		refresh(inst, gui)
 	end)
 	gui.Parent = board
+end
+
+-- The board drawn as a viewer (nil: none).
+function Signs.watching(model: Model?)
+	watched = model
+	for m, gui in signs do
+		refresh(m, gui)
+	end
 end
 
 -- true while the local player plays a match: signs off.

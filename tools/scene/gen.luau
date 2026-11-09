@@ -193,7 +193,11 @@ local lobbyKids: { Node } = {
 	neon("BorderW", { 0.8, 0.2, PD }, { PX0 + 0.4, 200.1, PCZ }),
 	neon("BorderE", { 0.8, 0.2, PD }, { PX1 - 0.4, 200.1, PCZ }),
 	-- a ring around the spawn and two lanes towards the arenas
-	neon("SpawnRing", { 16, 0.15, 16 }, { 0, 200.05, 56 }, NEON_PINK),
+	-- thin square ring around the spawn
+	neon("SpawnN", { 16, 0.12, 0.4 }, { 0, 200.06, 48 }, NEON_PINK),
+	neon("SpawnS", { 16, 0.12, 0.4 }, { 0, 200.06, 64 }, NEON_PINK),
+	neon("SpawnW", { 0.4, 0.12, 16 }, { -8, 200.06, 56 }, NEON_PINK),
+	neon("SpawnE", { 0.4, 0.12, 16 }, { 8, 200.06, 56 }, NEON_PINK),
 	neon("LaneW", { 0.6, 0.12, 22 }, { -40, 200.06, 52 }),
 	neon("LaneE", { 0.6, 0.12, 22 }, { 52, 200.06, 52 }),
 	-- light pylons at the back corners

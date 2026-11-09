@@ -65,6 +65,9 @@ local function destroy(s: Session)
 	if s.cam then
 		Cam.stop(s.cam)
 	end
+	if s.view then
+		Signs.watching(nil)
+	end
 	Stage.destroy(s.stage)
 	Actors.destroy(s.actors)
 	Fx.destroy(s.fx)
@@ -217,6 +220,9 @@ local function startSession(data: Net.MatchStart)
 		view = view,
 	}
 	session = s
+	if view then
+		Signs.watching(board.model)
+	end
 	s.actors.aim = data.aim
 	fx.ballPos = function(e)
 		return Actors.ballPos(s.actors, e)

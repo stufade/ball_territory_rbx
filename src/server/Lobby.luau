@@ -41,6 +41,11 @@ local function sendIntroPick(r: Roster.Rec)
 	end
 end
 
+-- A person already past the first entry (debug fake friend): no starter pick.
+function Lobby.adopt(r: Roster.Rec)
+	byId[r.id] = r
+end
+
 function Lobby.join(r: Roster.Rec)
 	byId[r.id] = r
 	Analytics.step(r.player, Analytics.Step.Join)

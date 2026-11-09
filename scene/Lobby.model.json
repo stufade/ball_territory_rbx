@@ -408,14 +408,14 @@
     },
     {
       "className": "Part",
-      "name": "SpawnRing",
+      "name": "SpawnN",
       "properties": {
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
           0,
-          200.05,
-          56,
+          200.06,
+          48,
           1,
           0,
           0,
@@ -438,7 +438,121 @@
         "Material": "Neon",
         "Size": [
           16,
-          0.15,
+          0.12,
+          0.4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "SpawnS",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          200.06,
+          64,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.309803,
+          0.847058
+        ],
+        "Material": "Neon",
+        "Size": [
+          16,
+          0.12,
+          0.4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "SpawnW",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -8,
+          200.06,
+          56,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.309803,
+          0.847058
+        ],
+        "Material": "Neon",
+        "Size": [
+          0.4,
+          0.12,
+          16
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "SpawnE",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          8,
+          200.06,
+          56,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.309803,
+          0.847058
+        ],
+        "Material": "Neon",
+        "Size": [
+          0.4,
+          0.12,
           16
         ],
         "TopSurface": "Smooth"

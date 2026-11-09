@@ -444,15 +444,22 @@ for _, c in watchers do
 	end
 end
 check(n == 6, `6 viewers at most on one arena (got {n})`)
-local ok = ann.viewing ~= nil
-check(ok, "Ann near Duel1 watches it")
-local t0, b0 = Mock.now(), ann.viewBytes
+-- the cap leaves one of the seven out (server order); follow one who watches
+local v: Client = ann
+for _, c in watchers do
+	if c.viewing then
+		v = c
+		break
+	end
+end
+check(v.viewing ~= nil, "a person near Duel1 watches it")
+local t0, b0 = Mock.now(), v.viewBytes
 run(30)
-local rate = (ann.viewBytes - b0) / (Mock.now() - t0) / 1024
+local rate = (v.viewBytes - b0) / (Mock.now() - t0) / 1024
 check(rate > 0.2 and rate < 20, string.format("viewer traffic %.1f KB/s under 20 KB/s", rate))
-at(ann, 0, 200)
+at(v, 0, 200)
 run(1)
-check(ann.viewing == nil and ann.unviews >= 1, "walking away stops watching")
+check(v.viewing == nil and v.unviews >= 1, "walking away stops watching")
 check(
 	runUntil(15, function()
 		local k = 0
@@ -464,14 +471,14 @@ check(
 	"the freed viewer slot goes to the person waiting near the arena"
 )
 for _, c in watchers do
-	if c ~= ann then
+	if c ~= v then
 		at(c, 0, 300)
 	end
 end
-at(ann, 0, 40)
+at(v, 0, 40)
 check(
 	runUntil(15, function()
-		return ann.viewing ~= nil
+		return v.viewing ~= nil
 	end),
 	"coming back watches again (from the next round if the arena is in its draft)"
 )

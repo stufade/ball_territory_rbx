@@ -54,7 +54,7 @@ local function buttons(p: Plaza, layer: Frame)
 	local party = inParty(p)
 	local host = isHost(p)
 	local play =
-		Theme.button(layer, "PLAY", UDim2.fromOffset(196, 88), UDim2.fromOffset(x, y), Theme.GO, Theme.INK, 48, RIGHT)
+		Theme.button(layer, "PLAY", UDim2.fromOffset(176, 78), UDim2.fromOffset(x, y), Theme.GO, Theme.INK, 44, RIGHT)
 	play.Activated:Connect(function()
 		p.playOpen = not p.playOpen
 		Plaza.render(p)
@@ -69,11 +69,11 @@ local function buttons(p: Plaza, layer: Frame)
 		p.playOpen = false
 	end
 	if p.playOpen then
-		local cx = x - 196 - 10
+		local cx = x - 176 - 10
 		local duelText = if party then "DUEL EACH OTHER" else "DUEL"
 		local ffaText = if party then "4 PLAYERS TOGETHER" else "4 PLAYERS"
-		local duel = small(layer, duelText, 230, 64, cx, y - 20, Theme.GO)
-		local ffa = small(layer, ffaText, 230, 64, cx, y + 52, Theme.PURPLE)
+		local duel = small(layer, duelText, 230, 62, cx, y - 24, Theme.GO)
+		local ffa = small(layer, ffaText, 230, 62, cx, y + 46, Theme.PURPLE)
 		local two = not party or #(p.party :: Net.PartyView).members == 2
 		if not two then
 			duel.BackgroundColor3 = Theme.PANEL_HI
@@ -94,7 +94,7 @@ local function buttons(p: Plaza, layer: Frame)
 	end
 	local v = p.party
 	local n = if v and v.id then #v.members else 0
-	local partyBtn = small(layer, if n > 0 then `PARTY {n}/4` else "PARTY +", 196, 60, x, y + 100, Theme.PURPLE)
+	local partyBtn = small(layer, if n > 0 then `PARTY {n}/4` else "PARTY +", 176, 56, x, y + 88, Theme.PURPLE)
 	partyBtn.Activated:Connect(function()
 		if n == 0 then
 			act(Net.Action.pcreate)

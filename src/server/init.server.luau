@@ -9,6 +9,7 @@ local Analytics = require("@self/Analytics")
 local Arenas = require("@self/Arenas")
 local Avatars = require("@self/Avatars")
 local Config = require("@self/Config")
+local FakeFriend = require("@self/FakeFriend")
 local Guard = require("@self/Logic/Guard")
 local Lobby = require("@self/Lobby")
 local Modes = require("@self/Modes")
@@ -124,6 +125,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local now = Roster.now()
 	Lobby.tick(now)
 	Watch.tick(dt)
+	FakeFriend.tick(now)
 	for _, s in table.clone(Session.active()) do
 		if s.closed then
 			continue

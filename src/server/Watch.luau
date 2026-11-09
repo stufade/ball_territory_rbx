@@ -23,7 +23,7 @@ local function viewers(s: any): number
 end
 
 local function flat(a: Vector3, b: Vector3): number
-	local dx, dz = a.X - b.X, a.Z - b.Z
+	local dx, dz = a.X - b.X, (a.Z - b.Z) * Config.WATCH_DEPTH
 	return math.sqrt(dx * dx + dz * dz)
 end
 
@@ -68,7 +68,7 @@ function Watch.pick(pos: Vector3, current: any): any
 		local d = flat(pos, a.focus)
 		if s == current and d <= Config.WATCH_LEAVE then
 			-- a little stickiness so walking between two arenas does not flip every check
-			d -= 8
+			d -= 4
 		elseif d > Config.WATCH_ENTER or viewers(s) >= Config.WATCH_MAX then
 			continue
 		end

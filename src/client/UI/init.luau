@@ -46,6 +46,21 @@ local function emulationOverlay(player: Player): () -> ()
 		bar(0, off.Y + size.Y, vp.X, vp.Y - off.Y - size.Y)
 		bar(0, 0, off.X, vp.Y)
 		bar(off.X + size.X, 0, vp.X - off.X - size.X, vp.Y)
+		-- touch controls of a phone (844x390 px): dynamic stick resting bottom left, jump button bottom right
+		local function circle(x: number, y: number, d: number, label: string)
+			local c = Instance.new("TextLabel")
+			c.BackgroundColor3 = Color3.new(1, 1, 1)
+			c.BackgroundTransparency = 0.75
+			c.Text = label
+			c.TextColor3 = Color3.new(1, 1, 1)
+			c.TextScaled = true
+			c.Position = UDim2.fromOffset(off.X + x * k, off.Y + y * k)
+			c.Size = UDim2.fromOffset(d * k, d * k)
+			Theme.round(c, 999)
+			c.Parent = gui
+		end
+		circle(60, e.Y - 175, 120, "STICK")
+		circle(e.X - 95, e.Y - 90, 70, "JUMP")
 		for _, r in { { 70, 39 }, { 116, 84 }, { 209, 38 } } do
 			local b = Instance.new("Frame")
 			b.BackgroundColor3 = Color3.fromRGB(25, 27, 32)
