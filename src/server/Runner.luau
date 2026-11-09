@@ -306,10 +306,9 @@ function Runner.input(r: Runner, rec: any, kind: number, dx: number?, dy: number
 				logInput(`{rec.name} final tap dropped: {math.floor((now - (rec.lastTap or 0)) * 1000)} ms`)
 				return
 			end
+			-- лимит считает и отвергнутые правилами тапы, иначе их серия обходит защиту
+			rec.lastTap = now
 			local ok = Rules.redirect(S, e, dx, dy)
-			if ok then
-				rec.lastTap = now
-			end
 			logInput(`{rec.name} final tap {if ok then "ok" else "refused by rules"} t={S.t}`)
 		else
 			local ok = Rules.redirect(S, e, dx, dy)
