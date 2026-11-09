@@ -133,7 +133,10 @@ function UI.start()
 		if kind == Net.MatchKind.hint and hud then
 			Hud.showHint(hud, data.k)
 		elseif kind == Net.MatchKind.round then
-			ctx.score = { data.a or 0, data.b or 0 }
+			local sc: { number }? = data.score
+			if sc then
+				ctx.score = { sc[1] or 0, sc[2] or 0 }
+			end
 			if data.lost then
 				lost = data.lost
 				if hud then
