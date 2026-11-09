@@ -7,6 +7,7 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Rules")).Config
 local Look = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Look"))
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
+local Matchup = require("./Matchup")
 local Theme = require("./Theme")
 
 local Menus = {}
@@ -86,20 +87,6 @@ local function pulse(ctx: Ctx, o: GuiObject, amount: number, speed: number)
 	end)
 end
 
--- Matchup tag of e against foes (duel table): 1 strong, -1 weak, 0 none, and the foe names.
-local function matchup(e: number, foes: { number }): (number, { string }, { string })
-	local good, bad = {}, {}
-	for _, f in foes do
-		if has(Config.DSTRONG[e], f) then
-			table.insert(good, name(f))
-		elseif has(Config.DWEAK[e], f) then
-			table.insert(bad, name(f))
-		end
-	end
-	local tag = if #good > #bad then 1 elseif #bad > #good then -1 else 0
-	return tag, good, bad
-end
-
 local function names(list: { number }?): string
 	if not list or #list == 0 then
 		return "nobody"
@@ -128,9 +115,8 @@ local function card(
 	b.BorderSizePixel = 0
 	b.Size = UDim2.fromOffset(w, h)
 	Theme.round(b, 12)
-	local tag, good, bad = matchup(e, foes)
-	local border = if tag > 0 then Theme.GOOD elseif tag < 0 then Theme.BAD else Theme.FRAME
-	local st = Theme.stroke(b, if tag ~= 0 then 5 else 2.5, border)
+	local chipText, chipColor = Matchup.chip(e, foes, name)
+	local st = Theme.stroke(b, 2.5, Theme.FRAME)
 	st.Name = "Border"
 	Theme.text(b, name(e), 34, UDim2.new(1, -16, 0, 40), UDim2.fromOffset(8, 12), { color = Theme.nameColor(e) })
 	local box = Theme.frame(b, UDim2.fromOffset(112, 112), UDim2.new(0.5, 0, 0, 58), Theme.SLOT, TOP_MID)
@@ -150,7 +136,7 @@ local function card(
 		b,
 		ABOUT[e] or "",
 		20,
-		UDim2.new(1, -20, 0, h - 206 - (if tag ~= 0 then 36 else 4)),
+		UDim2.new(1, -20, 0, h - 206 - (if chipText then 40 else 4)),
 		UDim2.fromOffset(10, 204),
 		{
 			bold = true,
@@ -159,13 +145,11 @@ local function card(
 			stroke = 0,
 		}
 	)
-	if tag ~= 0 then
-		local line = if tag > 0
-			then "STRONG VS " .. string.upper(table.concat(good, ", "))
-			else "WEAK VS " .. string.upper(table.concat(bad, ", "))
-		local chip = Theme.frame(b, UDim2.new(1, 0, 0, 34), UDim2.new(0, 0, 1, -34), border)
-		Theme.round(chip, 10)
-		Theme.text(chip, line, 20, UDim2.new(1, -12, 1, -4), UDim2.fromScale(0.5, 0.5), {
+	if chipText and chipColor then
+		local chip = Theme.frame(b, UDim2.new(1, -12, 0, 36), UDim2.new(0.5, 0, 1, -6), chipColor, V2(0.5, 1))
+		Theme.round(chip, 18)
+		Theme.stroke(chip, 2, Theme.INK)
+		Theme.text(chip, chipText, 22, UDim2.new(1, -12, 1, -4), UDim2.fromScale(0.5, 0.5), {
 			anchor = MID,
 			color = Theme.INK,
 			stroke = 0,
@@ -283,19 +267,21 @@ local function grid(root: Instance, o: GridOpts): Grid
 		UDim2.fromOffset(o.x + (o.w - cw * o.cols) / 2, o.y)
 	)
 	local selected = -1
-	type Cell = { btn: TextButton, art: ImageLabel, glow: Frame, ring: Frame, ringStroke: UIStroke, sel: Frame }
+	type Cell = { btn: TextButton, art: ImageLabel, ring: Frame, ringStroke: UIStroke, sel: Frame, tags: Frame }
 	local cells: { [number]: Cell } = {}
 	local function refresh()
 		for e, c in cells do
 			local col, num = o.mark(e)
-			local tag = matchup(e, o.foes)
 			local can = o.can(e)
 			c.art.ImageTransparency = if can or (col and num) then 0 else 0.6
-			c.glow.Visible = can and tag ~= 0
-			c.glow.BackgroundColor3 = if tag > 0 then Theme.GOOD else Theme.BAD
-			c.ring.Visible = col ~= nil or (can and tag ~= 0)
-			c.ringStroke.Color = col or (if tag > 0 then Theme.GOOD else Theme.BAD)
+			-- the ring only marks a taken ball (whose by colour); matchups are the ▲/▼ pills
+			c.ring.Visible = col ~= nil
+			c.ringStroke.Color = col or Theme.RING
 			c.sel.Visible = e == selected
+			c.tags:ClearAllChildren()
+			if can then
+				Matchup.badges(c.tags, e, o.foes, d)
+			end
 			local badge = c.btn:FindFirstChild("Badge")
 			if badge then
 				badge:Destroy()
@@ -318,15 +304,16 @@ local function grid(root: Instance, o: GridOpts): Grid
 		btn.Size = UDim2.fromOffset(cw, ch)
 		btn.Position = UDim2.fromOffset(i * cw, j * ch)
 		btn.Parent = area
-		local glow = Theme.disc(btn, d + 18, Theme.GOOD, UDim2.fromScale(0.5, 0.5), 0.72)
 		local sel = Theme.disc(btn, d + 22, Color3.new(1, 1, 1), UDim2.fromScale(0.5, 0.5), 0.55)
 		local ring = Theme.ring(btn, d + 10, Theme.GOOD, 5, UDim2.fromScale(0.5, 0.5))
 		local art = Theme.ball(btn, e, d, UDim2.fromScale(0.5, 0.5))
 		art.ZIndex = 3
+		local tags = Theme.clear(btn, UDim2.fromScale(1, 1))
+		tags.ZIndex = 6
 		cells[e] = {
 			btn = btn,
 			art = art,
-			glow = glow,
+			tags = tags,
 			ring = ring,
 			ringStroke = ring:FindFirstChildOfClass("UIStroke") :: UIStroke,
 			sel = sel,
@@ -592,34 +579,6 @@ local function timedTitle(root: Frame, ctx: Ctx, text: string, endsAt: number?, 
 	return t
 end
 
-local function pickStarter(root: Frame, st: Net.State, ctx: Ctx)
-	Theme.backdrop(root)
-	local t = timedTitle(root, ctx, "CHOOSE YOUR ELEMENT", st.endsAt, 8, 14)
-	local y = t.Position.Y.Offset + 60
-	Theme.text(root, "Your first ball. More come later.", 22, UDim2.fromOffset(500, 28), UDim2.new(0.5, 0, 0, y), {
-		anchor = TOP_MID,
-		bold = true,
-		color = Theme.DIM,
-		stroke = 0,
-	})
-	cardRow(root, ctx, st.options or {}, y + 40, {}, function(e)
-		ctx.act(Net.Action.pick, e)
-	end, st.taken)
-	Theme.text(
-		root,
-		"Tap a ball. Time is up: a random one goes.",
-		20,
-		UDim2.fromOffset(500, 24),
-		UDim2.new(0.5, 0, 1, -26),
-		{
-			anchor = TOP_MID,
-			bold = true,
-			color = Theme.DIM,
-			stroke = 0,
-		}
-	)
-end
-
 -- Grid + info + PICK button: the duel draft and the 4-player pick.
 local function gridPicker(
 	root: Frame,
@@ -714,6 +673,54 @@ local function gridPicker(
 	return g
 end
 
+local function pickStarter(root: Frame, st: Net.State, ctx: Ctx)
+	Theme.backdrop(root)
+	local t = timedTitle(root, ctx, "CHOOSE YOUR ELEMENT", st.endsAt, 8, 14)
+	local y = t.Position.Y.Offset + 60
+	Theme.text(root, "Your first ball. More come later.", 22, UDim2.fromOffset(500, 28), UDim2.new(0.5, 0, 0, y), {
+		anchor = TOP_MID,
+		bold = true,
+		color = Theme.DIM,
+		stroke = 0,
+	})
+	local options: { number } = st.options or {}
+	if #options > 5 then
+		-- TEST_ALL_BALLS: all 27 do not fit as cards, the grid of the 4-player pick takes them
+		local w = math.min(ctx.canvas.X - 40, 860)
+		gridPicker(root, ctx, (ctx.canvas.X - w) / 2, y + 36, w, ctx.canvas.Y - y - 36 - 50, {
+			can = function(e)
+				return has(options, e)
+			end,
+			mark = function(_)
+				return nil, nil
+			end,
+			foes = {},
+			send = function(e)
+				ctx.act(Net.Action.pick, e)
+			end,
+			active = true,
+			duel = false,
+		})
+		return
+	end
+	cardRow(root, ctx, options, y + 40, {}, function(e)
+		ctx.act(Net.Action.pick, e)
+	end, st.taken)
+	Theme.text(
+		root,
+		"Tap a ball. Time is up: a random one goes.",
+		20,
+		UDim2.fromOffset(500, 24),
+		UDim2.new(0.5, 0, 1, -26),
+		{
+			anchor = TOP_MID,
+			bold = true,
+			color = Theme.DIM,
+			stroke = 0,
+		}
+	)
+end
+
 local function pickFfa(root: Frame, st: Net.State, ctx: Ctx)
 	Theme.backdrop(root)
 	local options: { number } = st.options or {}
@@ -799,7 +806,11 @@ local function draft(root: Frame, st: Net.State, ctx: Ctx)
 	local mine, theirs = teams[me + 1] or {}, teams[2 - me] or {}
 	local myTurn = st.turn == me
 	local offer: { number } = st.offer or {}
-	local anyMode = false
+	-- TEST_ALL_BALLS gives an "any ball" for every pick: then the whole grid is open from the start
+	local anyLeft = st.anyLeft or (if st.any then 1 else 0)
+	local picksLeft = Config.DUEL_SIZE - #mine
+	local anyAlways = st.any == true and anyLeft > 1 and anyLeft >= picksLeft
+	local anyMode = anyAlways
 	-- left column: both teams, then the free "any ball"
 	local lw = 270
 	local ly = math.max(ctx.topbar.Y, 12)
@@ -849,7 +860,7 @@ local function draft(root: Frame, st: Net.State, ctx: Ctx)
 			end
 			local j = table.find(theirs, e)
 			if j then
-				return Theme.BAD, j
+				return Theme.DIM, j
 			end
 			return nil, nil
 		end,
@@ -861,7 +872,9 @@ local function draft(root: Frame, st: Net.State, ctx: Ctx)
 		waitText = "WAIT",
 		duel = true,
 	})
-	if myTurn and st.any then
+	local legendY = ly + 270
+	if myTurn and st.any and not anyAlways then
+		legendY += Theme.BTN_H + 16
 		local any = Theme.button(
 			root,
 			"ANY BALL",
@@ -886,13 +899,70 @@ local function draft(root: Frame, st: Net.State, ctx: Ctx)
 			end
 			g.refresh()
 		end)
+	elseif anyAlways then
+		Theme.text(root, "TEST: ALL 27 BALLS", 22, UDim2.fromOffset(lw, 26), UDim2.fromOffset(12, legendY), {
+			color = Theme.YELLOW_TXT,
+		})
+		legendY += 36
+	end
+	if #theirs > 0 then
+		Matchup.legend(root, "", UDim2.fromOffset(12, legendY), Vector2.zero)
+		Theme.text(
+			root,
+			"vs " .. sideName(ctx, 1 - me) .. "'S PICKS",
+			20,
+			UDim2.fromOffset(lw, 24),
+			UDim2.fromOffset(12, legendY + 30),
+			{ bold = true, color = Theme.DIM, stroke = 0, align = Enum.TextXAlignment.Left }
+		)
 	end
 end
 
-local function choose(root: Frame, st: Net.State, ctx: Ctx)
+-- The round winner stays with its ball: nothing to choose, just watch the loser pick.
+local function keepScreen(root: Frame, st: Net.State, ctx: Ctx, keep: number)
 	Theme.backdrop(root, 0.12)
 	local me = st.me or ctx.mySide
+	local cv = ctx.canvas
+	local top = safeY(ctx, (cv.X - 640) / 2, 24)
+	Theme.text(root, "YOU WON THE ROUND", 26, UDim2.fromOffset(400, 32), UDim2.new(0.5, 0, 0, top), {
+		anchor = TOP_MID,
+		color = Theme.GOOD_TXT,
+	})
+	local t = Theme.text(
+		root,
+		"YOU KEEP " .. name(keep),
+		54,
+		UDim2.fromOffset(700, 62),
+		UDim2.new(0.5, 0, 0, top + 34),
+		{ anchor = TOP_MID, color = Theme.nameColor(keep), stroke = 6 }
+	)
+	Theme.pop(t, 0, 0.6)
+	local cy = top + 34 + 62 + 100
+	Theme.disc(root, 196, Theme.YELLOW, UDim2.fromOffset(cv.X / 2, cy), 0.8)
+	local art = Theme.ball(root, keep, 170, UDim2.fromOffset(cv.X / 2, cy))
+	Theme.pop(art, 0.1, 0.4)
+	pulse(ctx, art, 0.04, 4)
+	local wait = Theme.text(root, "", 32, UDim2.fromOffset(700, 40), UDim2.new(0.5, 0, 0, cy + 110), {
+		anchor = TOP_MID,
+		color = Theme.TEXT,
+	})
+	local base = sideName(ctx, 1 - me) .. " IS CHOOSING"
+	local fill = Theme.timeBar(root, 420, 10, UDim2.new(0.5, 0, 0, cy + 160), TOP_MID)
+	countdown(ctx, st.endsAt, 10, function(left, k)
+		fill.Size = UDim2.fromScale(k, 1)
+		wait.Text = string.format("%s%s  %d", base, string.rep(".", math.floor(os.clock() * 3) % 4), math.ceil(left))
+	end)
+end
+
+local function choose(root: Frame, st: Net.State, ctx: Ctx)
+	local me = st.me or ctx.mySide
 	ctx.mySide = me
+	local keep = st.keep or -1
+	if keep >= 0 and #(st.left or {}) == 0 then
+		keepScreen(root, st, ctx, keep)
+		return
+	end
+	Theme.backdrop(root, 0.12)
 	local t = timedTitle(root, ctx, "CHOOSE YOUR BALL", st.endsAt, 10, 14)
 	local y = t.Position.Y.Offset + 58
 	local rival = st.rival or -1

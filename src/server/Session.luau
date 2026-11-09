@@ -2,6 +2,7 @@
 -- A session holds one arena from the first screen of a match (draft, pick) to the result screen.
 -- Mode logic lives in Modes/Duel, Modes/Ffa, Modes/Intro; they share the helpers here.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local Analytics = require("./Analytics")
 local Arenas = require("./Arenas")
@@ -59,8 +60,10 @@ function Session.new(mode: Net.ModeName, arena: Arenas.Arena, recs: { Roster.Rec
 	nextId += 1
 	local seats = Config.SEATS[mode]
 	local members = {}
+	-- debug: a lone person takes side 1 (right seat) of a duel, to check the client from both sides
+	local shift = if mode == "duel" and #recs == 1 and ServerScriptService:GetAttribute("DebugSide") == 1 then 1 else 0
 	for i = 1, seats do
-		local r = recs[i]
+		local r = recs[i - shift]
 		members[i] = {
 			rec = r,
 			side = i - 1,
