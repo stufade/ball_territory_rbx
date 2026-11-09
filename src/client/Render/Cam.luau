@@ -1,15 +1,12 @@
 --!strict
 -- Match camera: Scriptable at arena.Camera, FOV widened so the whole board fits, shake on powers and reactions.
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Look = require(ReplicatedStorage.Shared.Look)
 local Board = require(script.Parent.Board)
-local Geo = require(script.Parent.Geo)
+local Screen = require(script.Parent.Parent.Screen)
 
-local BASE_FOV = 70
-local MARGIN = 1.12
+local MARGIN = 1.03
 local BIND = "BTCamera"
 
 export type Cam = {
@@ -23,6 +20,8 @@ export type Cam = {
 
 local Cam = {}
 
+-- Board in the middle of the screen between the two side columns (Screen.COLUMN of the width: plates, avatars,
+-- power button) and under the top strip (land bar, timer). The scene places the stands for this layout.
 local function fit(self: Cam)
 	local cam = workspace.CurrentCamera
 	if not cam then
@@ -32,15 +31,20 @@ local function fit(self: Cam)
 	local home = (b.camera :: BasePart).CFrame
 	local look = home.LookVector
 	local dist = math.max(1, (b.origin.Position - home.Position):Dot(look))
-	local size = cam.ViewportSize
-	-- keep a right column free for the power button (Look.POWER_*, design px of the 960x540 UI canvas)
-	local ui = math.min(size.X / 960, size.Y / 540)
-	local reserve = math.min(size.X * 0.4, (Look.POWER_W + 2 * Look.POWER_PAD) * ui)
-	local aspect = (size.X - reserve) / math.max(1, size.Y)
-	local fov = Geo.fitFov((b.gw + 2) * b.cs / 2, (b.gh + 2) * b.cs / 2, dist, aspect, MARGIN, BASE_FOV)
-	cam.FieldOfView = fov
-	local perPx = 2 * dist * math.tan(math.rad(fov) / 2) / math.max(1, size.Y)
-	self.base = home * CFrame.new(reserve / 2 * perPx, 0, 0)
+	local _, size = Screen.band()
+	local w, h = size.X, math.max(1, size.Y)
+	local ui = math.min(w / Screen.DESIGN_W, h / Screen.DESIGN_H)
+	local top, pad = Screen.TOP_STRIP * ui, 8 * ui
+	local regionW = math.max(1, w * (1 - 2 * Screen.COLUMN))
+	local regionH = math.max(1, h - top - pad)
+	-- board with its rim and neon edges
+	local hw, hh = (b.gw * b.cs + 1.5) / 2 + 1.2, (b.gh * b.cs + 1.5) / 2 + 1.2
+	local f = math.min(regionW / (2 * hw), regionH / (2 * hh)) * dist / MARGIN
+	local bandFov = math.deg(2 * math.atan(h / 2 / f))
+	cam.FieldOfView = Screen.fovFor(bandFov)
+	-- move the camera up so the board centres in the region under the top strip
+	local down = (top + h - pad) / 2 - h / 2
+	self.base = home * CFrame.new(0, down * dist / f, 0)
 end
 
 function Cam.start(board: Board.Board): Cam?
@@ -59,7 +63,7 @@ function Cam.start(board: Board.Board): Cam?
 	cam.CameraType = Enum.CameraType.Scriptable
 	cam.CFrame = self.base
 	fit(self)
-	self.sizeConn = cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+	self.sizeConn = Screen.changed:Connect(function()
 		fit(self)
 	end)
 	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 1, function(dt)
@@ -94,10 +98,14 @@ function Cam.stop(self: Cam)
 	end
 	local cam = workspace.CurrentCamera
 	if cam then
-		cam.CameraType = if self.saved.type == Enum.CameraType.Scriptable
-			then Enum.CameraType.Custom
-			else self.saved.type
-		cam.FieldOfView = self.saved.fov
+		-- the first match can start before the character camera is set up (Fixed): always hand back a follow camera
+		cam.CameraType = Enum.CameraType.Custom
+		cam.FieldOfView = 70
+		local ch = Players.LocalPlayer.Character
+		local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+		if hum then
+			cam.CameraSubject = hum
+		end
 	end
 end
 

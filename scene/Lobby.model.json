@@ -1,39 +1,479 @@
 {
- "className": "Folder",
- "children": [
-  {
-   "name": "Pad",
-   "className": "Part",
-   "properties": {
-    "Size": [
-     60,
-     1,
-     60
-    ],
-    "CFrame": [
-     0,
-     0.25,
-     0,
-     1,
-     0,
-     0,
-     0,
-     1,
-     0,
-     0,
-     0,
-     1
-    ],
-    "Color": [
-     0.666667,
-     0.686275,
-     0.72549
-    ],
-    "Material": "SmoothPlastic",
-    "Anchored": true,
-    "TopSurface": "Smooth",
-    "BottomSurface": "Smooth"
-   }
-  }
- ]
+  "children": [
+    {
+      "className": "Part",
+      "name": "Pad",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          0.25,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "Color": [
+          0.113725,
+          0.22745,
+          0.478431
+        ],
+        "Material": "SmoothPlastic",
+        "Size": [
+          60,
+          1,
+          60
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "BorderN",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          0.85,
+          -29.6,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.211764,
+          0.839215,
+          1
+        ],
+        "Material": "Neon",
+        "Size": [
+          60,
+          0.2,
+          0.8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "BorderS",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          0.85,
+          29.6,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.211764,
+          0.839215,
+          1
+        ],
+        "Material": "Neon",
+        "Size": [
+          60,
+          0.2,
+          0.8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "BorderW",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -29.6,
+          0.85,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.211764,
+          0.839215,
+          1
+        ],
+        "Material": "Neon",
+        "Size": [
+          0.8,
+          0.2,
+          60
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "BorderE",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          29.6,
+          0.85,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.211764,
+          0.839215,
+          1
+        ],
+        "Material": "Neon",
+        "Size": [
+          0.8,
+          0.2,
+          60
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Lane",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          0.81,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.309803,
+          0.847058
+        ],
+        "Material": "Neon",
+        "Size": [
+          3,
+          0.12,
+          50
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Display",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          11,
+          -24,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "Color": [
+          0.094117,
+          0.117647,
+          0.188235
+        ],
+        "Material": "SmoothPlastic",
+        "Size": [
+          26,
+          15,
+          1
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "DisplayRim",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          11,
+          -24.6,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "Color": [
+          0.05098,
+          0.066666,
+          0.141176
+        ],
+        "Material": "SmoothPlastic",
+        "Size": [
+          28,
+          17,
+          1
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "DisplayEdge",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          19.05,
+          -23.45,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.211764,
+          0.839215,
+          1
+        ],
+        "Material": "Neon",
+        "Size": [
+          27,
+          0.3,
+          0.3
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PylonW",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -22,
+          5.75,
+          -16,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "Color": [
+          0.141176,
+          0.207843,
+          0.478431
+        ],
+        "Material": "SmoothPlastic",
+        "Size": [
+          3,
+          10,
+          3
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PylonWTop",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -22,
+          10.5,
+          -16,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.309803,
+          0.847058
+        ],
+        "Material": "Neon",
+        "Size": [
+          3.4,
+          0.5,
+          3.4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PylonE",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          22,
+          5.75,
+          -16,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "Color": [
+          0.141176,
+          0.207843,
+          0.478431
+        ],
+        "Material": "SmoothPlastic",
+        "Size": [
+          3,
+          10,
+          3
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PylonETop",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          22,
+          10.5,
+          -16,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.211764,
+          0.839215,
+          1
+        ],
+        "Material": "Neon",
+        "Size": [
+          3.4,
+          0.5,
+          3.4
+        ],
+        "TopSurface": "Smooth"
+      }
+    }
+  ],
+  "className": "Folder"
 }

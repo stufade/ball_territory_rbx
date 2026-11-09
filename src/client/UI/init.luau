@@ -7,15 +7,55 @@ local RunService = game:GetService("RunService")
 
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"):WaitForChild("Remotes"))
+local Screen = require("./Screen")
 local Hud = require("@self/Hud")
 local Menus = require("@self/Menus")
 local Theme = require("@self/Theme")
 
 local UI = {}
 
-local DESIGN_W, DESIGN_H = 960, 540
-
 local started = false
+
+-- Debug emulation overlay: black bars outside the band and grey stand-ins of the Roblox topbar buttons.
+local function emulationOverlay(player: Player): () -> ()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "BTEmulate"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 1000
+	gui.Parent = player:WaitForChild("PlayerGui")
+	return function()
+		gui:ClearAllChildren()
+		local e = Screen.emulated()
+		if not e then
+			return
+		end
+		local off, size = Screen.band()
+		local k = Screen.k()
+		local function bar(x: number, y: number, w: number, h: number)
+			local f = Instance.new("Frame")
+			f.BorderSizePixel = 0
+			f.BackgroundColor3 = Color3.new(0, 0, 0)
+			f.Position = UDim2.fromOffset(x, y)
+			f.Size = UDim2.fromOffset(w, h)
+			f.Parent = gui
+		end
+		local vp = (workspace.CurrentCamera :: Camera).ViewportSize
+		bar(0, 0, vp.X, off.Y)
+		bar(0, off.Y + size.Y, vp.X, vp.Y - off.Y - size.Y)
+		bar(0, 0, off.X, vp.Y)
+		bar(off.X + size.X, 0, vp.X - off.X - size.X, vp.Y)
+		for _, r in { { 70, 39 }, { 116, 84 }, { 209, 38 } } do
+			local b = Instance.new("Frame")
+			b.BackgroundColor3 = Color3.fromRGB(25, 27, 32)
+			b.BackgroundTransparency = 0.2
+			b.Position = UDim2.fromOffset(off.X + r[1] * k, off.Y + 11 * k)
+			b.Size = UDim2.fromOffset(r[2] * k, 38 * k)
+			Theme.round(b, 999)
+			b.Parent = gui
+		end
+	end
+end
 
 function UI.start()
 	if started then
@@ -31,28 +71,19 @@ function UI.start()
 	gui.DisplayOrder = 10
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	-- Canvas keeps a 960x540 design area at least; UIScale fits it to the real screen.
+	-- Band (the whole screen, or the emulated phone) holds the canvas; UIScale fits 960x540 design px into it.
+	local band = Instance.new("Frame")
+	band.Name = "Band"
+	band.BackgroundTransparency = 1
+	band.BorderSizePixel = 0
+	band.Parent = gui
 	local canvas = Instance.new("Frame")
+	canvas.Name = "Canvas"
 	canvas.BackgroundTransparency = 1
 	canvas.BorderSizePixel = 0
-	canvas.Parent = gui
+	canvas.Parent = band
 	local scale = Instance.new("UIScale")
 	scale.Parent = canvas
-	local function fit()
-		local size = gui.AbsoluteSize
-		if size.X < 1 or size.Y < 1 then
-			return
-		end
-		local s = math.min(size.X / DESIGN_W, size.Y / DESIGN_H)
-		scale.Scale = s
-		canvas.Size = UDim2.fromOffset(size.X / s, size.Y / s)
-	end
-	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-	fit()
-
-	local menu = Theme.frame(canvas, UDim2.fromScale(1, 1), nil, Theme.BG)
-	menu.Name = "Menu"
-	menu.Visible = false
 
 	local ctx: Menus.Ctx = {
 		act = function(verb, arg)
@@ -62,17 +93,89 @@ function UI.start()
 			return if endsAt then math.max(0, endsAt - workspace:GetServerTimeNow()) else 0
 		end,
 		tickers = {},
+		frames = {},
 		seats = {},
 		you = nil,
 		mySide = 0,
 		score = { 0, 0 },
+		rounds = 0,
 		lastEnd = nil,
+		lastRound = nil,
+		teams = { {}, {} },
+		lost = { {}, {} },
+		names = {},
+		topbar = Vector2.new(354, 80),
+		canvas = Vector2.new(960, 540),
 	}
 
+	local overlay = emulationOverlay(player)
 	local hud: Hud.Hud? = nil
+	local menu = Instance.new("Frame")
+	menu.Name = "Menu"
+	menu.BackgroundTransparency = 1
+	menu.Size = UDim2.fromScale(1, 1)
+	menu.Visible = false
+	menu.Parent = canvas
+	local lastState: Net.State? = nil
+
+	local function rebuild()
+		table.clear(ctx.tickers)
+		table.clear(ctx.frames)
+		menu:ClearAllChildren()
+		local st = lastState
+		if st and st.ph ~= "match" then
+			menu.Visible = true
+			Menus.build(menu, st, ctx)
+		else
+			menu.Visible = false
+		end
+	end
+
+	local function fit()
+		local off, size
+		if Screen.emulated() then
+			off, size = Screen.band()
+		else
+			off, size = Vector2.zero, gui.AbsoluteSize
+		end
+		if size.X < 1 or size.Y < 1 then
+			return
+		end
+		band.Position = UDim2.fromOffset(off.X, off.Y)
+		band.Size = UDim2.fromOffset(size.X, size.Y)
+		local s = math.min(size.X / Screen.DESIGN_W, size.Y / Screen.DESIGN_H)
+		scale.Scale = s
+		ctx.canvas = Vector2.new(size.X / s, size.Y / s)
+		canvas.Size = UDim2.fromOffset(ctx.canvas.X, ctx.canvas.Y)
+		-- topbar in design px; with safe insets the canvas may start right of the screen edge
+		local tb = Screen.topbar()
+		ctx.topbar = Vector2.new(math.max(0, tb.X - gui.AbsolutePosition.X) / s + 8, tb.Y / s + 6)
+		overlay()
+		if hud then
+			Hud.layout(hud, ctx.canvas, ctx.topbar)
+		end
+	end
+	local pending = false
+	local function refit()
+		if pending then
+			return
+		end
+		pending = true
+		task.defer(function()
+			pending = false
+			local before = ctx.canvas
+			fit()
+			if before ~= ctx.canvas and menu.Visible then
+				rebuild()
+			end
+		end)
+	end
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
+	Screen.changed:Connect(refit)
+	fit()
+
 	local matchId = -1
 	local dec = Net.Snap.newDecoder()
-	local lost: { { number } } = { {}, {} }
 
 	local function clearHud()
 		if hud then
@@ -82,26 +185,62 @@ function UI.start()
 		matchId = -1
 	end
 
-	Remotes.State.OnClientEvent:Connect(function(st: Net.State)
+	local held: Net.State? = nil
+	local function onState(st: Net.State)
 		if typeof(st) ~= "table" then
 			return
 		end
-		table.clear(ctx.tickers)
-		menu:ClearAllChildren()
+		-- debug: workspace attribute BTHold keeps the current screen (for screenshots of short screens)
+		if workspace:GetAttribute("BTHold") == true then
+			held = st
+			return
+		end
+		lastState = st
 		if st.ph == "match" then
+			table.clear(ctx.tickers)
+			table.clear(ctx.frames)
+			menu:ClearAllChildren()
 			menu.Visible = false
 			return
 		end
+		-- the result screen draws over the arena; everything else closes the HUD
 		clearHud()
 		if st.ph == "queue" or st.ph == "lobby" then
 			ctx.score = { 0, 0 }
-			lost = { {}, {} }
+			ctx.rounds = 0
+			ctx.lost = { {}, {} }
+			ctx.teams = { {}, {} }
 			ctx.lastEnd = nil
-		elseif st.ph == "choose" and st.lost then
-			lost = st.lost
+			ctx.lastRound = nil
 		end
-		menu.Visible = true
-		Menus.build(menu, st, ctx)
+		if st.teams then
+			ctx.teams = st.teams
+		end
+		if st.lost then
+			ctx.lost = st.lost
+		end
+		if st.names then
+			ctx.names = st.names
+		end
+		rebuild()
+	end
+	Remotes.State.OnClientEvent:Connect(onState)
+	-- debug: BallUI.Inject:Fire(st) shows a made-up State locally (screenshots of every screen, docs/ui.md)
+	local inject = Instance.new("BindableEvent")
+	inject.Name = "Inject"
+	inject.Parent = gui
+	inject.Event:Connect(function(st: Net.State)
+		local hold = workspace:GetAttribute("BTHold")
+		workspace:SetAttribute("BTHold", nil)
+		onState(st)
+		workspace:SetAttribute("BTHold", hold)
+	end)
+	workspace:GetAttributeChangedSignal("BTHold"):Connect(function()
+		local st = held
+		if st and workspace:GetAttribute("BTHold") ~= true then
+			held = nil
+			onState(st)
+		end
 	end)
 
 	Remotes.Match.OnClientEvent:Connect(function(kind: string, data: any)
@@ -122,9 +261,11 @@ function UI.start()
 				end
 			end
 			menu.Visible = false
-			hud = Hud.new(canvas, data, lost, function(k, dx, dy)
+			local h = Hud.new(canvas, data, ctx.lost, ctx.score, function(k, dx, dy)
 				Remotes.Input:FireServer(k, dx, dy)
 			end)
+			hud = h
+			Hud.layout(h, ctx.canvas, ctx.topbar)
 			return
 		end
 		if data.id ~= matchId then
@@ -138,14 +279,13 @@ function UI.start()
 				ctx.score = { sc[1] or 0, sc[2] or 0 }
 			end
 			if data.lost then
-				lost = data.lost
-				if hud then
-					Hud.setLost(hud, lost)
-				end
+				ctx.lost = data.lost
 			end
+			ctx.lastRound = data
+			ctx.rounds += 1
 			if hud then
-				local w = if data.win == ctx.mySide then "ROUND WON" elseif data.win < 0 then "DRAW" else "ROUND LOST"
-				Hud.showBanner(hud, w, 2.5)
+				Hud.setLost(hud, ctx.lost)
+				Hud.roundEnd(hud, data, ctx)
 			end
 		elseif kind == Net.MatchKind.finish then
 			ctx.lastEnd = data
@@ -160,9 +300,12 @@ function UI.start()
 	end)
 
 	local acc = 0
-	RunService.Heartbeat:Connect(function(dt)
+	RunService.Heartbeat:Connect(function(dt: number)
 		if hud then
-			Hud.step(hud)
+			Hud.step(hud, dt)
+		end
+		for _, f in ctx.frames do
+			f(dt)
 		end
 		acc += dt
 		if acc < 0.1 then

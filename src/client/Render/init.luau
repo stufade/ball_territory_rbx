@@ -18,6 +18,7 @@ local Fx = require(script.Fx)
 local Input = require(script.Input)
 local Sfx = require(script.Sfx)
 local Smooth = require(script.Smooth)
+local Stage = require(script.Stage)
 
 local Snap = require(ReplicatedStorage.Shared.Net.Snap)
 local SMOOTH_DELAY = 0.1
@@ -37,6 +38,7 @@ type Session = {
 	actors: Actors.Actors,
 	fx: Fx.Fx,
 	cam: Cam.Cam?,
+	stage: Stage.Stage,
 	phase: string,
 	frame: Snap.Frame?,
 	hp: { [number]: number },
@@ -60,6 +62,7 @@ local function destroy(s: Session)
 	if s.cam then
 		Cam.stop(s.cam)
 	end
+	Stage.destroy(s.stage)
 	Actors.destroy(s.actors)
 	Fx.destroy(s.fx)
 	Field.destroy(s.field)
@@ -198,6 +201,7 @@ local function startSession(data: Net.MatchStart)
 		actors = Actors.new(field, data.you, names),
 		fx = fx,
 		cam = cam,
+		stage = Stage.new(board, data),
 		phase = "aim",
 		frame = nil,
 		hp = {},
@@ -250,6 +254,7 @@ local function restartRound(s: Session, data: Net.MatchStart)
 	s.frame = nil
 	s.hp = {}
 	s.phase = "aim"
+	Stage.setSeats(s.stage, data.seats)
 	applyChanges(s, false)
 end
 
@@ -259,6 +264,9 @@ local function endMatch(s: Session, data: Net.MatchEnd)
 	if won then
 		Sfx.play("win")
 	end
+	Stage.react(s.stage, function(seat)
+		return if s.mode == "duel" then seat.side == data.winner else seat.e == data.winner
+	end)
 	for _, c in s.conns do
 		c:Disconnect()
 	end
@@ -296,13 +304,23 @@ local function onMatch(kind: string, data: any)
 		end
 	elseif kind == Net.MatchKind.phase then
 		s.phase = data.ph
+	elseif kind == Net.MatchKind.round then
+		Stage.react(s.stage, function(seat)
+			return seat.side == data.win
+		end)
 	elseif kind == Net.MatchKind.finish then
 		endMatch(s, data)
 	end
 end
 
 -- State leaves the match: anything but match/result tears the world down.
+local held: any = nil
 local function onState(st: any)
+	-- debug: the UI keeps its screen while workspace.BTHold is set; keep the arena too
+	if workspace:GetAttribute("BTHold") == true then
+		held = st
+		return
+	end
 	local s = session
 	if s and type(st) == "table" and st.ph ~= "match" and st.ph ~= "result" then
 		opening += 1
@@ -314,6 +332,13 @@ function Render.start()
 	Sfx.start()
 	Remotes.Match.OnClientEvent:Connect(onMatch)
 	Remotes.State.OnClientEvent:Connect(onState)
+	workspace:GetAttributeChangedSignal("BTHold"):Connect(function()
+		local st = held
+		if st and workspace:GetAttribute("BTHold") ~= true then
+			held = nil
+			onState(st)
+		end
+	end)
 	Players.LocalPlayer.AncestryChanged:Connect(function()
 		if session then
 			destroy(session)
