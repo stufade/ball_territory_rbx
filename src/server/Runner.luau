@@ -42,6 +42,8 @@ export type Runner = {
 	hints: boolean,
 	hinted: { [string]: boolean },
 	steps: number,
+	-- frames that hit MAX_STEPS: the server could not keep the 30 Hz clock
+	capped: number,
 	startedAt: number,
 }
 
@@ -117,6 +119,7 @@ function Runner.new(session: any, S: Rules.State, seats: { Seat }, aim: number, 
 		hints = hints,
 		hinted = {},
 		steps = 0,
+		capped = 0,
 		startedAt = now,
 	}
 	for _, s in seats do
@@ -248,6 +251,7 @@ function Runner.tick(r: Runner, dt: number, now: number): boolean
 			end
 		end
 		if n >= Config.MAX_STEPS then
+			r.capped += 1
 			r.acc = math.min(r.acc, DT)
 		end
 	end

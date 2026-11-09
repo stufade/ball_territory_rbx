@@ -69,8 +69,9 @@ Remotes.Input.OnServerEvent:Connect(function(player, kind, dx, dy)
 	end
 end)
 
--- Stats for M1-6 with DebugBotMatches: rules steps per second per round and server time per frame.
-local stat = { at = os.clock(), frames = 0, busy = 0, worst = 0, steps = {} :: { [any]: number } }
+-- Stats for M1-6 with DebugBotMatches: rules steps per second of each round in play (30 at normal speed, less in
+-- slow motion after a new reaction), frames that hit the catch-up cap, server time per frame.
+local stat = { at = os.clock(), frames = 0, busy = 0, worst = 0, base = {} :: { [any]: { number } } }
 
 local function report()
 	local now = os.clock()
@@ -78,32 +79,32 @@ local function report()
 	if span < Config.STAT_EVERY then
 		return
 	end
-	local rates = {}
+	local rates, base = {}, {}
 	for _, s in Session.active() do
 		local r = s.runner
 		if r and s.st == "round" and r.phase == "play" then
-			local was = stat.steps[r] or r.steps
-			table.insert(rates, string.format("%s %.1f", s.arena.name, (r.steps - was) / span))
-		end
-	end
-	local nextSteps = {}
-	for _, s in Session.active() do
-		if s.runner then
-			nextSteps[s.runner] = s.runner.steps
+			local b = stat.base[r]
+			if b then
+				table.insert(
+					rates,
+					string.format("%s %.1f/s capped %d", s.arena.name, (r.steps - b[1]) / span, r.capped - b[2])
+				)
+			end
+			base[r] = { r.steps, r.capped }
 		end
 	end
 	if ServerScriptService:GetAttribute("DebugBotMatches") == true then
 		print(
 			string.format(
-				"[BT] stats: %d sessions, steps/s [%s], server frame avg %.2f ms, max %.2f ms",
+				"[BT] stats: %d sessions, steps [%s], server frame avg %.2f ms, max %.2f ms",
 				#Session.active(),
-				table.concat(rates, ", "),
+				table.concat(rates, "; "),
 				stat.busy / math.max(1, stat.frames) * 1000,
 				stat.worst * 1000
 			)
 		)
 	end
-	stat.at, stat.frames, stat.busy, stat.worst, stat.steps = now, 0, 0, 0, nextSteps
+	stat.at, stat.frames, stat.busy, stat.worst, stat.base = now, 0, 0, 0, base
 end
 
 RunService.Heartbeat:Connect(function(dt)

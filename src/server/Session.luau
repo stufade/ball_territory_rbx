@@ -175,6 +175,10 @@ function Session.detach(s: Session, rec: Roster.Rec)
 		Avatars.release(rec.player)
 		Roster.lobby(rec)
 	end
+	local m = Session.member(s, rec)
+	if m then
+		m.rec = nil
+	end
 	s.viewers[rec] = nil
 end
 
