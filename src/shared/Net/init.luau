@@ -45,6 +45,9 @@ Net.Action = {
 	pkick = "pkick", -- (userId), host only
 	pplay = "pplay", -- (Net.Mode) host starts: duel = the two members against each other, ffa = all together
 	pfriends = "pfriends", -- host opened the Roblox friend invite prompt
+	-- T2.1 tutorial: "tut" (cue number) = the player tapped through a waiting cue; "tutor" = HOW TO PLAY on the plaza
+	tut = "tut",
+	tutor = "tutor",
 }
 
 -- Action "queue" argument.
@@ -65,6 +68,8 @@ Net.MatchKind = {
 	aim = "aim",
 	-- M1.6: the viewer no longer gets this match (walked away or the arena closed): {id}
 	unview = "unview",
+	-- T2.1: tutorial cue {id, s (scene "A".."D"), k (cue), n (cue number), ...} (docs/net.md)
+	tut = "tut",
 }
 
 -- Hints of the first round (Match "hint" k).
@@ -100,7 +105,7 @@ Net.Limits = {
 Net.SNAP_HZ = 15
 Net.SNAP_MAX = Snap.MAX
 
-export type ModeName = "duel" | "ffa" | "intro"
+export type ModeName = "duel" | "ffa" | "intro" | "tutor"
 
 export type Seat = { e: number, name: string, userId: number, side: number }
 
@@ -179,6 +184,8 @@ export type State = {
 	anyLeft: number?,
 	arena: string?,
 	win: boolean?,
+	-- lobby (T2.1): plaza button to highlight ("play" after the tutorial)
+	glow: string?,
 }
 
 return Net

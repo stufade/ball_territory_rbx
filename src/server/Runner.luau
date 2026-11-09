@@ -25,6 +25,8 @@ export type Seat = {
 	name: string,
 	userId: number,
 	weak: boolean?,
+	-- tutorial bot: ctl set (no smart bot), no prompts, moved by Runner.extra (T2.1)
+	staged: boolean?,
 }
 
 export type Runner = {
@@ -47,6 +49,12 @@ export type Runner = {
 	-- frames that hit MAX_STEPS: the server could not keep the 30 Hz clock
 	capped: number,
 	startedAt: number,
+	-- T2.1 tutorial hooks: clock multiplier (0 = time stands still), input filter (false drops the input, or it
+	-- returns a replacement direction), rules events as they go out, a call after each rules step
+	scale: number,
+	filter: ((seat: Seat, kind: number, dx: number?, dy: number?) -> (boolean, number?, number?))?,
+	watch: ((ev: Net.RulesEvent) -> ())?,
+	extra: ((S: Rules.State) -> ())?,
 }
 
 local function recipients(r: Runner): { Player }
@@ -119,7 +127,8 @@ local function sendStart(r: Runner, p: Player, key: buffer)
 	Remotes.Match:FireClient(p, Net.MatchKind.start, data)
 end
 
--- seats: e, name, userId (0 = bot), side, rec (nil = bot), weak (first-round bot). opts.aim: seconds to aim.
+-- seats: e, name, userId (0 = bot), side, rec (nil = bot), weak (first-round bot), staged (tutorial bot).
+-- aim: seconds to aim; 0 or less starts in play at once (no aim phase, no LAUNCH).
 function Runner.new(session: any, S: Rules.State, seats: { Seat }, aim: number, hints: boolean): Runner
 	local now = workspace:GetServerTimeNow()
 	local r: Runner = {
@@ -140,12 +149,19 @@ function Runner.new(session: any, S: Rules.State, seats: { Seat }, aim: number, 
 		steps = 0,
 		capped = 0,
 		startedAt = now,
+		scale = 1,
+		filter = nil,
+		watch = nil,
+		extra = nil,
 	}
 	for _, s in seats do
 		local b = S.by[s.e]
 		b.name = s.name
 		b.pid = if s.userId ~= 0 then tostring(s.userId) else ""
-		if s.weak then
+		if s.staged then
+			b.ctl = "stage"
+			b.prompts = false
+		elseif s.weak then
 			b.ctl = "weak"
 			b.prompts = false
 			table.insert(r.weak, WeakBot.new(s.e, S.rand, Config.WEAK_PRESS, Config.WEAK_FINAL_AIM))
@@ -155,12 +171,17 @@ function Runner.new(session: any, S: Rules.State, seats: { Seat }, aim: number, 
 			b.ctl = nil
 		end
 	end
+	if aim <= 0 then
+		Rules.launch(S)
+		r.phase = "play"
+		r.endsAt = now + S.round
+	end
 	Rules.drain(S)
 	local key = Snap.keyframe(r.enc, S)
 	for _, p in recipients(r) do
 		sendStart(r, p, key)
 	end
-	fire(r, Net.MatchKind.phase, { ph = "aim", endsAt = r.endsAt })
+	fire(r, Net.MatchKind.phase, { ph = r.phase, endsAt = r.endsAt })
 	if hints then
 		Runner.hint(r, Net.Hint.aim)
 	end
@@ -217,6 +238,9 @@ local function flush(r: Runner)
 			continue
 		end
 		table.insert(list, { kind = ev.kind, d = ev.d })
+		if r.watch then
+			r.watch(ev)
+		end
 		if r.hints then
 			if ev.kind == "ready" then
 				local b = S.by[ev.d.e]
@@ -255,7 +279,7 @@ function Runner.tick(r: Runner, dt: number, now: number): boolean
 			go(r, now)
 		end
 	else
-		r.acc += dt * Rules.timeScale(S)
+		r.acc += dt * Rules.timeScale(S) * r.scale
 		local n = 0
 		while r.acc >= DT and n < Config.MAX_STEPS do
 			r.acc -= DT
@@ -266,6 +290,9 @@ function Runner.tick(r: Runner, dt: number, now: number): boolean
 			Rules.step(S)
 			for _, w in r.weak do
 				WeakBot.step(w, Rules, S)
+			end
+			if r.extra then
+				r.extra(S)
 			end
 			r.steps += 1
 			if S.done then
@@ -307,6 +334,15 @@ function Runner.input(r: Runner, rec: any, kind: number, dx: number?, dy: number
 		return
 	end
 	local S, e = r.S, seat.e
+	if r.filter then
+		local ok, fx, fy = r.filter(seat, kind, dx, dy)
+		if not ok then
+			return
+		end
+		if fx and fy then
+			dx, dy = fx, fy
+		end
+	end
 	if kind == IN.aim or kind == IN.launch then
 		if r.phase ~= "aim" then
 			return

@@ -17,6 +17,7 @@ local Roster = require("./Roster")
 local Rules = require(ReplicatedStorage.Shared.Rules)
 local Runner = require("./Runner")
 local Session = require("./Session")
+local Tutorial = require("./Tutorial")
 local Watch = require("./Watch")
 
 local A = Net.Action
@@ -49,8 +50,16 @@ end
 function Lobby.join(r: Roster.Rec)
 	byId[r.id] = r
 	Analytics.step(r.player, Analytics.Step.Join)
-	r.introPick = { endsAt = r.joinedAt + HELLO_WAIT + Config.INTRO_PICK }
-	sendIntroPick(r)
+	if not Config.TUTORIAL then
+		r.introPick = { endsAt = r.joinedAt + HELLO_WAIT + Config.INTRO_PICK }
+		sendIntroPick(r)
+	elseif Tutorial.isDone(r.player) then
+		-- tutorial done (re-join on this server, or a saved profile of T2.2): straight to the plaza
+		r.first = false
+		Roster.lobby(r)
+	else
+		r.tutor = true
+	end
 end
 
 -- Takes the person's whole queue entry out (a party leaves together); everyone of it goes back to the lobby.
@@ -86,6 +95,7 @@ local function queueJoin(recs: { Roster.Rec }, mode: string, now: number)
 	end
 	for _, r in recs do
 		r.queuedAt = now
+		r.glow = nil
 		Roster.send(r, {
 			ph = "queue",
 			mode = mode :: any,
@@ -118,6 +128,10 @@ local function hello(r: Roster.Rec, now: number)
 	local s = r.session or r.watching
 	if s and s.runner and s.st == "round" then
 		Runner.join(s.runner, r.player)
+		local mode = Modes[s.mode] :: any
+		if r.session == s and mode.hello then
+			mode.hello(s, r)
+		end
 	end
 	Party.send(r)
 end
@@ -148,7 +162,15 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 		end
 		return
 	end
-	if r.introE or (verb == A.queue and Party.action(r, verb, arg, now)) then
+	if r.introE or r.tutor or (verb == A.queue and Party.action(r, verb, arg, now)) then
+		return
+	end
+	if verb == A.tutor then
+		-- HOW TO PLAY on the plaza: the tutorial again
+		unqueue(r)
+		Watch.stop(r)
+		r.glow = nil
+		r.tutor = true
 		return
 	end
 	if verb == A.queue then
@@ -180,9 +202,20 @@ local function startSession(mode: Net.ModeName, arena: Arenas.Arena, recs: { Ros
 	end
 end
 
--- Starts what can start: first rounds, then queue groups, then debug bot matches.
+-- Starts what can start: tutorials and first rounds, then queue groups, then debug bot matches.
 function Lobby.tick(now: number)
 	for _, r in Roster.all() do
+		-- the tutorial starts once the client listens (hello), so it sees the first scene from its start
+		local listening = r.readyAt ~= nil or now - r.joinedAt >= Config.TUT.helloWait
+		if r.tutor and not r.session and listening and Tutorial.ready(r.player) then
+			local arena = Arenas.free("duel")[1]
+			if arena then
+				r.tutor = nil
+				startSession("tutor", arena, { r }, false, now)
+			elseif not r.state or r.state.ph ~= "wait" then
+				Roster.send(r, { ph = "wait", mode = "tutor" })
+			end
+		end
 		local p = r.introPick
 		if p and now >= p.endsAt then
 			local starters = Collection.starters()

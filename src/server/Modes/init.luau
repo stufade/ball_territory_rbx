@@ -3,6 +3,7 @@
 local Duel = require("@self/Duel")
 local Ffa = require("@self/Ffa")
 local Intro = require("@self/Intro")
+local Tutor = require("@self/Tutor")
 
 export type Mode = {
 	start: (any, number) -> (),
@@ -15,6 +16,7 @@ local Modes: { [string]: Mode } = {
 	duel = Duel :: any,
 	ffa = Ffa :: any,
 	intro = Intro :: any,
+	tutor = Tutor :: any,
 }
 
 return Modes

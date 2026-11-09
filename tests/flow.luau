@@ -151,7 +151,7 @@ local function client(c: Client)
 				c.firstMatchAt = c.firstMatchAt or Mock.now()
 				c.echo = nil
 				c.launchSeen = false
-				if data.you then
+				if data.you and data.mode ~= "tutor" then
 					check(type(data.aim) == "table" and #data.aim == 2, "start carries own aim")
 				end
 				if c.keptBall then
@@ -178,6 +178,13 @@ local function client(c: Client)
 				c.lastRound = data
 			elseif kind == "hint" then
 				c.hints[data.k] = true
+			elseif kind == "tut" then
+				-- T2.1 tutorial cues; a waiting "tap" cue is answered (POWER and the direction come from the
+				-- clicks below)
+				c.hints[data.s .. ":" .. data.k] = true
+				if data.wait and data.k == "tap" then
+					action(c, "tut", data.n)
+				end
 			elseif kind == "end" then
 				c.ends += 1
 			end
@@ -346,11 +353,11 @@ check(
 	a.firstMatchAt and a.firstMatchAt - t0 <= 15,
 	`Ann in the first round within 15 s ({a.firstMatchAt and a.firstMatchAt - t0})`
 )
-check(a.match and a.match.mode == "intro" and a.match.w == 16 and a.match.h == 14, "intro on a 16x14 duel arena")
-check(a.hints.aim, "hint aim")
-run(45)
-check(a.hints.power and a.hints.final, "hints power and final")
-check(a.ends >= 1 and b.ends >= 1, "intro rounds ended")
+check(a.match and a.match.mode == "tutor" and a.match.w == 16 and a.match.h == 14, "tutorial on a 16x14 duel arena")
+check(a.hints["A:react"], "tutorial scene A")
+run(60)
+check(a.hints["B:grab"] and a.hints["C:ko"] and a.hints["D:final"], "tutorial scenes B (power), C (KO), D (final)")
+check(a.ends >= 1 and b.ends >= 1, "tutorials ended")
 local steps = {}
 for _, s in world.analytics.steps do
 	if s.player == "Ann" then
@@ -358,7 +365,7 @@ for _, s in world.analytics.steps do
 	end
 end
 check(steps[1] and steps[2] and steps[3] and steps[4] and steps[6] and steps[7], "funnel steps 1-4, 6, 7")
-noErrors("intro")
+noErrors("tutorial")
 
 -- 2. Duel of two people (they queued together after the intro) -------------------
 local took = runUntil(400, function()

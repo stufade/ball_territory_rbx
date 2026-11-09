@@ -21,6 +21,9 @@ export type Rec = {
 	-- intro starter pick before an arena is free
 	introPick: { endsAt: number }?,
 	introE: number?,
+	-- T2.1: the tutorial waits for an arena (first entry or HOW TO PLAY); plaza button to highlight after it
+	tutor: boolean?,
+	glow: string?,
 	session: any?,
 	watching: any?,
 	queuedAt: number?,
@@ -51,6 +54,8 @@ function Roster.add(player: Player): Rec
 		matches = 0,
 		introPick = nil,
 		introE = nil,
+		tutor = nil,
+		glow = nil,
 		session = nil,
 		watching = nil,
 		queuedAt = nil,
@@ -83,7 +88,7 @@ end
 
 -- Busy: in a match or in the first-entry pick; party play waits for such members.
 function Roster.busy(r: Rec): boolean
-	return r.session ~= nil or r.introPick ~= nil or r.introE ~= nil
+	return r.session ~= nil or r.introPick ~= nil or r.introE ~= nil or r.tutor == true
 end
 
 function Roster.all(): { [Player]: Rec }
@@ -93,7 +98,7 @@ end
 -- Sends a State screen. `force` resends even when the screen did not change.
 function Roster.send(r: Rec, st: Net.State, force: boolean?)
 	local old = r.state
-	if not force and old and old.ph == st.ph and st.ph == "lobby" and old.first == st.first then
+	if not force and old and old.ph == st.ph and st.ph == "lobby" and old.first == st.first and old.glow == st.glow then
 		return
 	end
 	r.state = st
@@ -103,7 +108,7 @@ function Roster.send(r: Rec, st: Net.State, force: boolean?)
 end
 
 function Roster.lobby(r: Rec)
-	Roster.send(r, { ph = "lobby", first = r.first })
+	Roster.send(r, { ph = "lobby", first = r.first, glow = r.glow })
 end
 
 return Roster

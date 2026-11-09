@@ -112,6 +112,26 @@ local function action(c: Client, verb: any, arg: any)
 	end
 end
 
+local function input(c: Client, kind: any, dx: any, dy: any)
+	for _, fn in Remotes.Input.OnServerEvent.fns do
+		fn(c.p, kind, dx, dy)
+	end
+end
+
+-- T2.1 tutorial: a waiting cue is answered at once (tap on, POWER, a tap at the enemy).
+local function tutorCue(c: Client, d: any)
+	if not d.wait then
+		return
+	end
+	if d.k == "tap" then
+		action(c, "tut", d.n)
+	elseif d.k == "power" then
+		input(c, 4)
+	elseif d.k == "dir" then
+		input(c, 3, d.x - d.fx, d.y - d.fy)
+	end
+end
+
 local function drive(c: Client)
 	local inbox = c.p._inbox
 	for _, m in inbox do
@@ -133,6 +153,8 @@ local function drive(c: Client)
 					c.matchId = data.id
 					c.seats = data.seats
 				end
+			elseif kind == "tut" then
+				tutorCue(c, data)
 			elseif kind == "unview" then
 				if c.viewing == data.id then
 					c.viewing = nil
