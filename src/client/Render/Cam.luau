@@ -2,6 +2,9 @@
 -- Match camera: Scriptable at arena.Camera, FOV widened so the whole board fits, shake on powers and reactions.
 local RunService = game:GetService("RunService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Look = require(ReplicatedStorage.Shared.Look)
 local Board = require(script.Parent.Board)
 local Geo = require(script.Parent.Geo)
 
@@ -26,11 +29,18 @@ local function fit(self: Cam)
 		return
 	end
 	local b = self.board
-	local look = self.base.LookVector
-	local dist = math.max(1, (b.origin.Position - self.base.Position):Dot(look))
+	local home = (b.camera :: BasePart).CFrame
+	local look = home.LookVector
+	local dist = math.max(1, (b.origin.Position - home.Position):Dot(look))
 	local size = cam.ViewportSize
-	local aspect = size.X / math.max(1, size.Y)
-	cam.FieldOfView = Geo.fitFov(b.gw * b.cs / 2, b.gh * b.cs / 2, dist, aspect, MARGIN, BASE_FOV)
+	-- keep a right column free for the power button (Look.POWER_*, design px of the 960x540 UI canvas)
+	local ui = math.min(size.X / 960, size.Y / 540)
+	local reserve = math.min(size.X * 0.4, (Look.POWER_W + 2 * Look.POWER_PAD) * ui)
+	local aspect = (size.X - reserve) / math.max(1, size.Y)
+	local fov = Geo.fitFov((b.gw + 2) * b.cs / 2, (b.gh + 2) * b.cs / 2, dist, aspect, MARGIN, BASE_FOV)
+	cam.FieldOfView = fov
+	local perPx = 2 * dist * math.tan(math.rad(fov) / 2) / math.max(1, size.Y)
+	self.base = home * CFrame.new(reserve / 2 * perPx, 0, 0)
 end
 
 function Cam.start(board: Board.Board): Cam?

@@ -1,0 +1,30 @@
+{
+ "ball": 128,
+ "ballCols": 8,
+ "ballR": 56.32,
+ "terrainIcon0": 27,
+ "crown": 39,
+ "tile": 64,
+ "frames": 8,
+ "top": [
+  "shock",
+  "burn",
+  "gas",
+  "lava",
+  "toxic",
+  "slime",
+  "water",
+  "ice",
+  "glass",
+  "rock",
+  "sand",
+  "bush"
+ ],
+ "period": {
+  "water": 1.5707963267948966,
+  "burn": 0.39269908169872414,
+  "toxic": 1.6666666666666667,
+  "lava": 6.283185307179586,
+  "gas": 3.141592653589793
+ }
+}

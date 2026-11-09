@@ -161,6 +161,9 @@ function UI.start()
 
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
+		if hud then
+			Hud.step(hud)
+		end
 		acc += dt
 		if acc < 0.1 then
 			return

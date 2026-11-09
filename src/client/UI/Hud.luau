@@ -7,16 +7,34 @@ local TweenService = game:GetService("TweenService")
 
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Rules")).Config
+local Art = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Art"))
+local Look = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Look"))
 local Theme = require("./Theme")
 
 local Hud = {}
 Hud.__index = Hud
 
+local buildPower: (self: any, gui: Frame, e: number) -> ()
+
 local HINTS: { [string]: string } = {
 	aim = "Drag to aim",
 	power = "Tap POWER!",
 	react = "Hit terrain for reactions!",
-	final = "FINAL — tap anywhere to steer",
+	-- final: the board canvas shows FINAL! TAP ANYWHERE TO STEER (Render.Fx)
+}
+
+type Power = {
+	btn: TextButton,
+	fill: Frame,
+	blink: Frame,
+	press: Frame,
+	word: TextLabel,
+	wordStroke: UIStroke,
+	sub: TextLabel,
+	subStroke: UIStroke,
+	scale: UIScale,
+	pressedAt: number,
+	ready: boolean,
 }
 
 type Card = {
@@ -35,11 +53,7 @@ export type Hud = {
 	landBar: Frame,
 	segs: { [number]: Frame },
 	timer: TextLabel,
-	powerBtn: TextButton,
-	powerFill: Frame,
-	powerScale: UIScale,
-	powerLabel: TextLabel,
-	pulse: Tween?,
+	power: Power?,
 	banner: TextLabel,
 	hint: TextLabel,
 	hintArrow: TextLabel,
@@ -48,7 +62,6 @@ export type Hud = {
 	you: number?,
 	roundEnds: number,
 	input: (kind: number, dx: number?, dy: number?) -> (),
-	ready: boolean,
 }
 
 local function reduced(): boolean
@@ -141,6 +154,105 @@ local function makeCard(gui: Frame, seat: Net.Seat, idx: number, mode: string): 
 	return { seat = seat, idx = idx, hp = hp, hpFill = fill, hearts = hearts, elem = elem }
 end
 
+local function plateText(parent: Instance, font: Font, size: number, y: number, stroke: number): (TextLabel, UIStroke)
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1
+	t.FontFace = font
+	t.TextScaled = true
+	t.TextColor3 = Color3.new(1, 1, 1)
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	t.AnchorPoint = Vector2.new(0, 0.5)
+	t.Position = UDim2.fromOffset(104, y)
+	t.Size = UDim2.new(1, -112, 0, size)
+	t.ZIndex = 6
+	local c = Instance.new("UITextSizeConstraint")
+	c.MaxTextSize = size
+	c.Parent = t
+	local s = Instance.new("UIStroke")
+	s.Color = Look.INK
+	s.Thickness = stroke
+	s.LineJoinMode = Enum.LineJoinMode.Round
+	s.Parent = t
+	t.Parent = parent
+	return t, s
+end
+
+local function fillFrame(parent: Instance, color: Color3, z: number): Frame
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.BackgroundColor3 = color
+	f.Size = UDim2.fromScale(1, 1)
+	f.ZIndex = z
+	f.Parent = parent
+	return f
+end
+
+-- Web drawButton: border plate, dark element colour, charge fill, ball art, power word, CHARGING / READY, TAP!
+function buildPower(self: Hud, gui: Frame, e: number)
+	local btn = Instance.new("TextButton")
+	btn.Name = "Power"
+	btn.AutoButtonColor = false
+	btn.Text = ""
+	btn.BorderSizePixel = 0
+	btn.BackgroundColor3 = Color3.fromHex("#464a78")
+	btn.AnchorPoint = Vector2.new(1, 1)
+	btn.Size = UDim2.fromOffset(Look.POWER_W, Look.POWER_H)
+	btn.Position = UDim2.new(1, -Look.POWER_PAD, 1, -Look.POWER_PAD)
+	btn.Parent = gui
+	local inner = fillFrame(btn, Look.dark(e), 2)
+	inner.Position = UDim2.fromOffset(4, 4)
+	inner.Size = UDim2.new(1, -8, 1, -8)
+	inner.ClipsDescendants = true
+	local shade = fillFrame(inner, Color3.new(0, 0, 0), 3)
+	shade.BackgroundTransparency = 0.5
+	local fill = fillFrame(inner, if e == Config.VOID then Color3.fromHex("#6a32c8") else Look.col(e), 4)
+	fill.Size = UDim2.fromScale(0, 1)
+	local blink = fillFrame(inner, Color3.new(1, 1, 1), 5)
+	blink.BackgroundTransparency = 0.72
+	blink.Visible = false
+	local press = fillFrame(inner, Color3.new(1, 1, 1), 5)
+	press.Visible = false
+	local ball = Instance.new("ImageLabel")
+	ball.BackgroundTransparency = 1
+	ball.Image = Art.BALLS
+	ball.ImageRectSize = Vector2.new(Art.BALL, Art.BALL)
+	ball.ImageRectOffset = Art.ballRect(e)
+	local bs = Art.BALL * 36 / Art.BALL_R
+	ball.Size = UDim2.fromOffset(bs, bs)
+	ball.AnchorPoint = Vector2.new(0.5, 0.5)
+	ball.Position = UDim2.new(0, 50, 0.5, 0)
+	ball.ZIndex = 6
+	ball.Parent = inner
+	local word, ws = plateText(inner, Look.FONT, 44, 36, 4)
+	word.Text = Config.WORD[e] or "POWER"
+	local sub, ss = plateText(inner, Look.BOLD, 21, 76, 3)
+	sub.Text = "CHARGING"
+	local scale = Instance.new("UIScale")
+	scale.Parent = btn
+	local p: Power = {
+		btn = btn,
+		fill = fill,
+		blink = blink,
+		press = press,
+		word = word,
+		wordStroke = ws,
+		sub = sub,
+		subStroke = ss,
+		scale = scale,
+		pressedAt = -9,
+		ready = false,
+	}
+	self.power = p
+	btn.Activated:Connect(function()
+		self.input(Net.Input.power)
+		p.pressedAt = os.clock()
+		if not reduced() then
+			scale.Scale = 0.92
+			TweenService:Create(scale, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		end
+	end)
+end
+
 function Hud.new(
 	canvas: Frame,
 	start: Net.MatchStart,
@@ -159,7 +271,6 @@ function Hud.new(
 		you = start.you,
 		roundEnds = start.round,
 		input = input,
-		ready = false,
 		hintToken = 0,
 	} :: any
 	for i, seat in start.seats do
@@ -188,35 +299,10 @@ function Hud.new(
 		UDim2.new(0.5, 0, 0, 44),
 		{ title = true, anchor = Vector2.new(0.5, 0) }
 	)
-	-- power button, right bottom under the thumb
-	local pb = Theme.button(
-		gui,
-		"",
-		UDim2.fromOffset(200, 200),
-		UDim2.new(1, -28, 1, -28),
-		Theme.PANEL,
-		nil,
-		Vector2.new(1, 1)
-	)
-	pb.ClipsDescendants = true
-	Theme.round(pb, 200)
-	pb.Name = "Power"
-	local fill = Theme.frame(pb, UDim2.fromScale(1, 0), UDim2.fromScale(0, 1), Theme.ACCENT, Vector2.new(0, 1))
-	fill.ZIndex = 1
-	self.powerFill = fill
-	local pl = Theme.label(pb, "POWER", 38, UDim2.fromScale(1, 0.4), UDim2.fromScale(0, 0.3), { title = true })
-	pl.ZIndex = 3
-	self.powerLabel = pl
-	self.powerBtn = pb
-	self.powerScale = Instance.new("UIScale")
-	self.powerScale.Parent = pb
-	pb.Activated:Connect(function()
-		input(Net.Input.power)
-		if not reduced() then
-			self.powerScale.Scale = 0.9
-			TweenService:Create(self.powerScale, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-		end
-	end)
+	-- power button: the web drawButton plate in the right column the match camera keeps free
+	if start.you then
+		buildPower(self, gui, start.you)
+	end
 	-- banners
 	self.banner = Theme.label(
 		gui,
@@ -241,7 +327,7 @@ function Hud.new(
 		"▶",
 		70,
 		UDim2.fromOffset(80, 80),
-		UDim2.new(1, -240, 1, -120),
+		UDim2.new(1, -(Look.POWER_W + Look.POWER_PAD + 6), 1, -(Look.POWER_PAD + Look.POWER_H / 2)),
 		{ title = true, anchor = Vector2.new(1, 0.5), color = Theme.ACCENT }
 	)
 	self.hintArrow.Visible = false
@@ -321,48 +407,41 @@ function Hud.onFrame(self: Hud, f: any)
 	local left = math.max(0, self.roundEnds - f.t)
 	self.timer.Text = tostring(math.ceil(left))
 	self.timer.TextColor3 = if left <= 10 then Theme.BAD else Theme.TEXT
-	-- CHOOSE DIRECTION
-	if f.pu >= 0 and f.pu > f.t then
-		self.banner.Visible = true
-		self.banner.Text = string.format("CHOOSE DIRECTION  %.1f", f.pu - f.t)
-	elseif f.final then
-		self.banner.Visible = true
-		self.banner.Text = "FINAL!"
-	elseif self.banner.Text ~= "" and (string.find(self.banner.Text, "CHOOSE") or self.banner.Text == "FINAL!") then
-		self.banner.Visible = false
-		self.banner.Text = ""
-	end
+	-- CHOOSE DIRECTION and FINAL! are drawn on the board canvas (Render.Fx), like the web drawCalls.
 	-- power button
+	local p = self.power
 	local mine = if self.you then info[self.you] else nil
-	if mine then
+	if p and mine then
 		local ch = math.clamp(mine.charge, 0, 1)
-		self.powerFill.Size = UDim2.fromScale(1, ch)
-		local ready = ch >= 1
-		if ready ~= self.ready then
-			self.ready = ready
-			if self.pulse then
-				self.pulse:Cancel()
-				self.pulse = nil
-				self.powerScale.Scale = 1
-			end
-			self.powerLabel.Text = if ready then "POWER!" else "POWER"
-			if ready and not reduced() then
-				local t = TweenService:Create(
-					self.powerScale,
-					TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-					{ Scale = 1.12 }
-				)
-				self.pulse = t
-				t:Play()
-			end
-		end
+		local ready = mine.alive and ch >= 1
+		local pressed = os.clock() - p.pressedAt < 0.35
+		p.fill.Size = UDim2.fromScale(ch, 1)
+		p.fill.BackgroundTransparency = if ready then 0 else 0.3
+		p.btn.BackgroundColor3 = if ready or pressed then Look.FRAME else Color3.fromHex("#464a78")
+		p.press.Visible = pressed
+		local ink = pressed
+		p.word.TextColor3 = if ink then Look.INK else Color3.new(1, 1, 1)
+		p.sub.TextColor3 = p.word.TextColor3
+		p.wordStroke.Enabled = not ink
+		p.subStroke.Enabled = not ink
+		p.sub.Text = if pressed
+			then "TAP!"
+			elseif not mine.alive then "RESPAWNING"
+			elseif ready then "READY, TAP!"
+			else "CHARGING"
+		p.ready = ready
+	end
+end
+
+-- Blink of a ready power plate (web: white 28% while sin(t*14) > 0); called every render frame.
+function Hud.step(self: Hud)
+	local p = self.power
+	if p then
+		p.blink.Visible = p.ready and not reduced() and math.sin(os.clock() * 14) > 0
 	end
 end
 
 function Hud.destroy(self: Hud)
-	if self.pulse then
-		self.pulse:Cancel()
-	end
 	self.gui:Destroy()
 end
 

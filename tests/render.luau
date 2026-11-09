@@ -5,6 +5,7 @@ local Rules = require("@rules")
 local Geo = require("../src/client/Render/Geo")
 local Smooth = require("../src/client/Render/Smooth")
 local Snap = require("../src/shared/Net/Snap")
+local Art = require("../src/shared/Art")
 
 local fails = 0
 local function check(cond: boolean, msg: string)
@@ -142,6 +143,21 @@ end
 
 -- angle interpolation takes the short way
 check(near(Geo.angleLerp(6.2, 0.1, 0.5), 6.2 + ((0.1 - 6.2 + math.pi) % (2 * math.pi) - math.pi) * 0.5), "angle lerp")
+
+-- art atlases (assets/art/layout.json): ball slots 8 per row, terrain row per Config.TOP layer
+do
+	local x, y = Art.ballXY(0)
+	check(x == 0 and y == 0, "ball slot 0")
+	x, y = Art.ballXY(26)
+	check(x == 2 * 128 and y == 3 * 128, "ball slot 26 (candy)")
+	x, y = Art.ballXY(Art.CROWN)
+	check(x == 7 * 128 and y == 4 * 128, "crown slot")
+	x, y = Art.tileXY(#TOP, 1, 7)
+	check(x == 15 * 64 and y == (#TOP - 1) * 64, "last terrain tile")
+	for name in Art.PERIOD do
+		check(table.find(TOP, name) ~= nil, "animated layer " .. name .. " is a TOP layer")
+	end
+end
 
 if fails > 0 then
 	print(fails .. " checks failed")

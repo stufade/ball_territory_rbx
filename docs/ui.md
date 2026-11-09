@@ -33,3 +33,20 @@
 
 ## Допущения по протоколу
 Счёт раундов берётся из `round.score`, `a`/`b` (шары раунда) UI не использует, `me` — сторона 0/1, HP 0..100.
+
+# V1 (M1.5): поле, шары и эффекты как в вебе
+
+Эталон — `ball_territory_web/public/index.html` (drawField, drawCell, drawBall, applyFx, reactionFx, drawCalls, drawButton).
+
+**Арт.** `tools/art/export.mjs` (node + puppeteer-core из `ball_territory_web/node_modules`, Chrome) вырезает из `index.html` сами функции `icon/ballArt/terrain/terrainIcon/crownArt` и рисует ими атласы в `assets/art/`: `balls.png` (8×5 по 128: 0–26 `ballArt(e)`, 27–38 `terrainIcon` слоёв `Config.TOP`, 39 корона), `terrain.png` (64 px, строка = слой `Config.TOP`, столбец = `chk*8 + кадр`, у анимированных слоёв 8 кадров на цикл), `icons.png` (белые иконки). Загружены через Studio MCP `upload_image`, id в `src/shared/Art.luau`. Перегенерация: `node tools/art/export.mjs`, затем загрузить и обновить id.
+
+**Палитра и шрифт.** `src/shared/Look.luau` — `RGB/COL/LIGHT/DARK/BRIGHT/NAMECOL/PATTERN/RXCOL/BIG` веба. Archivo Black → Montserrat Heavy (900), мелкий текст Arimo Bold, обводка `UIStroke` #0e0a22 толщиной как `stroke` веба.
+
+**Поле — холст.** `Render/Field.luau`: невидимая Part перед `Board` арены с `SurfaceGui` (`PixelsPerStud = 34 / CellSize`, `LightInfluence = 0`), то есть клетка = 34 px, как `CELL` веба, и рисунок переносится один в один. Почему не Part на клетку: текстуры, узоры, вспышки и текст поверх поля на GUI дают точные цвета canvas, без света и материалов. Слои: рамка #f0f0fc, клетки, «под шарами» (дыры, прицел), шары, эффекты, тонировка; `Root` трясётся и приближается к реакции (как `fx.shake/zoom/focus`), крупные слова (`Calls`) лежат над ним неподвижно.
+- `Render/Cells.luau` — `drawCell`: цвет стихии владельца в шахматку (×0,94 / ×0,86), узоры `PATTERN`, пустые клетки #2e325c/#282c50, плитка слоя из атласа (вода, огонь, токсин, лава, газ анимированы), угасание пульсирует, захват — белая вспышка `0,74^(dt·30)`.
+- `Render/Actors.luau` — `drawBall`: `ballArt` с иконкой, две головы-шипа, тень-кольцо, кольцо заряда (40 сегментов), свечение готовой силы, раш/замедление/оглушение, мигание неуязвимости, полоска HP < 100, «YOU» (у людей — имя), прицел пунктиром с мишенью в фазе `aim`, клоны, пузыри, бомбы, чёрные дыры, кольцо роста растения.
+- `Render/Fx.luau` — все события `applyFx` и `reactionFx`: частицы (пул 300), кольца, лучи, молнии, слово силы над шаром, огромные слова реакций цвета `RXCOL` с подпрыгиванием 0,6→1,3→1, формула «шар + слой = СЛОВО» при первой реакции, FINAL! с «TAP ANYWHERE TO STEER», полоса CHOOSE DIRECTION, «-5» урона, тонировка, встряска, пауза удара (проигрывание снимков ×0,15 на 0,05–0,12 с).
+
+**Кнопка силы** (`UI/Hud.luau`, `drawButton`): плашка `Look.POWER_W × POWER_H` = 300×112 справа внизу, рамка #464a78 (готова — #f0f0fc), фон `DARK[e]` под 50 % чёрного, заливка `COL[e]` по заряду, `ballArt`, слово силы, «CHARGING / READY, TAP! / RESPAWNING / TAP!», мигание готовой. Камера матча (`Render/Cam.luau`) держит правую колонку этой ширины свободной и сдвигает поле влево, поэтому кнопка не перекрывает поле ни на ПК, ни на телефоне.
+
+**HUD-баннеры** CHOOSE DIRECTION и FINAL! теперь рисует поле; подсказка `final` в HUD убрана, чтобы не дублировать.

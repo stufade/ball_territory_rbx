@@ -13,8 +13,8 @@ local Actors = require(script.Actors)
 local Board = require(script.Board)
 local Cam = require(script.Cam)
 local Cells = require(script.Cells)
+local Field = require(script.Field)
 local Fx = require(script.Fx)
-local Geo = require(script.Geo)
 local Input = require(script.Input)
 local Sfx = require(script.Sfx)
 local Smooth = require(script.Smooth)
@@ -32,6 +32,7 @@ type Session = {
 	mode: string,
 	dec: Snap.Decoder,
 	smooth: Smooth.Buffer,
+	field: Field.Field,
 	cells: Cells.Cells,
 	actors: Actors.Actors,
 	fx: Fx.Fx,
@@ -61,6 +62,7 @@ local function destroy(s: Session)
 	end
 	Actors.destroy(s.actors)
 	Fx.destroy(s.fx)
+	Field.destroy(s.field)
 	Board.close(s.board)
 	if session == s then
 		session = nil
@@ -93,16 +95,53 @@ local function onSnap(s: Session, buf: buffer)
 	end
 end
 
+-- Hot terrain under the balls and burning cells for the web ambient() sparks.
+local function ambient(s: Session)
+	local f = s.frame
+	if not f then
+		return
+	end
+	local hot: { [string]: { number } } = { burn = {}, lava = {}, toxic = {} }
+	for c, layer in s.cells.layerOf do
+		local list = hot[layer]
+		if list then
+			table.insert(list, c)
+		end
+	end
+	local balls = {}
+	local bd = s.board
+	for _, b in f.balls do
+		if b.alive then
+			local x, y = Actors.ballPos(s.actors, b.e)
+			if x and y then
+				local i, j = math.floor(x) - bd.ox, math.floor(y) - bd.oy
+				local layer = if i >= 0
+						and j >= 0
+						and i < bd.gw
+						and j < bd.gh
+					then s.cells.layerOf[j * bd.gw + i]
+					else nil
+				table.insert(balls, { e = b.e, x = x, y = y, layer = layer })
+			end
+		end
+	end
+	Fx.ambient(s.fx, hot, balls)
+end
+
 local function render(s: Session, dt: number)
-	local head = s.smooth:update(dt)
+	-- hit pause: hold the playback a moment on hits, KOs and reactions (the web slow motion feel)
+	local head = s.smooth:update(if s.fx.pause > 0 then dt * 0.15 else dt)
 	if head then
 		local a, b, t = s.smooth:sample(head)
 		if a and b then
-			Actors.update(s.actors, a, b, t)
+			Actors.update(s.actors, a, b, t, s.fx.now, s.phase == "aim")
 		end
 	end
-	Cells.update(s.cells, dt)
-	Fx.update(s.fx, dt)
+	Cells.update(s.cells, dt, s.fx.now)
+	if (s.phase == "play" or s.phase == "aim") and math.random() < 0.3 then
+		ambient(s)
+	end
+	Fx.update(s.fx, dt, s.frame)
 end
 
 local function startSession(data: Net.MatchStart)
@@ -118,7 +157,6 @@ local function startSession(data: Net.MatchStart)
 		end
 		return
 	end
-	local slots = Geo.slots(data.seats, data.you)
 	local sideOf: { [number]: number } = {}
 	for _, seat in data.seats do
 		sideOf[seat.e] = seat.side
@@ -130,14 +168,22 @@ local function startSession(data: Net.MatchStart)
 	end
 	local cam: Cam.Cam? = Cam.start(board)
 	local s: Session
-	local fx = Fx.new(board, function(amount)
+	local field = Field.new(board)
+	local names: { [number]: string } = {}
+	for _, seat in data.seats do
+		if seat.userId > 0 and seat.e ~= data.you then
+			names[seat.e] = seat.name
+		end
+	end
+	local fx = Fx.new(field, Sfx.play, function(amount)
 		if s.cam then
 			Cam.addShake(s.cam, amount)
 		end
-	end, Sfx.play)
+	end)
 	for e, word in Rules.Config.WORD do
-		fx.words[tostring(e)] = word
+		fx.words[e] = word
 	end
+	fx.you = data.you
 	s = {
 		id = data.id,
 		board = board,
@@ -147,8 +193,9 @@ local function startSession(data: Net.MatchStart)
 		mode = data.mode,
 		dec = dec,
 		smooth = Smooth.new(SMOOTH_DELAY),
-		cells = Cells.new(board, Rules.Config.TOP, slots),
-		actors = Actors.new(board, slots, data.you),
+		field = field,
+		cells = Cells.new(field, Rules.Config.TOP),
+		actors = Actors.new(field, data.you, names),
 		fx = fx,
 		cam = cam,
 		phase = "aim",
@@ -159,6 +206,9 @@ local function startSession(data: Net.MatchStart)
 		ended = false,
 	}
 	session = s
+	fx.ballPos = function(e)
+		return Actors.ballPos(s.actors, e)
+	end
 	applyChanges(s, false)
 	table.insert(
 		s.conns,
