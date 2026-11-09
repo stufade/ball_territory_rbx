@@ -108,7 +108,9 @@ end
 -- "SEARCHING... 2 PLAYERS · BOTS IN 4s  [CANCEL]" at the top middle.
 local function pill(p: Plaza, layer: Frame, st: Net.State)
 	local cv = p.ctx.canvas
-	local box = Theme.frame(layer, UDim2.fromOffset(470, 64), UDim2.fromOffset(cv.X / 2, 12), Theme.PANEL, TOP_MID)
+	-- centred, but never over the Roblox topbar buttons at the top left
+	local cx = math.max(cv.X / 2, p.ctx.topbar.X + 245)
+	local box = Theme.frame(layer, UDim2.fromOffset(470, 64), UDim2.fromOffset(cx, 12), Theme.PANEL, TOP_MID)
 	box.BackgroundTransparency = 0.1
 	Theme.round(box, 32)
 	Theme.stroke(box, 3, Theme.INK)
@@ -130,7 +132,7 @@ local function pill(p: Plaza, layer: Frame, st: Net.State)
 	local n = st.humans or 1
 	local function tick()
 		local dots = string.rep(".", 1 + math.floor(os.clock() * 2) % 3)
-		word.Text = `SEARCHING{dots} {mode}`
+		word.Text = `SEARCHING {mode}{dots}`
 		local left = if st.endsAt then math.max(0, st.endsAt - workspace:GetServerTimeNow()) else 0
 		sub.Text = `{n} PLAYER{if n == 1 then "" else "S"} · `
 			.. (if left > 0 then `BOTS IN {math.ceil(left)}s` else "BOTS JOINING")
