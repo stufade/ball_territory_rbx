@@ -227,6 +227,15 @@ local function run(seconds: number, each: (() -> ())?)
 	end
 end
 
+-- Runs until cond() or the time limit; returns the seconds it took.
+local function runUntil(limit: number, cond: () -> boolean): number
+	local t = Mock.now()
+	while Mock.now() - t < limit and not cond() do
+		run(1)
+	end
+	return Mock.now() - t
+end
+
 local function noErrors(what: string)
 	for _, w in warns do
 		print("WARN: " .. w)
@@ -259,7 +268,10 @@ check(steps[1] and steps[2] and steps[3] and steps[4] and steps[6] and steps[7],
 noErrors("intro")
 
 -- 2. Duel of two people (they queued together after the intro) -------------------
-run(150)
+local took = runUntil(400, function()
+	return a.ends >= 2 and b.ends >= 2
+end)
+print(`duel took {math.floor(took)} s`)
 check(a.ends >= 2 and b.ends >= 2, `duel finished (Ann {a.ends}, Bob {b.ends})`)
 check(a.starts >= 3, "duel had rounds")
 check(a.duelWith.Bob and b.duelWith.Ann, "Ann and Bob in one duel (M1-9 with a person)")
@@ -275,15 +287,24 @@ end)(), "funnel step SecondMatch")
 noErrors("duel")
 
 -- 3. 4-player match: Ann plus a leaver plus bots; Cid leaves mid-match --------------
-local cid = join("Cid", { "ffa" }, Mock.now() + 70)
-run(130)
+local cid = join("Cid", { "ffa" })
+runUntil(120, function()
+	return cid.st and cid.st.ph == "match" and cid.match and cid.match.mode == "ffa"
+end)
+run(20)
+leave(cid)
+runUntil(120, function()
+	return a.ends >= 3
+end)
 check(cid.gone and cid.leftInMatch, "Cid left in the middle of the match")
 check(a.ends >= 3, `ffa finished for Ann after Cid left (ends {a.ends})`)
 noErrors("ffa with a leaver")
 
 -- 4. Duel of one person against a bot --------------------------------------------
 local dan = join("Dan", { "duel" })
-run(250)
+runUntil(450, function()
+	return dan.ends >= 2
+end)
 check(dan.ends >= 2, `Dan's duel with a bot finished ({dan.ends})`)
 check(dan.duelWith.BOT, "Dan played a bot")
 noErrors("duel vs bot")
