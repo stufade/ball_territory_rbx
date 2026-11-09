@@ -52,6 +52,20 @@ function Rules.aim(S: State, e: number, dx: number, dy: number): boolean
 	return true
 end
 
+-- Direction a ball really gets from an aim (dx, dy): what Core.steer and Core.turn make of it, nil if too short.
+-- The client draws its own aim with it, so the line matches the flight.
+function Rules.aimDir(dx: number, dy: number): (number?, number?)
+	if not finite(dx) or not finite(dy) then
+		return nil, nil
+	end
+	local probe = { dx = 0, dy = 0 }
+	Core.steer(probe :: any, dx, dy)
+	if probe.dx == 0 and probe.dy == 0 then
+		return nil, nil
+	end
+	return probe.dx, probe.dy
+end
+
 -- Start of play: normalises every direction.
 function Rules.launch(S: State)
 	S.launched = true

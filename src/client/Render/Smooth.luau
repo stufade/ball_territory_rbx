@@ -22,9 +22,14 @@ function Smooth.reset(self: Buffer)
 	self.newest = -1
 end
 
--- Frames arrive in seq order; one with t not newer than the last is dropped.
+-- Frames arrive in seq order; an older t is dropped. The same t replaces the newest frame: match time stands still
+-- before launch, and dropping those frames froze the picture on the first one (the W3 aim bug).
 function Smooth.push(self: Buffer, t: number, frame: any)
-	if t <= self.newest then
+	if t < self.newest then
+		return
+	end
+	if t == self.newest then
+		self.entries[#self.entries].frame = frame
 		return
 	end
 	self.newest = t

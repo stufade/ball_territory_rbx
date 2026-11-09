@@ -50,6 +50,19 @@ type Client = {
 	loserChose: boolean,
 	duelWith: { [string]: boolean },
 	leftInMatch: boolean,
+	-- W3: own aim vector, the server echo, the first launched frame of the round, hidden frames before launch
+	aim: { number },
+	echo: { number }?,
+	launchSeen: boolean,
+	launchOk: number,
+	launchBad: number,
+	hiddenOk: number,
+	hiddenBad: number,
+	lastRound: any,
+	keepSeen: number,
+	keepBad: number,
+	keptBall: number?,
+	keptOk: number,
 }
 
 local clients: { Client } = {}
@@ -91,6 +104,18 @@ local function join(name: string, plan: { string }, leaveAt: number?): Client
 		loserChose = false,
 		duelWith = {},
 		leftInMatch = false,
+		aim = if name == "Ann" then { -1, 0.6 } elseif name == "Bob" then { 0.5, 1 } else { 1, 0.5 },
+		echo = nil,
+		launchSeen = false,
+		launchOk = 0,
+		launchBad = 0,
+		hiddenOk = 0,
+		hiddenBad = 0,
+		lastRound = nil,
+		keepSeen = 0,
+		keepBad = 0,
+		keptBall = nil,
+		keptOk = 0,
 	}
 	p.Parent = S.Players
 	S.Players.PlayerAdded:Fire(p)
@@ -124,11 +149,33 @@ local function client(c: Client)
 				check(Snap.applyKey(c.dec, data.key), "key applies")
 				check(#c.dec.cells == data.w * data.h, "key size = arena")
 				c.firstMatchAt = c.firstMatchAt or Mock.now()
+				c.echo = nil
+				c.launchSeen = false
+				if data.you then
+					check(type(data.aim) == "table" and #data.aim == 2, "start carries own aim")
+				end
+				if c.keptBall then
+					local mine
+					for _, seat in data.seats do
+						if seat.name == c.p.DisplayName then
+							mine = seat.e
+						end
+					end
+					if mine == c.keptBall then
+						c.keptOk += 1
+					end
+					c.keptBall = nil
+				end
 				if data.mode == "duel" then
 					for _, seat in data.seats do
 						c.duelWith[seat.name] = true
 					end
 				end
+			elseif kind == "aim" then
+				check(c.match and data.id == c.match.id, "aim echo of own match")
+				c.echo = { data.dx, data.dy }
+			elseif kind == "round" then
+				c.lastRound = data
 			elseif kind == "hint" then
 				c.hints[data.k] = true
 			elseif kind == "end" then
@@ -142,7 +189,36 @@ local function client(c: Client)
 			if buffer.readu8(b, 0) == Snap.FRAME then
 				c.snaps += 1
 			end
-			Snap.decode(c.dec, b)
+			local f = Snap.decode(c.dec, b)
+			if f and c.match then
+				if not f.launched then
+					local hidden = true
+					for _, ball in f.balls do
+						if ball.dx ~= 0 or ball.dy ~= 0 then
+							hidden = false
+						end
+					end
+					if hidden then
+						c.hiddenOk += 1
+					else
+						c.hiddenBad += 1
+					end
+				elseif not c.launchSeen and c.match.you and c.echo then
+					c.launchSeen = true
+					local echo = c.echo :: { number }
+					for _, ball in f.balls do
+						if ball.e == c.match.you then
+							local ok = math.abs(ball.dx - echo[1]) < 0.02 and math.abs(ball.dy - echo[2]) < 0.02
+							if ok then
+								c.launchOk += 1
+							else
+								c.launchBad += 1
+								print(`launch {c.p.DisplayName}: flies {ball.dx},{ball.dy}, aimed {echo[1]},{echo[2]}`)
+							end
+						end
+					end
+				end
+			end
 		end
 	end
 	c.frames += 1
@@ -187,6 +263,20 @@ local function client(c: Client)
 		else
 			action(c, "draft", st.offer[1])
 		end
+	elseif ph == "choose" and st.keep and st.keep >= 0 and c.frames % 30 == 0 then
+		-- the round winner keeps its ball and has nothing to choose; a choose from it is refused
+		c.keepSeen += 1
+		local lr = c.lastRound
+		local won = lr and lr.win == st.me and st.keep == (if st.me == 0 then lr.a else lr.b)
+		if #st.left > 0 or not won then
+			c.keepBad += 1
+		end
+		c.keptBall = st.keep
+		for _, e in st.teams[st.me + 1] do
+			if e ~= st.keep then
+				action(c, "choose", e)
+			end
+		end
 	elseif ph == "choose" and #st.left > 0 and c.frames % 30 == 0 then
 		if not st.blind and st.rival >= 0 then
 			c.loserChose = true
@@ -197,7 +287,10 @@ local function client(c: Client)
 		action(c, "queue", if mode == "duel" then 1 else 2)
 	elseif ph == "match" then
 		if c.frames % 10 == 0 then
-			input(c, 2, 1, 0.5)
+			input(c, 1, c.aim[1], c.aim[2])
+		end
+		if c.frames % 40 == 0 then
+			input(c, 2, c.aim[1], c.aim[2])
 		end
 		if c.frames % 3 == 0 then
 			input(c, 3, math.cos(c.frames), math.sin(c.frames))
@@ -276,6 +369,13 @@ check(a.ends >= 2 and b.ends >= 2, `duel finished (Ann {a.ends}, Bob {b.ends})`)
 check(a.starts >= 3, "duel had rounds")
 check(a.duelWith.Bob and b.duelWith.Ann, "Ann and Bob in one duel (M1-9 with a person)")
 check(a.loserChose or b.loserChose, "the loser chose a ball seeing the winner's ball")
+check(a.keepSeen + b.keepSeen > 0, "the round winner got the keep screen")
+check(a.keepBad + b.keepBad == 0, "keep screen only for the round winner, with its own ball and nothing to choose")
+check(a.keptOk + b.keptOk > 0, "the winner played the next round with the kept ball (its choose was refused)")
+for _, c in { a, b } do
+	check(c.hiddenOk > 0 and c.hiddenBad == 0, `{c.p.DisplayName}: no aim directions in frames before launch`)
+	check(c.launchOk > 0 and c.launchBad == 0, `{c.p.DisplayName}: the ball launches where the echoed aim points`)
+end
 check(steps[8] or (function()
 	for _, s in world.analytics.steps do
 		if s.player == "Ann" and s.n == 8 then

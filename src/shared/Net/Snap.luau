@@ -192,8 +192,10 @@ local function writeBall(b: buffer, o: number, S: Rules.State, ball: Rules.Ball)
 	buffer.writeu8(b, o + 8, if ball.alive then 1 else 0)
 	buffer.writeu8(b, o + 9, u8(min(1, ball.charge), 250))
 	buffer.writeu8(b, o + 10, flags)
-	buffer.writei8(b, o + 11, i8(ball.dx))
-	buffer.writei8(b, o + 12, i8(ball.dy))
+	-- before launch every direction is secret: the owner draws its own aim from Match "aim"
+	local hide = not S.launched
+	buffer.writei8(b, o + 11, if hide then 0 else i8(ball.dx))
+	buffer.writei8(b, o + 12, if hide then 0 else i8(ball.dy))
 	buffer.writeu8(b, o + 13, u8(ball.hole, 50))
 	buffer.writeu16(b, o + 14, u16(ball.hx))
 	buffer.writeu16(b, o + 16, u16(ball.hy))

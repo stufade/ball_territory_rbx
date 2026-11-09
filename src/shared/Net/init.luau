@@ -51,6 +51,8 @@ Net.MatchKind = {
 	hint = "hint",
 	round = "round",
 	finish = "end",
+	-- own aim before launch, only to its owner: {id, dx, dy}
+	aim = "aim",
 }
 
 -- Hints of the first round (Match "hint" k).
@@ -96,6 +98,8 @@ export type MatchStart = {
 	you: number?,
 	seats: { Seat },
 	key: buffer,
+	-- own aim direction in the aim phase (rivals' aims are hidden until launch)
+	aim: { number }?,
 }
 
 export type RulesEvent = { kind: string, d: { [string]: any } }
@@ -136,6 +140,9 @@ export type State = {
 	left: { number }?,
 	rival: number?,
 	blind: boolean?,
+	-- choose: own ball kept from the won round (-1 = must choose); draft: free "any ball" picks left
+	keep: number?,
+	anyLeft: number?,
 	arena: string?,
 	win: boolean?,
 }

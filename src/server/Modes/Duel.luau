@@ -3,6 +3,7 @@
 -- the round winner stays, a side out of balls loses.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Collection = require("../Collection")
 local Config = require("../Config")
 local Guard = require("../Logic/Guard")
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -38,6 +39,7 @@ local function sendDraft(s: Session.Session)
 			teams = copy(Offers.teams(o)),
 			offer = Offers.offerFor(o, m.side),
 			any = Offers.canAny(o, m.side),
+			anyLeft = o.anyLeft[m.side + 1],
 			names = Session.names(s),
 			endsAt = s.endsAt,
 		}
@@ -47,12 +49,14 @@ end
 local function sendChoose(s: Session.Session)
 	local d = s.data.duel
 	Session.each(s, function(m)
-		local needs = d.cur[m.side + 1] < 0
+		-- the round winner stays with its ball: it only watches the loser choose
+		local keep = d.cur[m.side + 1]
 		return {
 			ph = "choose",
 			mode = "duel",
 			me = m.side,
-			left = if needs then D.left(d, m.side) else {},
+			keep = keep,
+			left = if keep < 0 then D.left(d, m.side) else {},
 			rival = if s.data.blind then -1 else d.cur[2 - m.side],
 			blind = s.data.blind,
 			teams = copy(d.teams),
@@ -114,7 +118,7 @@ local function afterPick(s: Session.Session, now: number)
 end
 
 function Duel.start(s: Session.Session, now: number)
-	s.data.offers = Offers.new(Rules, rand() < 0.5, Config.OFFER, Config.ANY_FREE, rand)
+	s.data.offers = Offers.new(Rules, rand() < 0.5, Config.OFFER, Collection.anyFree(), rand)
 	s.data.score = { 0, 0 }
 	s.st = "draft"
 	s.data.turnAt = now

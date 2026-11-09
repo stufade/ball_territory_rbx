@@ -19,7 +19,7 @@ export type Ctx = {
 
 local Input = {}
 
-local AIM_GAP = 0.06
+local AIM_GAP = 0.08 -- under the Input rate limit, so the server keeps every aim the client draws
 local DIR_GAP = 0.1
 local WINDOW_SLACK = 0.2 -- s of match time
 
@@ -44,7 +44,7 @@ function Input.start(ctx: Ctx): () -> ()
 	local lastDir = 0
 	local down: InputObject? = nil
 
-	local function tap(pos: Vector3, dragging: boolean)
+	local function tap(pos: Vector3, dragging: boolean, final: boolean?)
 		local you = ctx.you
 		if not you then
 			return
@@ -54,7 +54,7 @@ function Input.start(ctx: Ctx): () -> ()
 		local kind: number
 		if ph == "aim" then
 			kind = ctx.kinds.aim
-			if now - lastSend < AIM_GAP then
+			if not final and now - lastSend < AIM_GAP then
 				return
 			end
 		elseif ph == "play" then
@@ -107,6 +107,10 @@ function Input.start(ctx: Ctx): () -> ()
 	local ended = UserInputService.InputEnded:Connect(function(input)
 		if input == down then
 			down = nil
+			-- the drag may end between throttled sends: the release point is the aim
+			if ctx.phase() == "aim" then
+				tap(input.Position, true, true)
+			end
 		end
 	end)
 	return function()

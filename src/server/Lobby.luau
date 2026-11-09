@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Analytics = require("./Analytics")
 local Arenas = require("./Arenas")
+local Collection = require("./Collection")
 local Config = require("./Config")
 local Guard = require("./Logic/Guard")
 local Modes = require("./Modes")
@@ -31,7 +32,7 @@ local function sendIntroPick(r: Roster.Rec)
 	if p then
 		Roster.send(
 			r,
-			{ ph = "pick", mode = "intro", options = table.clone(Net.STARTERS), taken = {}, endsAt = p.endsAt },
+			{ ph = "pick", mode = "intro", options = Collection.starters(), taken = {}, endsAt = p.endsAt },
 			true
 		)
 	end
@@ -108,7 +109,7 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 	end
 	if r.introPick then
 		local e = Guard.element(arg, NEL)
-		if verb == A.pick and e ~= nil and table.find(Net.STARTERS, e) then
+		if verb == A.pick and e ~= nil and table.find(Collection.starters(), e) then
 			r.introE = e
 			r.introPick = nil
 		end
@@ -159,7 +160,8 @@ function Lobby.tick(now: number)
 	for _, r in Roster.all() do
 		local p = r.introPick
 		if p and now >= p.endsAt then
-			r.introE = Net.STARTERS[math.random(1, #Net.STARTERS)]
+			local starters = Collection.starters()
+			r.introE = starters[math.random(1, #starters)]
 			r.introPick = nil
 		end
 		if r.introE and not r.session then

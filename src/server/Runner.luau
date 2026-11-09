@@ -1,5 +1,5 @@
 --!strict
--- One round on one arena: aim phase, the 30 Hz rules clock, 15 Hz snapshots, batched events, first-round hints, input.
+-- One round on one arena: aim phase (aims are kept apart from the rules until launch, so nobody sees a rival's aim), the 30 Hz rules clock, 15 Hz snapshots, batched events, first-round hints, input.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -36,6 +36,8 @@ export type Runner = {
 	phase: "aim" | "play" | "done",
 	endsAt: number,
 	launched: { [number]: boolean },
+	-- aims of people in the aim phase, by element: applied to the rules at launch
+	aims: { [number]: { number } },
 	acc: number,
 	snapAcc: number,
 	weak: { WeakBot.WeakBot },
@@ -89,6 +91,16 @@ local function startData(r: Runner, you: number?, key: buffer): { [string]: any 
 	}
 end
 
+-- Own aim of ball e as the rules will launch it.
+local function aimOf(r: Runner, e: number): { number }
+	local a = r.aims[e]
+	if a then
+		return { a[1], a[2] }
+	end
+	local b = r.S.by[e]
+	return { b.dx, b.dy }
+end
+
 local function sendStart(r: Runner, p: Player, key: buffer)
 	local you
 	for _, s in r.seats do
@@ -97,6 +109,9 @@ local function sendStart(r: Runner, p: Player, key: buffer)
 		end
 	end
 	local data = startData(r, you, key)
+	if you and r.phase == "aim" then
+		data.aim = aimOf(r, you)
+	end
 	data.id = r.session.id
 	Remotes.Match:FireClient(p, Net.MatchKind.start, data)
 end
@@ -113,6 +128,7 @@ function Runner.new(session: any, S: Rules.State, seats: { Seat }, aim: number, 
 		phase = "aim",
 		endsAt = now + aim,
 		launched = {},
+		aims = {},
 		acc = 0,
 		snapAcc = 0,
 		weak = {},
@@ -172,6 +188,9 @@ function Runner.hint(r: Runner, k: string)
 end
 
 local function go(r: Runner, now: number)
+	for e, a in r.aims do
+		Rules.aim(r.S, e, a[1], a[2])
+	end
 	Rules.launch(r.S)
 	r.phase = "play"
 	r.endsAt = now + r.S.round
@@ -285,15 +304,19 @@ function Runner.input(r: Runner, rec: any, kind: number, dx: number?, dy: number
 		return
 	end
 	local S, e = r.S, seat.e
-	if kind == IN.aim then
-		if r.phase == "aim" and dx and dy then
-			Rules.aim(S, e, dx, dy)
+	if kind == IN.aim or kind == IN.launch then
+		if r.phase ~= "aim" then
+			return
 		end
-	elseif kind == IN.launch then
-		if r.phase == "aim" then
-			if dx and dy then
-				Rules.aim(S, e, dx, dy)
+		if dx and dy then
+			local ax, ay = Rules.aimDir(dx, dy)
+			if ax and ay then
+				r.aims[e] = { ax, ay }
+				-- the owner draws exactly what will launch; nobody else hears of it
+				Remotes.Match:FireClient(rec.player, Net.MatchKind.aim, { id = r.session.id, dx = ax, dy = ay })
 			end
+		end
+		if kind == IN.launch then
 			r.launched[seat.userId] = true
 		end
 	elseif kind == IN.dir then

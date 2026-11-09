@@ -1,6 +1,9 @@
 --!strict
 -- Server timers and limits of M1 matches (seconds). Round lengths live in Rules.Config.
 return {
+	-- playtest switch: everybody owns all 27 balls (starter pick of all 27, "any ball" on every draft pick).
+	-- false brings back M1: 4 starters, one free "any ball" per duel. There are no drops yet.
+	TEST_ALL_BALLS = true,
 	-- wait for other people in the queue, then bots fill the seats
 	QUEUE_WAIT = 5,
 	-- duel draft 1-2-2-1: time per pick, balls offered per pick, free "any ball" picks per duel

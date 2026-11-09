@@ -210,6 +210,7 @@ local function startSession(data: Net.MatchStart)
 		ended = false,
 	}
 	session = s
+	s.actors.aim = data.aim
 	fx.ballPos = function(e)
 		return Actors.ballPos(s.actors, e)
 	end
@@ -238,6 +239,13 @@ local function startSession(data: Net.MatchStart)
 			end,
 			send = function(kind, dx, dy)
 				Remotes.Input:FireServer(kind, dx, dy)
+				if kind == Net.Input.aim then
+					-- drawn at once; the server echo (Match "aim") confirms the same direction
+					local ax, ay = Rules.aimDir(dx, dy)
+					if ax and ay then
+						s.actors.aim = { ax, ay }
+					end
+				end
 			end,
 			kinds = Net.Input,
 			finalGap = Net.Limits.finalTap + 0.02,
@@ -254,6 +262,7 @@ local function restartRound(s: Session, data: Net.MatchStart)
 	s.frame = nil
 	s.hp = {}
 	s.phase = "aim"
+	s.actors.aim = data.aim
 	Stage.setSeats(s.stage, data.seats)
 	applyChanges(s, false)
 end
@@ -301,6 +310,10 @@ local function onMatch(kind: string, data: any)
 	if kind == Net.MatchKind.ev then
 		for _, e in data.list do
 			Fx.event(s.fx, e.kind, e.d)
+		end
+	elseif kind == Net.MatchKind.aim then
+		if type(data.dx) == "number" and type(data.dy) == "number" then
+			s.actors.aim = { data.dx, data.dy }
 		end
 	elseif kind == Net.MatchKind.phase then
 		s.phase = data.ph

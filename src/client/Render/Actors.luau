@@ -56,6 +56,8 @@ export type Actors = {
 	field: Field.Field,
 	you: number?,
 	names: { [number]: string },
+	-- own aim before launch (Match start/aim): snapshots carry no directions until launch
+	aim: { number }?,
 	balls: { [number]: BallView },
 	holes: { [number]: Hole },
 	clones: { Thing },
@@ -178,6 +180,7 @@ function Actors.new(field: Field.Field, you: number?, names: { [number]: string 
 		field = field,
 		you = you,
 		names = names,
+		aim = nil,
 		balls = {},
 		holes = {},
 		clones = {},
@@ -346,8 +349,9 @@ local function updateBall(self: Actors, e: number, a: any, b: any, t: number, no
 	if surge then
 		v.surge.Position = Field.at(f, b.sx, b.sy)
 	end
-	if aiming then
-		drawAim(self, v, x, y, b.dx, b.dy, now)
+	local aim = self.aim
+	if aiming and e == self.you and aim then
+		drawAim(self, v, x, y, aim[1], aim[2], now)
 	else
 		hideAim(v)
 	end
