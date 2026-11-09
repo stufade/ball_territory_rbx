@@ -3,6 +3,7 @@
 -- lune run tests/net [matches per mode]
 local process = require("@lune/process")
 local Rules = require("@rules")
+local serde = require("@lune/serde")
 local Snap = require("../src/shared/Net/Snap")
 
 local R = tonumber(process.args[1]) or 6
@@ -48,13 +49,23 @@ local function run(mode: string, seed: number, lose: number)
 	local rnd = Rules.Rng.new(seed)
 	local bytes, packets, snaps, maxPacket, maxSnap = 0, 0, 0, 0, 0
 	local lost = 0
+	local evBytes = 0
 	while not S.done do
 		for _ = 1, STEPS_PER_SNAP do
 			if not S.done then
 				Rules.step(S)
 			end
 		end
-		Rules.drain(S)
+		local evs = {}
+		for _, ev in Rules.drain(S) do
+			if ev.kind ~= "wall" then
+				table.insert(evs, { kind = ev.kind, d = ev.d })
+			end
+		end
+		if #evs > 0 then
+			-- JSON length as a stand-in for Roblox table serialization of Match "ev"
+			evBytes += #serde.encode("json", { id = 1, list = evs })
+		end
 		local list = Snap.encode(enc, S)
 		snaps += 1
 		local sz = 0
@@ -100,7 +111,7 @@ local function run(mode: string, seed: number, lose: number)
 			check(dec.cells[c] == want[c], `healed cell {c - 1}`)
 		end
 	end
-	return bytes / snaps, maxSnap, maxPacket, packets / snaps, lost
+	return bytes / snaps, maxSnap, maxPacket, packets / snaps, lost, evBytes / snaps
 end
 
 -- stale and foreign packets are dropped
@@ -121,9 +132,10 @@ do
 end
 
 for _, mode in { "duel", "ffa" } do
-	local avg, mx, mp, ppf, total = 0, 0, 0, 0, 0
+	local avg, mx, mp, ppf, total, ev = 0, 0, 0, 0, 0, 0
 	for i = 1, R do
-		local a, m, p, pp = run(mode, 100 + i, 0)
+		local a, m, p, pp, _, e = run(mode, 100 + i, 0)
+		ev += e
 		avg += a
 		mx = math.max(mx, m)
 		mp = math.max(mp, p)
@@ -131,10 +143,11 @@ for _, mode in { "duel", "ffa" } do
 		total += 1
 	end
 	avg /= total
+	ev /= total
 	local _, _, _, _, lost = run(mode, 999, 0.2)
 	print(
 		string.format(
-			"%s: snapshot avg %d B, max %d B, max packet %d B, packets/snap max %.2f -> %.1f KB/s avg, %.1f KB/s peak (lossy run dropped %d packets, healed)",
+			"%s: snapshot avg %d B, max %d B, max packet %d B, packets/snap max %.2f -> %.1f KB/s avg, %.1f KB/s peak (lossy run dropped %d packets, healed); events ~%.1f KB/s, total ~%.1f KB/s",
 			mode,
 			avg,
 			mx,
@@ -142,9 +155,11 @@ for _, mode in { "duel", "ffa" } do
 			ppf,
 			avg * SNAP_HZ / 1000,
 			mx * SNAP_HZ / 1000,
-			lost
+			lost,
+			ev * SNAP_HZ / 1000,
+			(avg + ev) * SNAP_HZ / 1000
 		)
 	)
-	check(avg * SNAP_HZ / 1000 < 20, "budget 20 KB/s")
+	check((avg + ev) * SNAP_HZ / 1000 < 20, "budget 20 KB/s")
 end
 print("NET OK")
