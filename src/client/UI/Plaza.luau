@@ -12,6 +12,7 @@ local Theme = require("./Theme")
 local V2 = Vector2.new
 local RIGHT = V2(1, 0)
 local TOP_MID = V2(0.5, 0)
+local MID = V2(0.5, 0.5)
 
 export type Ctx = {
 	act: (verb: string, arg: number?) -> (),
