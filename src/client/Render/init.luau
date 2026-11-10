@@ -82,9 +82,6 @@ local function applyChanges(s: Session, animate: boolean)
 	for _, c in Snap.takeChanged(s.dec) do
 		Cells.set(s.cells, c, s.dec.cells[c + 1], animate)
 	end
-	if Cells.takeCaptured(s.cells) > 0 and not s.view then
-		Sfx.capture()
-	end
 end
 
 local function onSnap(s: Session, buf: buffer)
@@ -153,6 +150,25 @@ local function render(s: Session, dt: number)
 	Fx.update(s.fx, dt, s.frame)
 end
 
+-- Ball names over the balls: a viewer sees every name (bots too), a player only the other people.
+local function namesOf(data: Net.MatchStart, view: boolean): { [number]: string }
+	local names: { [number]: string } = {}
+	for _, seat in data.seats do
+		if (seat.userId ~= 0 or view) and seat.e ~= data.you then
+			names[seat.e] = seat.name
+		end
+	end
+	return names
+end
+
+local function sidesOf(data: Net.MatchStart): { [number]: number }
+	local sideOf: { [number]: number } = {}
+	for _, seat in data.seats do
+		sideOf[seat.e] = seat.side
+	end
+	return sideOf
+end
+
 local function startSession(data: Net.MatchStart)
 	local token = opening + 1
 	opening = token
@@ -166,10 +182,7 @@ local function startSession(data: Net.MatchStart)
 		end
 		return
 	end
-	local sideOf: { [number]: number } = {}
-	for _, seat in data.seats do
-		sideOf[seat.e] = seat.side
-	end
+	local sideOf = sidesOf(data)
 	local dec = Snap.newDecoder()
 	if not Snap.applyKey(dec, data.key) then
 		Board.close(board)
@@ -180,13 +193,7 @@ local function startSession(data: Net.MatchStart)
 	Signs.inMatch(not view)
 	local s: Session
 	local field = Field.new(board)
-	local names: { [number]: string } = {}
-	for _, seat in data.seats do
-		-- a viewer sees every name (bots too): who plays whom
-		if (seat.userId ~= 0 or view) and seat.e ~= data.you then
-			names[seat.e] = seat.name
-		end
-	end
+	local names = namesOf(data, view)
 	local fx = Fx.new(field, if view then function(_: string) end else Sfx.play, function(amount)
 		if s.cam then
 			Cam.addShake(s.cam, amount)
@@ -246,7 +253,9 @@ local function startSession(data: Net.MatchStart)
 	if data.you and not view then
 		s.stopInput = Input.start({
 			board = board,
-			you = data.you,
+			you = function()
+				return s.you
+			end,
 			phase = function()
 				return if s.ended then "" else s.phase
 			end,
@@ -281,6 +290,12 @@ local function restartRound(s: Session, data: Net.MatchStart)
 	s.frame = nil
 	s.hp = {}
 	s.phase = "aim"
+	-- every duel round the sides play other balls: own ball id, sides and names change with them
+	s.you = data.you
+	s.sideOf = sidesOf(data)
+	s.yourSide = if data.you then s.sideOf[data.you] else nil
+	s.fx.you = data.you
+	Actors.reset(s.actors, data.you, namesOf(data, s.view))
 	s.actors.aim = data.aim
 	Stage.setSeats(s.stage, data.seats)
 	applyChanges(s, false)

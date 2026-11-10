@@ -282,6 +282,7 @@ function Gui.world(): any
 	function rs.WaitForChild(_self: any, name: string)
 		return if name == "Shared" then shared("src/shared") else shared("src/shared/" .. name)
 	end
+	rs.Shared = shared("src/shared")
 	local players = service("Players")
 	players.LocalPlayer = new("Player")
 	players.LocalPlayer.UserId = 1
@@ -379,6 +380,14 @@ function Gui.loader(world: any): (string) -> any
 			Instance = { new = new },
 			os = fakeOs,
 			task = task,
+			-- script.Parent.X of src/client/Render modules: a path the stand-in require resolves
+			script = {
+				Parent = setmetatable({}, {
+					__index = function(_, k)
+						return { __modpath = (if init then dirname(dirname(file)) else dirname(file)) .. "/" .. k }
+					end,
+				}),
+			},
 			print = function() end,
 		}, { __index = base })
 	end

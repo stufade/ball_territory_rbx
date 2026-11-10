@@ -8,7 +8,7 @@ local Geo = require(script.Parent.Geo)
 
 export type Ctx = {
 	board: Board.Board,
-	you: number?,
+	you: () -> number?, -- own ball id, changes every duel round
 	phase: () -> string,
 	frame: () -> any?, -- newest decoded frame (pu, t, final)
 	ballPos: (e: number) -> (number?, number?),
@@ -45,7 +45,7 @@ function Input.start(ctx: Ctx): () -> ()
 	local down: InputObject? = nil
 
 	local function tap(pos: Vector3, dragging: boolean, final: boolean?)
-		local you = ctx.you
+		local you = ctx.you()
 		if not you then
 			return
 		end

@@ -14,6 +14,7 @@ local NEON = Color3.fromHex("#36d6ff")
 local CHEER_R15 = "rbxassetid://507770677"
 local CHEER_R6 = "rbxassetid://129423030"
 local IDLE_R15 = "rbxassetid://507766388"
+local IDLE_R6 = "rbxassetid://180435571"
 
 export type Stage = {
 	board: Board.Board,
@@ -22,6 +23,9 @@ export type Stage = {
 	glows: { [number]: BasePart },
 	tracks: { AnimationTrack },
 	sagged: { [Motor6D]: CFrame },
+	-- own avatar on its stand: the Roblox Animate script is off for the match (F1: it kept the plaza run playing
+	-- on the anchored avatar, running in place); our looped idle plays instead
+	still: LocalScript?,
 	dead: boolean,
 }
 
@@ -110,6 +114,30 @@ local function character(self: Stage, seat: Net.Seat): Model?
 	return self.dummies[seat.side]
 end
 
+-- Own avatar stands idle on its stand: Animate off, its movement tracks stopped, a looped idle of our own.
+local function standStill(self: Stage)
+	local ch = Players.LocalPlayer.Character
+	local animate = ch and ch:FindFirstChild("Animate")
+	local a, hum = animator(ch :: Model)
+	if not (ch and a and hum) then
+		return
+	end
+	if animate and animate:IsA("LocalScript") and animate.Enabled then
+		animate.Enabled = false
+		self.still = animate
+	end
+	for _, t in a:GetPlayingAnimationTracks() do
+		t:Stop(0.2)
+	end
+	play(
+		self,
+		ch,
+		if hum.RigType == Enum.HumanoidRigType.R6 then IDLE_R6 else IDLE_R15,
+		true,
+		Enum.AnimationPriority.Idle
+	)
+end
+
 function Stage.new(board: Board.Board, data: Net.MatchStart): Stage
 	local self: Stage = {
 		board = board,
@@ -118,6 +146,7 @@ function Stage.new(board: Board.Board, data: Net.MatchStart): Stage
 		glows = {},
 		tracks = {},
 		sagged = {},
+		still = nil,
 		dead = false,
 	}
 	for _, seat in data.seats do
@@ -144,6 +173,9 @@ function Stage.new(board: Board.Board, data: Net.MatchStart): Stage
 		end
 	end
 	Stage.setSeats(self, data.seats)
+	if data.you ~= nil and data.view ~= true then
+		standStill(self)
+	end
 	return self
 end
 
@@ -229,6 +261,11 @@ function Stage.destroy(self: Stage)
 	for _, t in self.tracks do
 		t:Stop(0)
 	end
+	local animate = self.still
+	if animate and animate.Parent then
+		animate.Enabled = true
+	end
+	self.still = nil
 	for _, g in self.glows do
 		g.Color = NEON
 	end

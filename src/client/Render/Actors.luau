@@ -502,6 +502,25 @@ function Actors.update(self: Actors, a: any, b: any, t: number, now: number, aim
 	end)
 end
 
+-- New duel round: the sides take other balls, so ball e may now be someone else's (an own-styled rival ball with
+-- the YOU tag and the aim line, the W3 aim bug again). Views are rebuilt for the new owners.
+function Actors.reset(self: Actors, you: number?, names: { [number]: string })
+	for _, v in self.balls do
+		v.box:Destroy()
+		v.surge:Destroy()
+		v.aimOut:Destroy()
+		v.aimIn:Destroy()
+		for _, d in v.dashes do
+			d:Destroy()
+		end
+	end
+	for _, h in self.holes do
+		h.box:Destroy()
+	end
+	self.balls, self.holes = {}, {}
+	self.you, self.names, self.aim = you, names, nil
+end
+
 function Actors.destroy(_self: Actors) end
 
 return Actors
