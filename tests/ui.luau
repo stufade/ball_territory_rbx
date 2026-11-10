@@ -232,6 +232,18 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	check(w.root.Visible and find(w.root, "Coins") and find(w.root, "DailyBtn") == nil, `{tag}: search: counters only`)
 end
 
+-- level 10: a toast with its coins and crystals
+do
+	local w = make(V2(1168, 540))
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(150, 15, false, 1)
+	v.news = { { level = 10, coins = 150, crystals = 15 } }
+	Wallet.setProfile(w, v)
+	step(w, 0.1)
+	local t = w.root.Parent:FindFirstChild("Toast", true)
+	check(t and t.Text == "LEVEL 10!  +150 COINS  +15 CRYSTALS", `level 10 toast ({t and t.Text})`)
+end
+
 -- an older server (no economy fields): nothing shows
 do
 	local w = make(V2(1168, 540))

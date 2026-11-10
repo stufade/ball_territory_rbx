@@ -215,6 +215,14 @@ end
 
 function Wallet.setProfile(w: Wallet, v: Net.ProfileView)
 	w.view = v
+	-- levels after the level balls pay coins (and every 5th crystals): no NEW BALL! for them, a toast instead
+	local ups: { Net.LevelUp } = v.news or {}
+	for _, up in ups do
+		if up.coins then
+			local gem = if up.crystals then `  +{up.crystals} CRYSTALS` else ""
+			toast(w, `LEVEL {up.level}!  +{up.coins} COINS{gem}`, Theme.YELLOW)
+		end
+	end
 	local found: { string } = v.found or {}
 	for _, k in found do
 		w.fresh[k] = true
