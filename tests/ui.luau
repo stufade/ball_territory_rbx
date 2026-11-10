@@ -119,11 +119,18 @@ end
 for _, cv in { V2(1168, 540), V2(960, 540) } do
 	local tag = `{cv.X}x{cv.Y}`
 	local w, canvas, acts, flags = make(cv)
-	-- after the tutorial (PLAY lit): no login popup yet
-	Wallet.setState(w, { ph = "lobby", glow = "play" })
+	-- during the tutorial's reward screen: no login popup (U2: it opens on the plaza right after it)
+	Wallet.setState(w, { ph = "reward" })
 	Wallet.setProfile(w, view(0, 0, true, 0))
 	step(w, 3)
-	check(w.root.Visible and not w.pop.Visible, `{tag}: counters on the plaza, no popup before the first match`)
+	check(not w.pop.Visible, `{tag}: no login popup over the reward screen`)
+	Wallet.setState(w, { ph = "match", mode = "tutor" })
+	step(w, 3)
+	check(not w.pop.Visible, `{tag}: no login popup during the tutorial`)
+	Wallet.setState(w, { ph = "lobby", glow = "play" })
+	flags.busy = true -- hold it while the layout is checked
+	step(w, 3)
+	check(w.root.Visible and not w.pop.Visible, `{tag}: counters on the plaza`)
 	local coins, gems = find(w.root, "Coins"), find(w.root, "Crystals")
 	check(coins and gems and find(coins, "Value").Text == "0", `{tag}: coin and crystal pills`)
 	local dailyBtn = find(w.root, "DailyBtn")
@@ -145,7 +152,7 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	end
 	-- NEW BALL! on screen: the login screen waits
 	Wallet.setState(w, { ph = "result", win = true })
-	Wallet.setState(w, { ph = "lobby" })
+	Wallet.setState(w, { ph = "lobby", glow = "play" })
 	flags.busy = true
 	step(w, 2)
 	check(not w.pop.Visible, `{tag}: no login popup over NEW BALL!`)
@@ -162,9 +169,21 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	check(find(find(panel, "Day7"), "TextLabel") ~= nil, `{tag}: day 7 card`)
 	local hasVoid = false
 	for _, t in Gui.texts(find(panel, "Day7")) do
-		hasVoid = hasVoid or t == Rules.Config.TITLE[13]
+		hasVoid = hasVoid or t == `DAY 7: {Rules.Config.TITLE[13]}`
 	end
 	check(hasVoid, `{tag}: day 7 shows VOID`)
+	local d7 = rectOf(find(panel, "Day7"))
+	check(d7[3] >= 300 and d7[4] >= 300, `{tag}: day 7 is the big card ({d7[3]}x{d7[4]})`)
+	check(find(find(panel, "Day7"), "Hole") ~= nil and find(find(panel, "Day7"), "VoidBall") ~= nil, `{tag}: live VOID`)
+	check(
+		find(find(panel, "Day7"), "Left").Text == "IN 6 DAYS",
+		`{tag}: days left ({find(find(panel, "Day7"), "Left").Text})`
+	)
+	for i = 1, 6 do
+		local c = rectOf(find(panel, `Day{i}`))
+		check(not overlap(c, d7), `{tag}: day {i} clear of day 7`)
+		check(not overlap(c, rectOf(find(panel, "Claim"))), `{tag}: day {i} clear of CLAIM`)
+	end
 	find(panel, "Claim").Activated:Fire()
 	find(panel, "Claim").Activated:Fire()
 	check(#acts == 1 and acts[1][1] == "daily", `{tag}: CLAIM sends Action daily once`)
@@ -174,6 +193,7 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	v.gains = { { cur = "coins", n = 50, why = "login_d1" } }
 	Wallet.setProfile(w, v)
 	check(find(w.pop, "Taken") ~= nil and find(find(w.pop, "Day1"), "Got") ~= nil, `{tag}: TAKEN!, day 1 ticked`)
+	check(find(w.pop, "FlyCoins") ~= nil and find(w.pop, "Flying") ~= nil, `{tag}: coins fly into the counter`)
 	check(find(w.pop, "Next") ~= nil and find(w.pop, "Ok") ~= nil, `{tag}: next reward timer`)
 	step(w, 0.3)
 	local mid = tonumber((find(w.root, "Coins"):FindFirstChild("Value", true).Text:gsub(",", "")))

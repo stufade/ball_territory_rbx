@@ -282,7 +282,7 @@ function Wallet.setState(w: Wallet, st: Net.State)
 end
 
 -- Every frame: counters, floats, toasts, popup effects; the login screen opens itself once a day on the plaza
--- (not before the first real match: after the tutorial PLAY comes first).
+-- (U2: also right after the tutorial's reward screen; never during the tutorial or over NEW BALL!).
 function Wallet.step(w: Wallet, dt: number)
 	if w.coins then
 		Money.step(w.coins, dt)
@@ -341,7 +341,6 @@ function Wallet.step(w: Wallet, dt: number)
 		and d.ready
 		and st
 		and st.ph == "lobby"
-		and st.glow ~= "play"
 		and w.autoFor ~= d.n
 		and not w.open
 		and not w.ctx.busy()
