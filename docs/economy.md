@@ -101,6 +101,7 @@
 7. После полной коллекции монеты копятся (2 ч/день: 27 тыс. к д30). Новые шары в обновлениях покупаются сразу. Нужен сток позже (ивент-шары, подарки другу за монеты?).
 
 ## Что делать luau-coder (следующие задачи M3)
+**M3.1 сделано (2026-11-10):** пункты 1, 2, 3, 7 (вход, задания, книга) и 8 — код `src/server/Logic/{Meta,Wallet,Earn,Daily,Book,Award}.luau`, протокол `docs/net.md` «M3.1», экраны `docs/ui.md` «Валюты, вход, задания, книга», тесты `tests/economy`, `tests/ui`. Пул заданий — `Economy.QUESTS.pool`. Осталось M3.2: 4, 5, 6, стартовый набор и геймпассы (x2 монет уже учтён в `Logic/Earn`, флаг `pass2x`).
 1. `Config.TIERS` читать из `Economy.TIERS`; `Progress.need` с потолком `Economy.XP_CAP`; награды уровней 10+.
 2. Профиль v2: `coins`, `crystals`, `loginDays`, `dailyClaimed`, `quests`, `book`, `pity = {coins, crystals}`, `streak`, `starterSeen/Until`, `trialsUsed`, `dailyBall`; миграция с v1.
 3. Монеты за матч (`Economy.COINS`, AFK-проверка, x2, друг с лимитом), серия.
