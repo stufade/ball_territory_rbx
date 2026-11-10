@@ -105,9 +105,10 @@ return {
 		reactMax = 10,
 		ko = 5,
 		koMax = 15,
-		-- XP from level L to L+1: base + step * (L - 1)
+		-- XP from level L to L+1: base + step * (L - 1), capped at Economy.XP_CAP (E3.1). step 100 (was 50):
+		-- a 30-min player reaches level 9 (the last level ball) on day ~8, not day 5 (tools/econ/sim)
 		base = 150,
-		step = 50,
+		step = 100,
 		boost = 2,
 		boostTime = 15 * 60,
 	},
