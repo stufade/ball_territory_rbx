@@ -454,8 +454,10 @@ do
 	check(c.st and c.st.ph == "queue" and c.st.glow == nil, "search")
 	local own = true
 	local xp = nil
+	-- a duel lasts until one side loses all 3 balls: 3..5 rounds of up to ~50 s each, decided by unseeded random.
+	-- A 5-round duel ends after ~250 s, so the old 200 s budget flaked; 600 s covers the longest duel.
 	i = 0
-	while i < 400 do
+	while i < 1200 do
 		s1.run(0.5)
 		i += 1
 		local st = c.st
