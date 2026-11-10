@@ -14,6 +14,7 @@ local Menus = require("@self/Menus")
 local Plaza = require("@self/Plaza")
 local Theme = require("@self/Theme")
 local Tutor = require("@self/Tutor")
+local Wallet = require("@self/Wallet")
 
 local UI = {}
 
@@ -142,6 +143,13 @@ function UI.start()
 	local tutor = Tutor.new(canvas, ctx :: any)
 	-- T2.2 level bar, 2x XP badge and NEW BALL! on the plaza (over the plaza buttons)
 	local level = Level.new(canvas, ctx :: any)
+	-- M3.1 coins and crystals, login reward, quests, reaction book on the plaza
+	-- the shared ctx: canvas and topbar change with the screen
+	local wctx: any = ctx
+	wctx.busy = function()
+		return level.showing
+	end
+	local wallet = Wallet.new(canvas, wctx)
 
 	local function rebuild()
 		table.clear(ctx.tickers)
@@ -151,6 +159,7 @@ function UI.start()
 		if st then
 			Plaza.setState(plaza, st)
 			Level.setState(level, st)
+			Wallet.setState(wallet, st)
 		end
 		if st and st.ph ~= "match" and st.ph ~= "lobby" and st.ph ~= "queue" then
 			menu.Visible = true
@@ -200,6 +209,9 @@ function UI.start()
 				Plaza.render(plaza)
 				Level.render(level)
 			end
+			if before ~= ctx.canvas then
+				Wallet.refit(wallet)
+			end
 		end)
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
@@ -231,6 +243,7 @@ function UI.start()
 		if st.ph == "match" then
 			Plaza.setState(plaza, st)
 			Level.setState(level, st)
+			Wallet.setState(wallet, st)
 			table.clear(ctx.tickers)
 			table.clear(ctx.frames)
 			menu:ClearAllChildren()
@@ -268,6 +281,7 @@ function UI.start()
 	inject.Event:Connect(function(kind: string, data: any)
 		if kind == "Profile" and typeof(data) == "table" then
 			Level.setProfile(level, data)
+			Wallet.setProfile(wallet, data)
 		elseif kind == "State" then
 			local hold = workspace:GetAttribute("BTHold")
 			workspace:SetAttribute("BTHold", nil)
@@ -370,6 +384,7 @@ function UI.start()
 	Remotes.Profile.OnClientEvent:Connect(function(v: Net.ProfileView)
 		if typeof(v) == "table" and type(v.level) == "number" and typeof(v.balls) == "table" then
 			Level.setProfile(level, v)
+			Wallet.setProfile(wallet, v)
 		end
 	end)
 
@@ -387,6 +402,7 @@ function UI.start()
 		end
 		Tutor.step(tutor, dt)
 		Level.step(level, dt)
+		Wallet.step(wallet, dt)
 		for _, f in ctx.frames do
 			f(dt)
 		end

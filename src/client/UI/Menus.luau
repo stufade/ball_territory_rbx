@@ -9,6 +9,7 @@ local Look = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Look
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Cheer = require("./Cheer")
 local Matchup = require("./Matchup")
+local Money = require("./Money")
 local Reward = require("./Reward")
 local Theme = require("./Theme")
 
@@ -1156,9 +1157,11 @@ local function result(root: Frame, st: Net.State, ctx: Ctx)
 	-- T2.2: XP of the match, doubled while the boost runs
 	if st.xp and st.xp > 0 then
 		local boosted = (st.xpMult or 1) > 1
+		-- M3.1: the multiplier may be 1.5 (friend) or 3 (boost and friend)
+		local m = math.floor((st.xpMult or 2) * 10 + 0.5) / 10
 		local xpText = Theme.text(
 			root,
-			string.format("+%d XP%s", st.xp, if boosted then string.format("  (%dx)", st.xpMult or 2) else ""),
+			string.format("+%d XP%s", st.xp, if boosted then `  ({m}x)` else ""),
 			34,
 			UDim2.fromOffset(400, 40),
 			UDim2.fromOffset(cx, cy + 128),
@@ -1167,6 +1170,8 @@ local function result(root: Frame, st: Net.State, ctx: Ctx)
 		xpText.Name = "Xp"
 		Theme.pop(xpText, 1.9, 0.3)
 	end
+	-- M3.1: coins of the match (friend bonus, streak), or why there are none (AFK)
+	Money.result(root, st, cx, cy + 168)
 	local back = Theme.text(root, "", 22, UDim2.fromOffset(400, 28), UDim2.new(0, cx, 1, -34), {
 		anchor = TOP_MID,
 		color = Theme.DIM,
