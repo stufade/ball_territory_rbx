@@ -1,5 +1,10 @@
 --!strict
 -- Server timers and limits of M1 matches (seconds). Round lengths live in Rules.Config.
+-- Economy numbers (M3) live in ReplicatedStorage.Shared.Economy (docs/economy.md), shared with the client.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Economy = require(ReplicatedStorage.Shared.Economy)
+
 return {
 	-- debug switch: everybody owns all 27 balls (starter pick of all 27, "any ball" on every draft pick).
 	-- false (players): each person drafts from the collection of the profile (T2.2). In Studio the same is on with
@@ -87,12 +92,9 @@ return {
 		writeGap = 7,
 	},
 	-- T2.2 progression. Tiers are rarity and show, not strength (docs/idea-analysis.md, «Тиры»).
-	TIERS = {
-		common = { 0, 1, 3, 2, 4, 5, 6, 10 },
-		rare = { 11, 7, 8, 12, 15, 18, 24, 26 },
-		epic = { 9, 14, 19, 23, 22, 21 },
-		legendary = { 13, 17, 16, 20, 25 },
-	},
+	-- T2.2 progression, tiers from Economy (E3.1). Tiers are rarity and show, not strength.
+	TIERS = Economy.TIERS,
+	ECON = Economy,
 	-- the tutorial reward: the 4 starters one by one, then the free spin lands on one of these legendaries
 	BASE_BALLS = { 0, 1, 3, 2 },
 	SPIN_POOL = { 17, 16, 20, 25 },
@@ -105,7 +107,7 @@ return {
 		reactMax = 10,
 		ko = 5,
 		koMax = 15,
-		-- XP from level L to L+1: base + step * (L - 1), capped at Economy.XP_CAP (E3.1). step 100 (was 50):
+		-- XP from level L to L+1: min(Economy.XP_CAP, base + step * (L - 1)) (E3.1). step 100 (was 50):
 		-- a 30-min player reaches level 9 (the last level ball) on day ~8, not day 5 (tools/econ/sim)
 		base = 150,
 		step = 100,

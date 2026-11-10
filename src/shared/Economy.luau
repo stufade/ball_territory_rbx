@@ -4,6 +4,9 @@
 -- the UI reads real prices through MarketplaceService:GetProductInfo (brief «Монетизация»).
 -- Source tags: [brief] docs/game-brief.md, [idea] docs/idea-analysis.md «Монетизация», [sim] tuned by tools/econ/sim.
 -- Element ids as in Rules.Config (0 FIRE ... 26 CANDY).
+export type Gift = { coins: number?, crystals: number?, ball: number?, trials: number? }
+export type Quest = { id: string, tier: string, kind: string, goal: number, text: string, k: string? }
+
 return {
 	-- [brief] 8/8/6/5. Same lists as Config.TIERS (server, T2.2); luau-coder: make Config.TIERS read these.
 	TIERS = {
@@ -97,8 +100,8 @@ return {
 		{ coins = 150, trials = 1 },
 		{ coins = 200 },
 		{ ball = 13 }, -- VOID [brief]
-	},
-	LATER_DAY7 = { coins = 300, crystals = 10 },
+	} :: { Gift },
+	LATER_DAY7 = { coins = 300, crystals = 10 } :: Gift,
 
 	-- 3 quests a day (VIP 4), new at 00:00 UTC, about reactions and balls [brief]. All 3 take ~8 matches (~25 min) [sim].
 	QUESTS = {
@@ -107,6 +110,19 @@ return {
 		mid = 80, -- e.g. make 3 WILDFIRE, win 1 duel with a rare ball
 		hard = 120, -- e.g. win 3 duels, 10 reactions in one day
 		allDone = 50, -- coins for all of the day
+		-- M3.1: one quest of each tier a day, drawn from these (kinds: Logic/Daily.luau). Counted only in matches
+		-- where the player was not AFK. WILDFIRE: fire on grass, every new player has FIRE and PLANT.
+		pool = {
+			{ id = "play3", tier = "easy", kind = "play", goal = 3, text = "PLAY 3 MATCHES" },
+			{ id = "rx10", tier = "easy", kind = "rx", goal = 10, text = "MAKE 10 REACTIONS" },
+			{ id = "ko2", tier = "easy", kind = "ko", goal = 2, text = "KNOCK OUT 2 BALLS" },
+			{ id = "win2", tier = "mid", kind = "win", goal = 2, text = "WIN 2 MATCHES" },
+			{ id = "wild3", tier = "mid", kind = "rxk", k = "WILDFIRE", goal = 3, text = "MAKE 3 WILDFIRE" },
+			{ id = "rare1", tier = "mid", kind = "rareWin", goal = 1, text = "WIN WITH A RARE+ BALL" },
+			{ id = "duel3", tier = "hard", kind = "duelWin", goal = 3, text = "WIN 3 DUELS" },
+			{ id = "rx30", tier = "hard", kind = "rx", goal = 30, text = "MAKE 30 REACTIONS" },
+			{ id = "top2", tier = "hard", kind = "ffaTop", goal = 2, text = "WIN 2 4-PLAYER MATCHES" },
+		} :: { Quest },
 	},
 
 	-- Reaction book, 42 reactions [brief]: coins for each new one, crystals every 10, a big prize for all 42.

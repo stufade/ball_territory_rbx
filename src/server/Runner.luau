@@ -55,8 +55,11 @@ export type Runner = {
 	filter: ((seat: Seat, kind: number, dx: number?, dy: number?) -> (boolean, number?, number?))?,
 	watch: ((ev: Net.RulesEvent) -> ())?,
 	extra: ((S: Rules.State) -> ())?,
-	-- reactions set off by each element this round (T2.2 XP)
+	-- reactions set off by each element this round (T2.2 XP), by name (M3.1 book and quests)
 	rxBy: { [number]: number },
+	rxKinds: { [number]: { [string]: number } },
+	-- sides whose person sent an input this round (M3.1: a round without one is AFK)
+	acted: { [number]: boolean },
 }
 
 local function recipients(r: Runner): { Player }
@@ -156,6 +159,8 @@ function Runner.new(session: any, S: Rules.State, seats: { Seat }, aim: number, 
 		watch = nil,
 		extra = nil,
 		rxBy = {},
+		rxKinds = {},
+		acted = {},
 	}
 	for _, s in seats do
 		local b = S.by[s.e]
@@ -243,6 +248,12 @@ local function flush(r: Runner)
 		table.insert(list, { kind = ev.kind, d = ev.d })
 		if ev.kind == "rx" and type(ev.d.by) == "number" then
 			r.rxBy[ev.d.by] = (r.rxBy[ev.d.by] or 0) + 1
+			local k = ev.d.k
+			if type(k) == "string" then
+				local m = r.rxKinds[ev.d.by] or {}
+				m[k] = (m[k] or 0) + 1
+				r.rxKinds[ev.d.by] = m
+			end
 		end
 		if r.watch then
 			r.watch(ev)
@@ -317,14 +328,26 @@ function Runner.tick(r: Runner, dt: number, now: number): boolean
 	end
 	if S.done then
 		r.phase = "done"
-		-- KOs and reactions of each side add up over the session's rounds (T2.2 XP)
+		-- KOs and reactions of each side add up over the session's rounds (T2.2 XP); M3.1: reactions by name,
+		-- balls played, rounds and rounds with an input of the person (AFK check)
 		local t = r.session.tally
 		if t then
 			for _, seat in r.seats do
 				local b = S.by[seat.e]
-				local x = t[seat.side] or { kills = 0, rx = 0 }
+				local x = t[seat.side] or { kills = 0, rx = 0, kinds = {}, balls = {}, rounds = 0, active = 0 }
 				x.kills += if b then b.kills else 0
 				x.rx += r.rxBy[seat.e] or 0
+				local kinds: { [string]: number } = r.rxKinds[seat.e] or {}
+				for k, n in kinds do
+					x.kinds[k] = (x.kinds[k] or 0) + n
+				end
+				if not table.find(x.balls, seat.e) then
+					table.insert(x.balls, seat.e)
+				end
+				x.rounds += 1
+				if r.acted[seat.side] then
+					x.active += 1
+				end
 				t[seat.side] = x
 			end
 		end
@@ -350,6 +373,7 @@ function Runner.input(r: Runner, rec: any, kind: number, dx: number?, dy: number
 	if not seat or r.phase == "done" then
 		return
 	end
+	r.acted[seat.side] = true
 	local S, e = r.S, seat.e
 	if r.filter then
 		local ok, fx, fy = r.filter(seat, kind, dx, dy)

@@ -225,13 +225,33 @@ function Mock.world(): any
 		return self:GetChildren()
 	end
 
-	local analytics = { steps = {} :: { any }, custom = {} :: { any } }
+	local analytics = { steps = {} :: { any }, custom = {} :: { any }, economy = {} :: { any } }
 	local AnalyticsService = new("AnalyticsService")
 	function AnalyticsService.LogOnboardingFunnelStepEvent(_self: any, player: any, n: number, name: string)
 		table.insert(analytics.steps, { player = player.Name, n = n, name = name })
 	end
 	function AnalyticsService.LogCustomEvent(_self: any, player: any, name: string, value: number, fields: any)
 		table.insert(analytics.custom, { player = player.Name, name = name, value = value, fields = fields })
+	end
+	function AnalyticsService.LogEconomyEvent(
+		_self: any,
+		player: any,
+		flow: any,
+		cur: string,
+		n: number,
+		bal: number,
+		kind: string,
+		sku: string?
+	)
+		table.insert(analytics.economy, {
+			player = player.Name,
+			flow = flow.Name,
+			cur = cur,
+			n = n,
+			bal = bal,
+			kind = kind,
+			sku = sku,
+		})
 	end
 
 	local RunService = new("RunService")

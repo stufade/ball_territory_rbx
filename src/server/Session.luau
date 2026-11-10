@@ -8,6 +8,7 @@ local Analytics = require("./Analytics")
 local Arenas = require("./Arenas")
 local Avatars = require("./Avatars")
 local Config = require("./Config")
+local Friends = require("./Friends")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Party = require("./Party")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
@@ -36,12 +37,30 @@ export type Session = {
 	data: any,
 	recipients: (Session) -> { Player },
 	-- KOs and reactions by side over the rounds (Runner adds each round)
-	tally: { [number]: { kills: number, rx: number } },
+	tally: { [number]: Tally },
 }
 
--- T2.2: XP of a finished match for one person, set by the server bootstrap (Profiles.award). Returns the XP and
--- the multiplier for the result screen.
-export type Award = (player: Player, mode: Net.ModeName, win: boolean, kills: number, rx: number) -> (number?, number?)
+-- kinds: reactions by name; balls: balls the side played; rounds / active: rounds played and with an input
+export type Tally = {
+	kills: number,
+	rx: number,
+	kinds: { [string]: number },
+	balls: { number },
+	rounds: number,
+	active: number,
+}
+
+-- T2.2: XP of a finished match for one person, set by the server bootstrap (Profiles.award); M3.1 also coins.
+-- afk: some round had no input of the person; friend: an active Roblox friend played this match too.
+-- Returns the fields the result screen adds (xp, xpMult, coins, ...).
+export type Award = (
+	player: Player,
+	mode: Net.ModeName,
+	win: boolean,
+	t: Tally,
+	afk: boolean,
+	friend: boolean
+) -> { [string]: any }?
 
 local nextId = 0
 local active: { Session } = {}
@@ -174,17 +193,34 @@ function Session.finish(s: Session, winner: number, places: { Net.Place }, winOf
 	Session.fire(s, Net.MatchKind.finish, { mode = s.mode, winner = winner, places = places })
 	s.st = "result"
 	s.endsAt = Roster.now() + Config.RESULT_TIME
+	local afk: { [Member]: boolean } = {}
+	for _, m in s.members do
+		local t = s.tally[m.side]
+		afk[m] = t == nil or t.active < t.rounds
+	end
 	for _, m in s.members do
 		local r = m.rec
 		if r then
 			local win = winOf(m)
-			local t = s.tally[m.side] or { kills = 0, rx = 0 }
+			local t = s.tally[m.side] or { kills = 0, rx = 0, kinds = {}, balls = {}, rounds = 0, active = 0 }
 			local award = Session.award
-			local xp, mult
+			local st: Net.State = { ph = "result", mode = s.mode, win = win, endsAt = s.endsAt }
 			if award and not s.debug then
-				xp, mult = award(r.player, s.mode, win, t.kills, t.rx)
+				local friend = false
+				for _, o in s.members do
+					local orec = o.rec
+					if o ~= m and orec and o.userId > 0 and not afk[o] and Friends.are(r.player, orec.player) then
+						friend = true
+					end
+				end
+				local add = award(r.player, s.mode, win, t, afk[m], friend)
+				if add then
+					for k, v in add do
+						(st :: any)[k] = v
+					end
+				end
 			end
-			Roster.send(r, { ph = "result", mode = s.mode, win = win, endsAt = s.endsAt, xp = xp, xpMult = mult }, true)
+			Roster.send(r, st, true)
 			Analytics.custom(r.player, "MatchEnd", if win then 1 else 0, s.mode, if win then "win" else "lose")
 		end
 	end

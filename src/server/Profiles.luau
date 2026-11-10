@@ -2,11 +2,15 @@
 -- Player profiles of T2.2: load with a session lock (Store), the tutorial flag and reward, collection, level, XP,
 -- the 2x boost; saves on leave, every PROFILE.autosave s, soon after a reward, and at BindToClose.
 -- The client gets its view by the Profile remote (docs/net.md). Pure rules: Logic/Progress.
+-- M3.1: coins and crystals, match coins, login reward, daily quests, reaction book (Logic/Award, Daily), analytics.
 local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
+local Analytics = require("./Analytics")
+local Award = require("./Logic/Award")
 local Config = require("./Config")
+local Daily = require("./Logic/Daily")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Progress = require("./Logic/Progress")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
@@ -33,14 +37,18 @@ export type Profile = {
 	soon: boolean,
 	saving: boolean,
 	gone: boolean,
+	-- the UTC day the quests were last looked at (a new day refreshes the view)
+	day: number,
 }
 
 local profiles: { [Player]: Profile } = {}
 local loadedFns: { (Player) -> () } = {}
 local store: Store.Store
 
+local shiftDays: () -> number
+
 local function clock(): number
-	return os.time()
+	return os.time() + shiftDays()
 end
 
 local function serverNow(): number
@@ -52,8 +60,11 @@ function Profiles.get(player: Player): Profile?
 	return if p and p.ready then p else nil
 end
 
--- The client's view: level bar, boost badge, collection; `news` = level ups to show now.
-function Profiles.send(player: Player, news: { Progress.LevelUp }?)
+local NAMES = Rules.Config.REACTIONS
+
+-- The client's view: level bar, boost badge, collection; `news` = level ups to show now; `extra` = one-off fields
+-- of this change (gains, found, done, claim).
+function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [string]: any }?)
 	local p = profiles[player]
 	if not p or not p.ready or not player.Parent then
 		return
@@ -71,6 +82,14 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?)
 		levelBalls = Config.LEVEL_BALLS,
 		news = news,
 	}
+	for k, v in Award.view(d, clock(), serverNow(), Config, #NAMES) do
+		(view :: any)[k] = v
+	end
+	if extra then
+		for k, v in extra do
+			(view :: any)[k] = v
+		end
+	end
 	Remotes.Profile:FireClient(player, view)
 end
 
@@ -78,6 +97,31 @@ local function attrs(p: Profile)
 	local d = p.data
 	p.player:SetAttribute("Level", d.level)
 	p.player:SetAttribute("Balls", #d.balls)
+	p.player:SetAttribute("Coins", d.coins)
+	p.player:SetAttribute("Crystals", d.crystals)
+end
+
+local function deep(t: any): any
+	if type(t) ~= "table" then
+		return t
+	end
+	local out = {}
+	for k, v in t do
+		out[k] = deep(v)
+	end
+	return out
+end
+
+-- Wallet flows: to analytics, and to the client as "gains" (counters roll, small toasts).
+local function gains(player: Player, log: { any }): { any }?
+	Analytics.flows(player, log)
+	local out = {}
+	for _, f in log do
+		if not f.sink then
+			table.insert(out, { cur = f.cur, n = f.n, why = f.why })
+		end
+	end
+	return if #out > 0 then out else nil
 end
 
 local function save(p: Profile, release: boolean)
@@ -87,8 +131,8 @@ local function save(p: Profile, release: boolean)
 	p.saving = true
 	p.soon = false
 	p.savedAt = clock()
-	local data = table.clone(p.data)
-	data.balls = table.clone(p.data.balls)
+	-- a deep copy: the save yields, the live data keeps changing
+	local data = deep(p.data)
 	local ok, lost = Store.save(store, p.key, data, release)
 	p.saving = false
 	if ok and not lost then
@@ -123,6 +167,7 @@ function Profiles.join(player: Player)
 		soon = false,
 		saving = false,
 		gone = false,
+		day = -1,
 	}
 	profiles[player] = p
 	task.spawn(function()
@@ -145,7 +190,13 @@ function Profiles.join(player: Player)
 		end
 		p.savedAt = clock()
 		p.data = Progress.migrate(raw)
-		Progress.repair(p.data, Config :: any)
+		Progress.repair(p.data, Config :: any, NAMES)
+		local now = clock()
+		if p.data.born < 0 then
+			p.data.born = Daily.day(now)
+		end
+		p.day = Daily.day(now)
+		Daily.quests(p.data, now, Config.ECON, rand)
 		p.ready = true
 		if p.data.tut then
 			Tutorial.setDone(player, true)
@@ -163,6 +214,7 @@ function Profiles.join(player: Player)
 			)
 		)
 		Profiles.send(player)
+		Analytics.collection(player, #p.data.balls, Daily.day(now) - p.data.born, #p.data.book)
 		for _, fn in table.clone(loadedFns) do
 			task.spawn(fn, player)
 		end
@@ -227,20 +279,52 @@ function Profiles.tutorialDone(player: Player): Reward?
 	return { balls = r.balls, legend = r.legend, pool = table.clone(Config.SPIN_POOL), boost = r.boost }
 end
 
--- A real match is over: XP (boosted), level ups with their balls. Returns what the result screen shows.
-function Profiles.award(player: Player, stats: Progress.Stats): Progress.Gain?
+-- A real match is over: coins, XP (boosted), level ups with their balls, quests, new reactions of the book.
+-- Returns what the result screen shows.
+function Profiles.award(player: Player, info: Award.Info): Award.Result?
 	local p = Profiles.get(player)
 	if not p then
 		return nil
 	end
-	local g = Progress.award(p.data, stats, clock(), Config :: any, rand)
+	local log = {}
+	local res = Award.match(p.data, info, clock(), Config, rand, NAMES, log)
+	local g = res.gain
 	p.dirty = true
-	if #g.ups > 0 then
+	if #g.ups > 0 or #res.quests > 0 or #res.book.new > 0 then
 		saveSoon(p)
 	end
 	attrs(p)
-	Profiles.send(player, if #g.ups > 0 then g.ups else nil)
-	return g
+	Profiles.send(player, if #g.ups > 0 then g.ups else nil, {
+		gains = gains(player, log),
+		found = if #res.book.new > 0 then res.book.new else nil,
+		done = if #res.quests > 0 then res.quests else nil,
+	})
+	return res
+end
+
+-- Action daily: today's login reward (once per UTC day). Saved soon (VOID on the 7th day).
+function Profiles.claimDaily(player: Player)
+	local p = Profiles.get(player)
+	if not p then
+		return
+	end
+	local log = {}
+	local c = Daily.claim(p.data, clock(), Config.ECON, log)
+	if not c then
+		return
+	end
+	saveSoon(p)
+	attrs(p)
+	Analytics.login(player, c.n, c.pos, c.cycle)
+	print(`[BT] login reward of {player.Name}: day {c.pos} (claim {c.n})`)
+	Profiles.send(player, nil, { gains = gains(player, log), claim = c })
+end
+
+-- Debug: ServerScriptService attribute DebugDay = n shifts this server's profile clock by n days (login and
+-- quest resets without waiting for 00:00 UTC). Never set in a live game.
+function shiftDays(): number
+	local n = ServerScriptService:GetAttribute("DebugDay")
+	return if type(n) == "number" and n == n then math.floor(n) * 86400 else 0
 end
 
 -- Debug: ServerScriptService attribute DebugXp = n gives every loaded person n XP once (the NEW BALL! screen).
@@ -252,17 +336,27 @@ local function debugXp()
 	ServerScriptService:SetAttribute("DebugXp", nil)
 	for player, p in profiles do
 		if p.ready then
-			local ups = Progress.addXp(p.data, n, Config :: any, rand)
+			local log = {}
+			local ups = Progress.addXp(p.data, n, Config :: any, rand, log)
 			p.dirty = true
 			attrs(p)
-			Profiles.send(player, if #ups > 0 then ups else nil)
+			Profiles.send(player, if #ups > 0 then ups else nil, { gains = gains(player, log) })
 		end
 	end
 end
 
--- Heartbeat: due saves (one write per key per writeGap s), autosave.
+-- Heartbeat: due saves (one write per key per writeGap s), autosave; a new UTC day refreshes quests and login.
 function Profiles.tick()
 	local now = clock()
+	local today = Daily.day(now)
+	for player, p in profiles do
+		if p.ready and p.day ~= today then
+			p.day = today
+			Daily.quests(p.data, now, Config.ECON, rand)
+			p.dirty = true
+			Profiles.send(player)
+		end
+	end
 	for _, p in profiles do
 		if p.ready and not p.temp and not p.saving then
 			local age = now - p.savedAt

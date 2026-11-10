@@ -1,9 +1,13 @@
 --!strict
 -- Profile data of T2.2, pure (runs in lune, tests/profile): schema and migration, the tutorial reward, XP and levels,
 -- level balls, the 2x XP boost. Numbers come in as `cfg` (src/server/Config.luau), time as os.time() seconds.
+-- v2 (M3.1): wallet, login days, quests, book and the rest of Logic/Meta; levels 10+ pay coins (Logic/Wallet).
+local Meta = require("./Meta")
+local Wallet = require("./Wallet")
+
 local Progress = {}
 
-Progress.VERSION = 1
+Progress.VERSION = 2
 
 export type Data = {
 	-- schema version
@@ -24,6 +28,22 @@ export type Data = {
 	-- lifetime counters
 	matches: number,
 	wins: number,
+	-- v2 (Logic/Meta)
+	coins: number,
+	crystals: number,
+	born: number,
+	loginDays: number,
+	dailyClaimed: number,
+	quests: Meta.Quests,
+	book: { string },
+	pity: { coins: number, crystals: number },
+	streak: number,
+	starterSeen: number,
+	starterUntil: number,
+	trialsUsed: Meta.DayCount,
+	trialBonus: number,
+	dailyBall: Meta.DailyBall,
+	friend: Meta.DayCount,
 }
 
 export type Cfg = {
@@ -44,35 +64,40 @@ export type Cfg = {
 	},
 	LEVEL_BALLS: number,
 	LEVEL_TIERS: { string },
+	ECON: {
+		XP_CAP: number,
+		LEVEL_COINS: number,
+		LEVEL_CRYSTALS_EVERY: number,
+		LEVEL_CRYSTALS: number,
+		FRIEND: { xp: number, coins: number, daily: number },
+		[string]: any,
+	},
 }
 
-export type Stats = { win: boolean, kills: number, rx: number }
-export type LevelUp = { level: number, e: number? }
+-- afk: no aim or power in some round (no XP, no coins); friend: the friend bonus applies to this match
+export type Stats = { win: boolean, kills: number, rx: number, afk: boolean?, friend: boolean? }
+-- e: the ball of levels 2..LEVEL_BALLS; coins / crystals: the pay of levels after them
+export type LevelUp = { level: number, e: number?, coins: number?, crystals: number? }
 export type Gain = { xp: number, base: number, mult: number, ups: { LevelUp } }
 
 local NEL = 27
 
 function Progress.new(): Data
-	return {
-		v = Progress.VERSION,
-		tut = false,
-		rewarded = false,
-		played = false,
-		balls = {},
-		level = 1,
-		xp = 0,
-		boostUntil = 0,
-		matches = 0,
-		wins = 0,
-	}
+	local d = Meta.fresh()
+	d.v = Progress.VERSION
+	d.tut = false
+	d.rewarded = false
+	d.played = false
+	d.balls = {}
+	d.level = 1
+	d.xp = 0
+	d.boostUntil = 0
+	d.matches = 0
+	d.wins = 0
+	return d :: any
 end
 
-local function int(v: any, lo: number, hi: number, def: number): number
-	if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then
-		return def
-	end
-	return math.clamp(math.floor(v), lo, hi)
-end
+local int = Meta.int
 
 -- Any stored value (nil, an older schema, junk) -> a valid Data of the current schema. Unknown keys are dropped,
 -- a newer schema than this server knows is read field by field (what it understands is kept).
@@ -109,17 +134,23 @@ function Progress.migrate(raw: any): Data
 	d.boostUntil = int(raw.boostUntil, 0, 2 ^ 40, 0)
 	d.matches = int(raw.matches, 0, 1e9, 0)
 	d.wins = int(raw.wins, 0, 1e9, 0)
+	-- v1 -> v2: a v1 record has none of the M3 fields, they start at the defaults
+	Meta.read(d, raw)
 	return d
 end
 
 -- A finished tutorial always comes with the starters (a v0 record, a hand-edited one).
-function Progress.repair(d: Data, cfg: Cfg)
+-- reactions: the 42 names (Rules.Config.REACTIONS): book entries and quests not known any more are dropped.
+function Progress.repair(d: Data, cfg: Cfg, reactions: { string }?)
 	if d.tut then
 		for _, e in cfg.BASE_BALLS do
 			if not table.find(d.balls, e) then
 				table.insert(d.balls, e)
 			end
 		end
+	end
+	if reactions then
+		Meta.repair(d, reactions, cfg.ECON.QUESTS.pool)
 	end
 end
 
@@ -135,9 +166,9 @@ local function give(d: Data, e: number): boolean
 	return true
 end
 
--- XP from `level` to the next one.
+-- XP from `level` to the next one, flat at XP_CAP (docs/economy.md «Уровни»).
 function Progress.need(level: number, cfg: Cfg): number
-	return cfg.XP.base + cfg.XP.step * (math.max(1, level) - 1)
+	return math.min(cfg.ECON.XP_CAP, cfg.XP.base + cfg.XP.step * (math.max(1, level) - 1))
 end
 
 function Progress.boostLeft(d: Data, now: number): number
@@ -171,8 +202,9 @@ function Progress.levelPool(d: Data, cfg: Cfg): { number }
 	return out
 end
 
--- Adds XP (already multiplied), levels up as far as it reaches. Levels 2..LEVEL_BALLS give a random ball of the pool.
-function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number): { LevelUp }
+-- Adds XP (already multiplied), levels up as far as it reaches. Levels 2..LEVEL_BALLS give a random ball of the pool,
+-- later levels LEVEL_COINS coins and every LEVEL_CRYSTALS_EVERY-th also crystals (flows in `log`).
+function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number, log: { Wallet.Flow }?): { LevelUp }
 	local ups = {}
 	d.xp += math.max(0, math.floor(amount))
 	while d.xp >= Progress.need(d.level, cfg) do
@@ -186,22 +218,32 @@ function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number): 
 				give(d, e)
 				up.e = e
 			end
+		else
+			local E = cfg.ECON
+			local why = `level_{d.level}`
+			up.coins = Wallet.add(d, "coins", E.LEVEL_COINS, why, "Gameplay", log)
+			if d.level % E.LEVEL_CRYSTALS_EVERY == 0 then
+				up.crystals = Wallet.add(d, "crystals", E.LEVEL_CRYSTALS, why, "Gameplay", log)
+			end
 		end
 		table.insert(ups, up)
 	end
 	return ups
 end
 
--- A match is over for this person: counters, XP times the boost, level ups.
-function Progress.award(d: Data, s: Stats, now: number, cfg: Cfg, rand: () -> number): Gain
+-- A match is over for this person: counters, XP times the boost (and the friend bonus), level ups. AFK: no XP.
+function Progress.award(d: Data, s: Stats, now: number, cfg: Cfg, rand: () -> number, log: { Wallet.Flow }?): Gain
 	d.matches += 1
 	if s.win then
 		d.wins += 1
 	end
+	if s.afk then
+		return { xp = 0, base = 0, mult = 1, ups = {} }
+	end
 	local base = Progress.matchXp(s, cfg)
-	local mult = Progress.mult(d, now, cfg)
-	local xp = base * mult
-	return { xp = xp, base = base, mult = mult, ups = Progress.addXp(d, xp, cfg, rand) }
+	local mult = Progress.mult(d, now, cfg) * (if s.friend then cfg.ECON.FRIEND.xp else 1)
+	local xp = math.floor(base * mult)
+	return { xp = xp, base = base, mult = mult, ups = Progress.addXp(d, xp, cfg, rand, log) }
 end
 
 -- The free spin of the tutorial: one of SPIN_POOL, each equally likely, and only a ball not owned yet when possible.

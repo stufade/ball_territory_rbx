@@ -73,6 +73,58 @@ function Analytics.custom(player: Player, name: string, value: number, mode: str
 	end)
 end
 
+-- M3.1 economy (docs/economy.md «Что делать luau-coder» 8): every source and sink of coins and crystals.
+-- f: Logic/Wallet.Flow {cur, n, sink, kind (AnalyticsEconomyTransactionType name), why (item SKU), bal}.
+function Analytics.flows(player: Player, log: { any })
+	for _, f in log do
+		safe("economy", function()
+			AnalyticsService:LogEconomyEvent(
+				player,
+				if f.sink then Enum.AnalyticsEconomyFlowType.Sink else Enum.AnalyticsEconomyFlowType.Source,
+				if f.cur == "coins" then "Coins" else "Crystals",
+				f.n,
+				f.bal,
+				f.kind,
+				f.why
+			)
+		end)
+	end
+end
+
+local function event(player: Player, name: string, value: number, f1: string?, f2: string?)
+	safe(name, function()
+		local fields: { [string]: string } = {}
+		if f1 then
+			fields[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = f1
+		end
+		if f2 then
+			fields[Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = f2
+		end
+		AnalyticsService:LogCustomEvent(player, name, value, fields)
+	end)
+end
+
+-- Login reward claimed: value = login days so far; day of the cycle and the cycle.
+function Analytics.login(player: Player, n: number, pos: number, cycle: number)
+	event(player, "LoginDay", n, `day {pos}`, `cycle {cycle}`)
+end
+
+-- Once per profile load: balls owned (value) on day N since the first visit (D7/D14/D30), and the book.
+function Analytics.collection(player: Player, balls: number, day: number, book: number)
+	local d = `d{if day >= 30 then "30+" elseif day >= 14 then "14-29" elseif day >= 7 then "7-13" else tostring(day)}`
+	event(player, "Collection", balls, d, `book {book // 10 * 10}`)
+end
+
+-- M3.2 hooks (spins and offers do not exist in M3.1): a spin (coins | crystals, tier, pity counter after),
+-- an offer (what, shown | declined | bought).
+function Analytics.spin(player: Player, kind: string, tier: string, pity: number)
+	event(player, "Spin", pity, kind, tier)
+end
+
+function Analytics.offer(player: Player, what: string, action: string)
+	event(player, "Offer", 1, what, action)
+end
+
 function Analytics.forget(player: Player)
 	done[player] = nil
 end

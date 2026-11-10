@@ -51,6 +51,8 @@ Net.Action = {
 	tutor = "tutor",
 	-- T2.2: the tutorial reward screen is over (State reward -> lobby)
 	claim = "claim",
+	-- M3.1: take today's login reward (once per UTC day, the server decides)
+	daily = "daily",
 }
 
 -- Action "queue" argument.
@@ -164,7 +166,8 @@ export type Place = { e: number, pct: number, kills: number, powers: number }
 export type MatchEnd = { id: number, mode: ModeName, winner: number, places: { Place } }
 
 -- Profile remote (T2.2): level bar, 2x XP badge and collection of one player, sent on every change.
-export type LevelUp = { level: number, e: number? }
+-- e: the ball of levels 2..9; coins / crystals: the pay of later levels (M3.1)
+export type LevelUp = { level: number, e: number?, coins: number?, crystals: number? }
 export type ProfileView = {
 	level: number,
 	-- XP inside the level and XP the level needs
@@ -180,7 +183,36 @@ export type ProfileView = {
 	levelBalls: number,
 	-- level ups of this change, to show as NEW BALL! (e = the ball, nil = no ball at that level)
 	news: { LevelUp }?,
+	-- M3.1 economy (all optional: an older server leaves them out)
+	coins: number?,
+	crystals: number?,
+	-- login reward: claims so far, day of the cycle (1..7) of the next claim (today's once taken), can claim now,
+	-- the 7 cards of that cycle
+	daily: { n: number, pos: number, ready: boolean, cards: { DayCard } }?,
+	-- today's quests and the next reset (GetServerTimeNow)
+	quests: { list: { QuestView }, all: boolean, allCoins: number, endsAt: number }?,
+	-- reaction names found, of bookTotal
+	book: { string }?,
+	bookTotal: number?,
+	-- duel wins in a row
+	streak: number?,
+	-- one-off fields of this change: wallet gains, new book reactions, quests just done, the login claim
+	gains: { { cur: string, n: number, why: string } }?,
+	found: { string }?,
+	done: { { id: string, text: string, coins: number } }?,
+	claim: { n: number, pos: number, cycle: number, gift: DayCard }?,
 }
+
+export type DayCard = {
+	coins: number?,
+	crystals: number?,
+	ball: number?,
+	trials: number?,
+	got: boolean?,
+	today: boolean?,
+}
+
+export type QuestView = { id: string, text: string, n: number, goal: number, coins: number, done: boolean }
 
 -- State remote: one table per screen, `ph` tells which.
 export type State = {
@@ -213,6 +245,11 @@ export type State = {
 	-- T2.2 result: XP of this match (with the boost) and the multiplier
 	xp: number?,
 	xpMult: number?,
+	-- M3.1 result: coins of this match (all bonuses in), the friend bonus counted, AFK (nothing paid), streak
+	coins: number?,
+	friend: boolean?,
+	afk: boolean?,
+	streak: number?,
 	-- T2.2 reward after the tutorial: the 4 starters, the legendary of the free spin (decided by the server), the
 	-- spin strip's balls, seconds of 2x XP
 	balls: { number }?,

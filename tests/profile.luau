@@ -54,13 +54,13 @@ do
 	check(d.level == 1 and d.xp == 0 and d.boostUntil == 123, "NaN level and negative xp fixed")
 	check((d :: any).junk == nil, "unknown keys dropped")
 	d = Progress.migrate({ done = true, owned = { 5 }, level = 3 })
-	check(d.v == 1 and d.tut and d.rewarded and d.level == 3 and d.balls[1] == 5, "v0 record migrates")
+	check(d.v == Progress.VERSION and d.tut and d.rewarded and d.level == 3 and d.balls[1] == 5, "v0 record migrates")
 	Progress.repair(d, cfg)
 	check(Progress.owns(d, 0) and Progress.owns(d, 2) and #d.balls == 5, "repair: done tutorial has the starters")
 	d = Progress.migrate({ v = 7, tut = true, level = 4, newField = {} })
-	check(d.tut and d.level == 4 and d.v == 1, "newer schema read field by field")
+	check(d.tut and d.level == 4 and d.v == Progress.VERSION, "newer schema read field by field")
 	local s = Progress.migrate(Progress.new())
-	check(s.level == 1 and s.v == 1, "new survives a round trip")
+	check(s.level == 1 and s.v == Progress.VERSION, "new survives a round trip")
 end
 
 -- 2. XP and levels ------------------------------------------------------------------------------------------------
@@ -176,9 +176,12 @@ do
 	for _ = 1, 8000 do
 		local d = Progress.new()
 		local rw = Progress.tutorialReward(d, 0, cfg, r)
-		if not rw or not table.find(cfg.SPIN_POOL, rw.legend) or not Progress.owns(d, rw.legend) then
-			bad += 1
-		elseif not table.find(cfg.TIERS.legendary, rw.legend) then
+		if
+			not rw
+			or not table.find(cfg.SPIN_POOL, rw.legend)
+			or not Progress.owns(d, rw.legend)
+			or not table.find(cfg.TIERS.legendary, rw.legend)
+		then
 			bad += 1
 		else
 			hits[rw.legend] = (hits[rw.legend] or 0) + 1
@@ -328,7 +331,7 @@ do
 end
 
 -- 8. The whole server: tutorial -> reward -> plaza -> duel XP -> restart -> plaza --------------------------------
-type Client = { p: any, st: any, prof: any, profs: number, news: { any }, answered: any }
+type Client = { p: any, st: any, prof: any, profs: number, news: { any }, answered: any, afk: boolean? }
 
 local function server(stores: any?)
 	local world = Mock.world()
@@ -365,6 +368,9 @@ local function server(stores: any?)
 				if a[1].news then
 					table.insert(c.news, a[1].news)
 				end
+			elseif m.remote == "Match" and a[1] == "start" and a[2].mode ~= "tutor" and not a[2].view and not c.afk then
+				-- a real player: LAUNCH in every round (no input in a round = AFK, no XP or coins)
+				input(c, 2)
 			elseif m.remote == "Match" and a[1] == "tut" and a[2].wait then
 				local d = a[2]
 				if d.k == "tap" then
@@ -479,6 +485,54 @@ do
 	check(own, "draft: own field and offers from the 5 balls")
 	check(xp and xp >= 2 * cfg.XP.play and c.st.xpMult == 2, `result: boosted XP ({xp})`)
 	check(c.prof and (c.prof.xp > 0 or c.prof.level > 1), "profile XP grew")
+	-- M3.1: coins of the duel on the result and in the profile, analytics flows
+	local won = c.st.win
+	local coins = c.st.coins
+	check(coins and coins >= (if won then 50 else 25), `result: duel coins ({coins})`)
+	-- the profile also has the book's coins (new reactions) and quests done
+	local extra = 25 * #(c.prof.book or {})
+	for _, q in c.prof.quests.list do
+		extra += if q.done then q.coins else 0
+	end
+	check(c.prof.coins == coins + extra and c.p:GetAttribute("Coins") == c.prof.coins, "profile coins: match + book")
+	local eco = s1.world.analytics.economy
+	check(
+		#eco > 0 and eco[1].flow == "Source" and eco[1].cur == "Coins" and eco[1].sku == "match_duel",
+		"economy event"
+	)
+	check(c.prof.quests and #c.prof.quests.list == 3 and c.prof.daily and c.prof.daily.ready, "view: quests, daily")
+	-- the login reward: Action daily, once
+	local before = c.prof.coins
+	s1.action(c, "daily")
+	s1.run(0.1)
+	check(c.prof.coins == before + 50 and c.prof.claim and c.prof.claim.pos == 1, "daily: day 1, +50 coins")
+	check(not c.prof.daily.ready and c.prof.daily.n == 1, "daily: claimed today")
+	s1.action(c, "daily")
+	s1.run(0.1)
+	check(c.prof.coins == before + 50, "daily: twice a day pays once")
+	local login = false
+	for _, e in s1.world.analytics.custom do
+		login = login or (e.name == "LoginDay" and e.value == 1)
+	end
+	check(login, "analytics LoginDay")
+	-- AFK in a 4-player match: no coins, no XP
+	s1.run(cfg.RESULT_TIME + 2)
+	c.afk = true
+	local xpBefore, lvBefore, coinsBefore = c.prof.xp, c.prof.level, c.prof.coins
+	s1.action(c, "queue", 2)
+	i = 0
+	local afkSt = nil
+	while i < 800 do
+		s1.run(0.5)
+		i += 1
+		if c.st and c.st.ph == "result" then
+			afkSt = c.st
+			break
+		end
+	end
+	check(afkSt and afkSt.afk == true and afkSt.coins == 0 and afkSt.xp == 0, "AFK match: no coins, no XP")
+	check(c.prof.coins == coinsBefore and c.prof.xp == xpBefore and c.prof.level == lvBefore, "AFK: profile same")
+	c.afk = false
 	-- debug XP: level 2 gives a new ball
 	s1.world.services.ServerScriptService:SetAttribute("DebugXp", 400)
 	s1.run(0.2)

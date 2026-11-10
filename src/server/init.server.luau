@@ -10,6 +10,7 @@ local Arenas = require("@self/Arenas")
 local Avatars = require("@self/Avatars")
 local Config = require("@self/Config")
 local FakeFriend = require("@self/FakeFriend")
+local Friends = require("@self/Friends")
 local Guard = require("@self/Logic/Guard")
 local Lobby = require("@self/Lobby")
 local Modes = require("@self/Modes")
@@ -44,20 +45,40 @@ Tutorial.onDone(function(player, _info)
 		end
 	end
 end)
-Session.award = function(player, mode, win, kills, rx)
+Session.award = function(player, mode, win, t, afk, friend)
 	if mode == "tutor" then
-		return nil, nil
+		return nil
 	end
-	local g = Profiles.award(player, { win = win, kills = kills, rx = rx })
-	if not g then
-		return nil, nil
+	local res = Profiles.award(player, {
+		mode = mode,
+		win = win,
+		kills = t.kills,
+		rx = t.rx,
+		kinds = t.kinds,
+		balls = t.balls,
+		afk = afk,
+		friend = friend,
+		-- the coins x2 game pass comes with M3.2
+		pass2x = false,
+	})
+	if not res then
+		return nil
 	end
-	return g.xp, g.mult
+	local c = res.coins
+	return {
+		xp = res.gain.xp,
+		xpMult = res.gain.mult,
+		coins = c.coins + c.streakCoins,
+		friend = if c.friend then true else nil,
+		afk = if afk then true else nil,
+		streak = if mode == "duel" then c.streak else nil,
+	}
 end
 
 local function onPlayer(player: Player)
 	local r = Roster.add(player)
 	Profiles.join(player)
+	Friends.joined(player)
 	Avatars.home(player)
 	local function spawned(ch: Model)
 		local hrp = ch:WaitForChild("HumanoidRootPart", 10)
@@ -88,6 +109,7 @@ Players.PlayerRemoving:Connect(function(player)
 		Roster.remove(player)
 	end
 	Profiles.leave(player)
+	Friends.left(player)
 	Analytics.forget(player)
 end)
 

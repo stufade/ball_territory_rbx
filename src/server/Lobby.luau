@@ -189,6 +189,10 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 		claim(r)
 		return
 	end
+	if verb == A.daily then
+		Profiles.claimDaily(r.player)
+		return
+	end
 	-- party verbs work anywhere (in a match too); a queue request of a party member is the host's party search
 	if verb ~= A.queue and Party.action(r, verb, arg, now) then
 		return
