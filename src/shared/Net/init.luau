@@ -17,6 +17,7 @@ Net.Remote = {
 	Input = "Input", -- RemoteEvent C->S (kind: number, dx: number?, dy: number?)
 	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?)
 	Party = "Party", -- RemoteEvent S->C (view: PartyView), M1.6
+	Profile = "Profile", -- RemoteEvent S->C (view: ProfileView), T2.2
 }
 
 Net.Input = {
@@ -48,6 +49,8 @@ Net.Action = {
 	-- T2.1 tutorial: "tut" (cue number) = the player tapped through a waiting cue; "tutor" = HOW TO PLAY on the plaza
 	tut = "tut",
 	tutor = "tutor",
+	-- T2.2: the tutorial reward screen is over (State reward -> lobby)
+	claim = "claim",
 }
 
 -- Action "queue" argument.
@@ -160,9 +163,28 @@ export type RoundEnd = {
 export type Place = { e: number, pct: number, kills: number, powers: number }
 export type MatchEnd = { id: number, mode: ModeName, winner: number, places: { Place } }
 
+-- Profile remote (T2.2): level bar, 2x XP badge and collection of one player, sent on every change.
+export type LevelUp = { level: number, e: number? }
+export type ProfileView = {
+	level: number,
+	-- XP inside the level and XP the level needs
+	xp: number,
+	need: number,
+	-- owned balls (element ids) and how many balls there are
+	balls: { number },
+	total: number,
+	-- 2x XP ends at this workspace:GetServerTimeNow() (nil = no boost), the multiplier
+	boostEnds: number?,
+	boostMult: number,
+	-- levels up to this one give a ball
+	levelBalls: number,
+	-- level ups of this change, to show as NEW BALL! (e = the ball, nil = no ball at that level)
+	news: { LevelUp }?,
+}
+
 -- State remote: one table per screen, `ph` tells which.
 export type State = {
-	ph: "lobby" | "queue" | "pick" | "draft" | "choose" | "match" | "wait" | "result",
+	ph: "lobby" | "queue" | "pick" | "draft" | "choose" | "match" | "wait" | "result" | "reward",
 	mode: ModeName?,
 	endsAt: number?,
 	first: boolean?,
@@ -186,6 +208,17 @@ export type State = {
 	win: boolean?,
 	-- lobby (T2.1): plaza button to highlight ("play" after the tutorial)
 	glow: string?,
+	-- T2.2 draft: the side's own balls to draft from (nil = every ball)
+	own: { number }?,
+	-- T2.2 result: XP of this match (with the boost) and the multiplier
+	xp: number?,
+	xpMult: number?,
+	-- T2.2 reward after the tutorial: the 4 starters, the legendary of the free spin (decided by the server), the
+	-- spin strip's balls, seconds of 2x XP
+	balls: { number }?,
+	legend: number?,
+	pool: { number }?,
+	boost: number?,
 }
 
 return Net

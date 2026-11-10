@@ -423,6 +423,16 @@ check(not string.find(keys, "C:go C:out", 1, true), "a good tap in C is a KO the
 check(ann.p:GetAttribute("TutorialDone") == true and Tutorial.isDone(ann.p), "flag TutorialDone set")
 check(#hooked == 1 and hooked[1].name == "Ann" and hooked[1].info.first == true, "T2.2 hook onDone called once, first")
 run(Config.RESULT_TIME + 1)
+-- T2.2: the reward screen, then the plaza
+local rw = ann.st
+check(rw and rw.ph == "reward", "reward screen after the victory")
+check(rw and rw.balls and #rw.balls == 4 and table.find(Config.SPIN_POOL, rw.legend), "reward: 4 balls, a legendary")
+check(rw and rw.boost == Config.XP.boostTime, "reward: 15 min of 2x XP")
+action(ann, "queue", 1)
+run(0.5)
+check(ann.st and ann.st.ph == "reward", "no search from the reward screen")
+action(ann, "claim")
+run(0.5)
 check(ann.st and ann.st.ph == "lobby" and ann.st.glow == "play" and ann.st.first == false, "plaza with PLAY lit")
 local steps = {}
 for _, s in world.analytics.steps do

@@ -15,18 +15,49 @@ local Lobby = require("@self/Lobby")
 local Modes = require("@self/Modes")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Party = require("@self/Party")
+local Profiles = require("@self/Profiles")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Roster = require("@self/Roster")
 local Runner = require("@self/Runner")
 local Session = require("@self/Session")
+local Tutorial = require("@self/Tutorial")
 local Watch = require("@self/Watch")
 
 print("[BT] server boot")
 Arenas.init()
 Party.start()
+Profiles.start()
+
+-- T2.2 wiring: the profile may come after Lobby.join; the won tutorial gives the reward; matches give XP.
+Profiles.onLoaded(function(player)
+	local r = Roster.get(player)
+	if r then
+		Lobby.loaded(r)
+	end
+end)
+Tutorial.onDone(function(player, _info)
+	local r = Roster.get(player)
+	if r then
+		Lobby.tutorialDone(r, Roster.now())
+		if Profiles.played(player) then
+			r.glow = nil
+		end
+	end
+end)
+Session.award = function(player, mode, win, kills, rx)
+	if mode == "tutor" then
+		return nil, nil
+	end
+	local g = Profiles.award(player, { win = win, kills = kills, rx = rx })
+	if not g then
+		return nil, nil
+	end
+	return g.xp, g.mult
+end
 
 local function onPlayer(player: Player)
 	local r = Roster.add(player)
+	Profiles.join(player)
 	Avatars.home(player)
 	local function spawned(ch: Model)
 		local hrp = ch:WaitForChild("HumanoidRootPart", 10)
@@ -56,6 +87,7 @@ Players.PlayerRemoving:Connect(function(player)
 		Lobby.leave(r, Roster.now())
 		Roster.remove(player)
 	end
+	Profiles.leave(player)
 	Analytics.forget(player)
 end)
 
@@ -126,6 +158,7 @@ RunService.Heartbeat:Connect(function(dt)
 	Lobby.tick(now)
 	Watch.tick(dt)
 	FakeFriend.tick(now)
+	Profiles.tick()
 	for _, s in table.clone(Session.active()) do
 		if s.closed then
 			continue

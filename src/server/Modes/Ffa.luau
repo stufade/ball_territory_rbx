@@ -2,6 +2,7 @@
 -- 4-player match: each person picks a ball (10 s, no two alike), bots take the empty seats, one 60 s round.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Collection = require("../Collection")
 local Config = require("../Config")
 local Guard = require("../Logic/Guard")
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -34,10 +35,26 @@ local function free(s: Session.Session): { number }
 	return out
 end
 
+-- Free balls a person may pick: the own collection (T2.2); none of them free -> any free ball.
+local function freeFor(s: Session.Session, m: Session.Member): { number }
+	local all = free(s)
+	local own = Collection.owned(if m.rec then m.rec.player else nil)
+	if not own then
+		return all
+	end
+	local out = {}
+	for _, e in all do
+		if table.find(own, e) then
+			table.insert(out, e)
+		end
+	end
+	return if #out > 0 then out else all
+end
+
 local function sendPick(s: Session.Session)
-	local options, used = free(s), taken(s)
-	Session.each(s, function(_)
-		return { ph = "pick", mode = "ffa", options = options, taken = used, endsAt = s.endsAt }
+	local used = taken(s)
+	Session.each(s, function(m)
+		return { ph = "pick", mode = "ffa", options = freeFor(s, m), taken = used, endsAt = s.endsAt }
 	end)
 end
 
@@ -46,7 +63,7 @@ local function startRound(s: Session.Session)
 	for _, m in s.members do
 		if picks[m.side] == nil then
 			if m.rec then
-				local f = free(s)
+				local f = freeFor(s, m)
 				picks[m.side] = f[math.floor(rand() * #f) + 1]
 			else
 				picks[m.side] = Rules.Duel.pickFree(taken(s), rand)
@@ -112,7 +129,7 @@ function Ffa.action(s: Session.Session, rec: Roster.Rec, verb: string, arg: numb
 		return
 	end
 	local e = Guard.element(arg, NEL)
-	if e == nil or table.find(taken(s), e) then
+	if e == nil or not table.find(freeFor(s, m), e) then
 		return
 	end
 	s.data.picks[m.side] = e

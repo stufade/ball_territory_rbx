@@ -1,9 +1,10 @@
 --!strict
 -- Server timers and limits of M1 matches (seconds). Round lengths live in Rules.Config.
 return {
-	-- playtest switch: everybody owns all 27 balls (starter pick of all 27, "any ball" on every draft pick).
-	-- false brings back M1: 4 starters, one free "any ball" per duel. There are no drops yet.
-	TEST_ALL_BALLS = true,
+	-- debug switch: everybody owns all 27 balls (starter pick of all 27, "any ball" on every draft pick).
+	-- false (players): each person drafts from the collection of the profile (T2.2). In Studio the same is on with
+	-- the ServerScriptService attribute DebugAllBalls = true.
+	TEST_ALL_BALLS = false,
 	-- wait for other people in the queue, then bots fill the seats
 	QUEUE_WAIT = 5,
 	-- duel draft 1-2-2-1: time per pick, balls offered per pick, free "any ball" picks per duel
@@ -74,4 +75,46 @@ return {
 		botAim = { 0.5, 0.9 },
 		keep = 4.5,
 	},
+	-- T2.2 profile (DataStore): store name, autosave period, session lock, retries; a lock older than LOCK_TTL
+	-- belongs to a dead server; a live one is waited for LOCK_WAIT s, then taken over (the old server stops saving)
+	PROFILE = {
+		store = "Profiles1",
+		autosave = 60,
+		lockTtl = 600,
+		lockWait = 15,
+		retries = 5,
+		-- seconds between two writes of one key (DataStore allows one per 6 s)
+		writeGap = 7,
+	},
+	-- T2.2 progression. Tiers are rarity and show, not strength (docs/idea-analysis.md, «Тиры»).
+	TIERS = {
+		common = { 0, 1, 3, 2, 4, 5, 6, 10 },
+		rare = { 11, 7, 8, 12, 15, 18, 24, 26 },
+		epic = { 9, 14, 19, 23, 22, 21 },
+		legendary = { 13, 17, 16, 20, 25 },
+	},
+	-- the tutorial reward: the 4 starters one by one, then the free spin lands on one of these legendaries
+	BASE_BALLS = { 0, 1, 3, 2 },
+	SPIN_POOL = { 17, 16, 20, 25 },
+	-- XP of a match: taking part, winning, each reaction and KO of the player's balls (capped), times the boost.
+	-- With the 2x boost of the first 15 min level 2 comes after 2-3 matches (tests/profile prints the count).
+	XP = {
+		play = 20,
+		win = 25,
+		react = 2,
+		reactMax = 10,
+		ko = 5,
+		koMax = 15,
+		-- XP from level L to L+1: base + step * (L - 1)
+		base = 150,
+		step = 50,
+		boost = 2,
+		boostTime = 15 * 60,
+	},
+	-- levels 2..LEVEL_BALLS each give a random ball not collected yet from these tiers (legendaries come from
+	-- spins and the 7th day; brief «Прогрессия»: 8 random balls for levels 2-9)
+	LEVEL_BALLS = 9,
+	LEVEL_TIERS = { "common", "rare", "epic" },
+	-- the reward screen moves on by itself after this long (AFK)
+	REWARD_MAX = 90,
 }

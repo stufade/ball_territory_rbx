@@ -55,6 +55,8 @@ export type Runner = {
 	filter: ((seat: Seat, kind: number, dx: number?, dy: number?) -> (boolean, number?, number?))?,
 	watch: ((ev: Net.RulesEvent) -> ())?,
 	extra: ((S: Rules.State) -> ())?,
+	-- reactions set off by each element this round (T2.2 XP)
+	rxBy: { [number]: number },
 }
 
 local function recipients(r: Runner): { Player }
@@ -153,6 +155,7 @@ function Runner.new(session: any, S: Rules.State, seats: { Seat }, aim: number, 
 		filter = nil,
 		watch = nil,
 		extra = nil,
+		rxBy = {},
 	}
 	for _, s in seats do
 		local b = S.by[s.e]
@@ -238,6 +241,9 @@ local function flush(r: Runner)
 			continue
 		end
 		table.insert(list, { kind = ev.kind, d = ev.d })
+		if ev.kind == "rx" and type(ev.d.by) == "number" then
+			r.rxBy[ev.d.by] = (r.rxBy[ev.d.by] or 0) + 1
+		end
 		if r.watch then
 			r.watch(ev)
 		end
@@ -311,6 +317,17 @@ function Runner.tick(r: Runner, dt: number, now: number): boolean
 	end
 	if S.done then
 		r.phase = "done"
+		-- KOs and reactions of each side add up over the session's rounds (T2.2 XP)
+		local t = r.session.tally
+		if t then
+			for _, seat in r.seats do
+				local b = S.by[seat.e]
+				local x = t[seat.side] or { kills = 0, rx = 0 }
+				x.kills += if b then b.kills else 0
+				x.rx += r.rxBy[seat.e] or 0
+				t[seat.side] = x
+			end
+		end
 		return true
 	end
 	return false

@@ -37,4 +37,5 @@ return {
 	Input = get("RemoteEvent", Net.Remote.Input) :: RemoteEvent,
 	Action = get("RemoteEvent", Net.Remote.Action) :: RemoteEvent,
 	Party = get("RemoteEvent", Net.Remote.Party) :: RemoteEvent,
+	Profile = get("RemoteEvent", Net.Remote.Profile) :: RemoteEvent,
 }

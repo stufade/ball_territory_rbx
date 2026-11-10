@@ -40,6 +40,7 @@ local function sendDraft(s: Session.Session)
 			offer = Offers.offerFor(o, m.side),
 			any = Offers.canAny(o, m.side),
 			anyLeft = o.anyLeft[m.side + 1],
+			own = s.data.own[m.side + 1],
 			names = Session.names(s),
 			endsAt = s.endsAt,
 		}
@@ -118,7 +119,16 @@ local function afterPick(s: Session.Session, now: number)
 end
 
 function Duel.start(s: Session.Session, now: number)
-	s.data.offers = Offers.new(Rules, rand() < 0.5, Config.OFFER, Collection.anyFree(), rand)
+	-- each person drafts from the own collection (T2.2), bots from every ball
+	local own, any = {}, {}
+	for side = 1, 2 do
+		local rec = s.members[side].rec
+		local player = if rec then rec.player else nil
+		own[side] = Collection.owned(player)
+		any[side] = Collection.anyFree(player)
+	end
+	s.data.own = own
+	s.data.offers = Offers.new(Rules, rand() < 0.5, Config.OFFER, any, rand, own)
 	s.data.score = { 0, 0 }
 	s.st = "draft"
 	s.data.turnAt = now

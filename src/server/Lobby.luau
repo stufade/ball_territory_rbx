@@ -12,6 +12,7 @@ local Guard = require("./Logic/Guard")
 local Modes = require("./Modes")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Party = require("./Party")
+local Profiles = require("./Profiles")
 local Queue = require("./Logic/Queue")
 local Roster = require("./Roster")
 local Rules = require(ReplicatedStorage.Shared.Rules)
@@ -56,9 +57,50 @@ function Lobby.join(r: Roster.Rec)
 	elseif Tutorial.isDone(r.player) then
 		-- tutorial done (re-join on this server, or a saved profile of T2.2): straight to the plaza
 		r.first = false
+		if not Profiles.played(r.player) then
+			r.glow = "play"
+		end
 		Roster.lobby(r)
 	else
+		-- the tutorial starts once the profile is loaded (Tutorial.ready); a saved "done" cancels it (Lobby.loaded)
 		r.tutor = true
+	end
+end
+
+-- T2.2: the profile came (it may come after Lobby.join): a finished tutorial goes straight to the plaza.
+function Lobby.loaded(r: Roster.Rec)
+	if not Config.TUTORIAL or not Tutorial.isDone(r.player) or r.session or not r.tutor then
+		return
+	end
+	r.tutor = nil
+	r.first = false
+	r.glow = if Profiles.played(r.player) then nil else "play"
+	Roster.lobby(r)
+	Party.refresh(r)
+end
+
+-- T2.2: the tutorial is won. The first time the reward screen comes after the victory screen (Roster.lobby shows it
+-- until the client claims it, or REWARD_MAX s).
+function Lobby.tutorialDone(r: Roster.Rec, now: number)
+	local rw = Profiles.tutorialDone(r.player)
+	if rw then
+		r.reward = {
+			ph = "reward",
+			balls = rw.balls,
+			legend = rw.legend,
+			pool = rw.pool,
+			boost = rw.boost,
+			endsAt = now + Config.REWARD_MAX,
+		}
+	end
+end
+
+local function claim(r: Roster.Rec)
+	if r.reward then
+		r.reward = nil
+		r.glow = if Profiles.played(r.player) then nil else "play"
+		Roster.lobby(r)
+		Party.refresh(r)
 	end
 end
 
@@ -96,6 +138,7 @@ local function queueJoin(recs: { Roster.Rec }, mode: string, now: number)
 	for _, r in recs do
 		r.queuedAt = now
 		r.glow = nil
+		Profiles.setPlayed(r.player)
 		Roster.send(r, {
 			ph = "queue",
 			mode = mode :: any,
@@ -139,6 +182,11 @@ end
 function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 	if verb == A.hello then
 		hello(r, now)
+		Profiles.send(r.player)
+		return
+	end
+	if verb == A.claim then
+		claim(r)
 		return
 	end
 	-- party verbs work anywhere (in a match too); a queue request of a party member is the host's party search
@@ -162,7 +210,7 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 		end
 		return
 	end
-	if r.introE or r.tutor or (verb == A.queue and Party.action(r, verb, arg, now)) then
+	if r.introE or r.tutor or r.reward or (verb == A.queue and Party.action(r, verb, arg, now)) then
 		return
 	end
 	if verb == A.tutor then
@@ -205,6 +253,10 @@ end
 -- Starts what can start: tutorials and first rounds, then queue groups, then debug bot matches.
 function Lobby.tick(now: number)
 	for _, r in Roster.all() do
+		local rw = r.reward
+		if rw and not r.session and now >= (rw.endsAt or 0) then
+			claim(r)
+		end
 		-- the tutorial starts once the client listens (hello), so it sees the first scene from its start
 		local listening = r.readyAt ~= nil or now - r.joinedAt >= Config.TUT.helloWait
 		if r.tutor and not r.session and listening and Tutorial.ready(r.player) then

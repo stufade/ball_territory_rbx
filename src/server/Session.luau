@@ -17,6 +17,8 @@ local Watch = require("./Watch")
 
 local Session = {}
 
+Session.award = nil :: Award?
+
 export type Member = { rec: Roster.Rec?, side: number, name: string, userId: number }
 
 export type Session = {
@@ -33,7 +35,13 @@ export type Session = {
 	startedAt: number,
 	data: any,
 	recipients: (Session) -> { Player },
+	-- KOs and reactions by side over the rounds (Runner adds each round)
+	tally: { [number]: { kills: number, rx: number } },
 }
+
+-- T2.2: XP of a finished match for one person, set by the server bootstrap (Profiles.award). Returns the XP and
+-- the multiplier for the result screen.
+export type Award = (player: Player, mode: Net.ModeName, win: boolean, kills: number, rx: number) -> (number?, number?)
 
 local nextId = 0
 local active: { Session } = {}
@@ -87,6 +95,7 @@ function Session.new(mode: Net.ModeName, arena: Arenas.Arena, recs: { Roster.Rec
 		startedAt = Roster.now(),
 		data = {},
 		recipients = recipients,
+		tally = {},
 	}
 	arena.session = s
 	table.insert(active, s)
@@ -169,7 +178,13 @@ function Session.finish(s: Session, winner: number, places: { Net.Place }, winOf
 		local r = m.rec
 		if r then
 			local win = winOf(m)
-			Roster.send(r, { ph = "result", mode = s.mode, win = win, endsAt = s.endsAt }, true)
+			local t = s.tally[m.side] or { kills = 0, rx = 0 }
+			local award = Session.award
+			local xp, mult
+			if award and not s.debug then
+				xp, mult = award(r.player, s.mode, win, t.kills, t.rx)
+			end
+			Roster.send(r, { ph = "result", mode = s.mode, win = win, endsAt = s.endsAt, xp = xp, xpMult = mult }, true)
 			Analytics.custom(r.player, "MatchEnd", if win then 1 else 0, s.mode, if win then "win" else "lose")
 		end
 	end

@@ -1,6 +1,8 @@
 --!strict
--- Duel draft 1-2-2-1 with offers, pure. Each pick a side gets `size` random free balls (all 27 are open in M1)
--- and may once per duel take any free ball instead. Bots pick the best counter from their own offer.
+-- Duel draft 1-2-2-1 with offers, pure. Each pick a side gets `size` random free balls of its own collection
+-- (T2.2; nil = every ball) and may once per duel take any free ball of it instead. Bots pick the best counter from
+-- their own offer, dealt from balls the rival person does not own when there are enough, so a bot does not take a
+-- newcomer's few balls. A side with fewer own free balls than the offer gets the rest from all free balls.
 -- Rules comes in through Offers.new: the server requires it from ReplicatedStorage, tests from the file.
 local Offers = {}
 
@@ -13,33 +15,73 @@ export type Offers = {
 	offer: { number },
 	anyLeft: { number },
 	rand: () -> number,
+	-- own balls of sides 0 and 1 as sets (nil = every ball)
+	own: { { [number]: boolean }? },
 }
 
+local function owns(o: Offers, side: number, e: number): boolean
+	local set = o.own[side + 1]
+	return set == nil or set[e] == true
+end
+
+local function sample(o: Offers, from: { number }, n: number, out: { number })
+	for _ = 1, math.min(n, #from) do
+		local i = math.floor(o.rand() * #from) + 1
+		table.insert(out, table.remove(from, i) :: number)
+	end
+end
+
 local function deal(o: Offers)
-	local free = {}
+	local side = o.duel.draftTurn(o.draft)
+	local rival = 1 - side
+	local mine, spare = {}, {}
 	for e = 0, o.nel - 1 do
 		if o.duel.draftFree(o.draft, e) then
-			table.insert(free, e)
+			local first = owns(o, side, e)
+			if o.own[side + 1] == nil and o.own[rival + 1] ~= nil then
+				-- a bot (or an all-balls side) leaves the rival person's own balls alone when it can
+				first = not owns(o, rival, e)
+			end
+			table.insert(if first then mine else spare, e)
 		end
 	end
 	local out = {}
-	for _ = 1, math.min(o.size, #free) do
-		local i = math.floor(o.rand() * #free) + 1
-		table.insert(out, table.remove(free, i) :: number)
-	end
+	sample(o, mine, o.size, out)
+	sample(o, spare, o.size - #out, out)
 	o.offer = out
 end
 
--- first = true: side 1 picks first. anyFree = free "any ball" picks per side.
-function Offers.new(Rules: any, first: boolean, size: number, anyFree: number, rand: () -> number): Offers
+-- first = true: side 1 picks first. anyFree = free "any ball" picks per side (a number for both, or one per side).
+-- own = own balls of sides 0 and 1 (nil = every ball).
+function Offers.new(
+	Rules: any,
+	first: boolean,
+	size: number,
+	anyFree: number | { number },
+	rand: () -> number,
+	own: { { number }? }?
+): Offers
+	local sets: { { [number]: boolean }? } = {}
+	for side = 1, 2 do
+		local list = own and own[side]
+		if list then
+			local set = {}
+			for _, e in list do
+				set[e] = true
+			end
+			sets[side] = set
+		end
+	end
+	local anyLeft = if type(anyFree) == "table" then table.clone(anyFree) else { anyFree, anyFree }
 	local o: Offers = {
 		duel = Rules.Duel,
 		nel = Rules.Config.NEL,
 		draft = Rules.Duel.newDraft(first),
 		size = size,
 		offer = {},
-		anyLeft = { anyFree, anyFree },
+		anyLeft = anyLeft,
 		rand = rand,
+		own = sets,
 	}
 	deal(o)
 	return o
@@ -86,9 +128,14 @@ function Offers.pick(o: Offers, side: number, e: number): boolean
 	return take(o, side, e)
 end
 
--- Free "any ball": any free element, once per duel.
+-- Free "any ball": any free element of the side's collection, once per duel.
 function Offers.any(o: Offers, side: number, e: number): boolean
-	if side ~= Offers.turn(o) or not Offers.canAny(o, side) or not o.duel.draftFree(o.draft, e) then
+	if
+		side ~= Offers.turn(o)
+		or not Offers.canAny(o, side)
+		or not o.duel.draftFree(o.draft, e)
+		or not owns(o, side, e)
+	then
 		return false
 	end
 	if not take(o, side, e) then

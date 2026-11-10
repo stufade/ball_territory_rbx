@@ -142,6 +142,16 @@ function Inst.GetAttribute(self: any, k: string)
 end
 function Inst.SetAttribute(self: any, k: string, v: any)
 	rawget(self, "_a")[k] = v
+	local sigs = rawget(self, "_p")._attrSignals
+	if sigs and sigs[k] then
+		sigs[k]:Fire()
+	end
+end
+function Inst.GetAttributeChangedSignal(self: any, k: string)
+	local p = rawget(self, "_p")
+	p._attrSignals = p._attrSignals or {}
+	p._attrSignals[k] = p._attrSignals[k] or signal()
+	return p._attrSignals[k]
 end
 function Inst.GetFullName(self: any)
 	return self.Name
@@ -255,7 +265,34 @@ function Mock.world(): any
 	function TeleportService.TeleportAsync(_self: any, placeId: number, players: { any }, options: any)
 		table.insert(teleports, { placeId = placeId, players = players, options = options })
 	end
+	-- DataStore in memory: UpdateAsync/GetAsync on one table per store; `failNext` makes calls error (retry tests)
+	local stores = {} :: { [string]: any }
+	local DataStoreService = new("DataStoreService")
+	function DataStoreService.GetDataStore(_self: any, name: string)
+		local st = stores[name]
+		if not st then
+			st = { data = {} :: { [string]: any }, failNext = 0, writes = 0 }
+			function st.UpdateAsync(self: any, key: string, fn: any)
+				if self.failNext > 0 then
+					self.failNext -= 1
+					error("mock DataStore: 500 internal error")
+				end
+				local out = fn(self.data[key])
+				if out ~= nil then
+					self.data[key] = out
+					self.writes += 1
+				end
+				return out
+			end
+			function st.GetAsync(self: any, key: string)
+				return self.data[key]
+			end
+			stores[name] = st
+		end
+		return st
+	end
 	local services = {
+		DataStoreService = DataStoreService,
 		Players = Players,
 		ReplicatedStorage = ReplicatedStorage,
 		RunService = RunService,
@@ -269,6 +306,10 @@ function Mock.world(): any
 	function game.GetService(_self: any, name: string)
 		return services[name] or error("no service " .. name)
 	end
+	local closers = {} :: { any }
+	function game.BindToClose(_self: any, fn: any)
+		table.insert(closers, fn)
+	end
 	return {
 		game = game,
 		workspace = workspace,
@@ -276,6 +317,8 @@ function Mock.world(): any
 		analytics = analytics,
 		arenas = list,
 		teleports = teleports,
+		stores = stores,
+		closers = closers,
 	}
 end
 
@@ -333,7 +376,12 @@ function Mock.loader(world: any, logs: { string }, warns: { string })
 	local cache: { [string]: any } = {}
 	local load: (string) -> any
 	local base = getfenv(0)
-	local fakeOs = setmetatable({ clock = Mock.now }, { __index = os })
+	local fakeOs = setmetatable({
+		clock = Mock.now,
+		time = function()
+			return math.floor(Mock.now())
+		end,
+	}, { __index = os })
 	local task = {
 		spawn = function(f: any, ...: any)
 			f(...)
@@ -344,6 +392,11 @@ function Mock.loader(world: any, logs: { string }, warns: { string })
 		-- delays run at once (the flow tests do not wait for them)
 		delay = function(_t: number, f: any, ...: any)
 			f(...)
+		end,
+		-- waits move the fake clock (retries and lock waits of the profile store)
+		wait = function(t: number?)
+			Mock.advance(t or 0)
+			return t or 0
 		end,
 	}
 	local Enum = setmetatable({}, {

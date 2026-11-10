@@ -24,6 +24,8 @@ export type Rec = {
 	-- T2.1: the tutorial waits for an arena (first entry or HOW TO PLAY); plaza button to highlight after it
 	tutor: boolean?,
 	glow: string?,
+	-- T2.2: the tutorial reward screen waits for the client's claim (shown instead of the lobby until then)
+	reward: Net.State?,
 	session: any?,
 	watching: any?,
 	queuedAt: number?,
@@ -56,6 +58,7 @@ function Roster.add(player: Player): Rec
 		introE = nil,
 		tutor = nil,
 		glow = nil,
+		reward = nil,
 		session = nil,
 		watching = nil,
 		queuedAt = nil,
@@ -88,7 +91,7 @@ end
 
 -- Busy: in a match or in the first-entry pick; party play waits for such members.
 function Roster.busy(r: Rec): boolean
-	return r.session ~= nil or r.introPick ~= nil or r.introE ~= nil or r.tutor == true
+	return r.session ~= nil or r.introPick ~= nil or r.introE ~= nil or r.tutor == true or r.reward ~= nil
 end
 
 function Roster.all(): { [Player]: Rec }
@@ -108,6 +111,11 @@ function Roster.send(r: Rec, st: Net.State, force: boolean?)
 end
 
 function Roster.lobby(r: Rec)
+	local reward = r.reward
+	if reward then
+		Roster.send(r, reward, true)
+		return
+	end
 	Roster.send(r, { ph = "lobby", first = r.first, glow = r.glow })
 end
 
