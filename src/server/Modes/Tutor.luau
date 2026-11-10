@@ -49,6 +49,9 @@ export type Data = {
 	evs: { Net.RulesEvent },
 	-- tutorial time (real time times the debug speed); scene timers run on it
 	clock: number,
+	-- debug tour (DebugTutorTour): the tutorial stands still until this real time; a hold due at tutorial time
+	holdUntil: number,
+	holdAt: { at: number, name: string }?,
 	last: { [string]: any }?,
 }
 
@@ -98,8 +101,22 @@ function Tutor.stage(name: string, seed: number?): Rules.State
 	return S
 end
 
+-- Debug: ServerScriptService attribute DebugTutorTour = true plays the tutorial by itself and stands still TOUR_HOLD s
+-- at every moment worth a screenshot (tools/tut-shots.sh takes a burst of shots meanwhile; docs/shots/t2.1/README.md).
+local TOUR_HOLD = 3
+-- cue -> tutorial seconds after it to hold (the land of IGNITE fills in 1.5 s, the final is mid-way at 7 s)
+local TOUR: { [string]: number } =
+	{ boom = 0.15, wild = 0.4, tap = 0, power = 0, grab = 2, dir = 0, ko = 0.3, final = 7 }
+
+local function tour(): boolean
+	return ServerScriptService:GetAttribute("DebugTutorTour") == true
+end
+
 local function cue(s: Session.Session, k: string, extra: { [string]: any }?, wait: boolean?)
 	local d: Data = s.data
+	if tour() and TOUR[k] then
+		d.holdAt = { at = d.clock + TOUR[k], name = d.scene .. "-" .. k }
+	end
 	d.n += 1
 	local data: { [string]: any } = { s = d.scene, k = k, n = d.n, wait = wait == true }
 	if extra then
@@ -194,11 +211,18 @@ local function grab(s: Session.Session, now: number)
 	hint(s, Net.Hint.power)
 end
 
+-- The tap is in: CHOOSE DIRECTION closes (its half-speed clock would only drag the flight out).
+local function closeWindow(s: Session.Session)
+	local S = run(s).S
+	S.promptUntil = math.min(S.promptUntil, S.t)
+end
+
 local function fly(s: Session.Session, now: number)
 	local d: Data = s.data
 	d.step = "fly"
 	d.at = now
 	run(s).scale = 1
+	closeWindow(s)
 	cue(s, "go")
 	hint(s, Net.Hint.aim)
 end
@@ -233,6 +257,7 @@ function filter(
 		d.step = "miss"
 		d.at = now
 		run(s).scale = 1
+		closeWindow(s)
 		cue(s, "miss")
 		return true
 	end
@@ -256,6 +281,11 @@ local function onEvent(s: Session.Session, ev: Net.RulesEvent, now: number)
 	end
 end
 
+-- How long a waiting cue waits for the player; the debug tour acts at once.
+local function afk(): number
+	return if tour() then 0.4 else T.afk
+end
+
 local function step(s: Session.Session, now: number)
 	local d: Data = s.data
 	local r = s.runner :: Runner.Runner
@@ -271,18 +301,18 @@ local function step(s: Session.Session, now: number)
 		elseif st == "run" and ((d.wildAt and now - d.wildAt >= T.afterWild) or el >= T.watchMax) then
 			d.step, d.at, r.scale = "tap", now, 0
 			cue(s, "tap", nil, true)
-		elseif st == "tap" and el >= T.afk then
+		elseif st == "tap" and el >= afk() then
 			go(s, "B", now)
 		end
 	elseif d.scene == "B" then
-		if st == "wait" and el >= T.afk then
+		if st == "wait" and el >= afk() then
 			Rules.press(r.S, FIRE)
 			grab(s, now)
 		elseif st == "run" and el >= T.grab then
 			go(s, "C", now)
 		end
 	elseif d.scene == "C" then
-		if st == "wait" and el >= T.afk then
+		if st == "wait" and el >= afk() then
 			local tx, ty = Stage.offAngle(r.S, FIRE, BOT, 1, 0)
 			Rules.redirect(r.S, FIRE, tx, ty)
 			fly(s, now)
@@ -339,6 +369,8 @@ function Tutor.start(s: Session.Session, now: number)
 		first = not Tutorial.isDone(rec.player),
 		evs = {},
 		clock = now,
+		holdUntil = 0,
+		holdAt = nil,
 		last = nil,
 	}
 	s.data = d
@@ -359,7 +391,13 @@ end
 function Tutor.tick(s: Session.Session, dt: number, realNow: number)
 	if s.st == "round" then
 		local d: Data = s.data
-		dt *= speed()
+		local h = d.holdAt
+		if h and d.clock >= h.at then
+			d.holdAt = nil
+			d.holdUntil = realNow + TOUR_HOLD
+			print(`[BT] tutorial tour: hold {h.name}`)
+		end
+		dt *= if realNow < d.holdUntil then 0 else speed()
 		d.clock += dt
 		local now = d.clock
 		local over = Runner.tick(s.runner :: Runner.Runner, dt, now)
@@ -384,10 +422,16 @@ function Tutor.tick(s: Session.Session, dt: number, realNow: number)
 	end
 end
 
--- "tut" (cue number): the player tapped through the waiting cue.
+-- "tut" (cue number): the player tapped through the waiting cue. "tutor": the tutorial from the start.
 function Tutor.action(s: Session.Session, _rec: Roster.Rec, verb: string, arg: number?, _now: number)
 	local d: Data = s.data
 	local now = d.clock
+	if verb == Net.Action.tutor and s.st == "round" then
+		-- HOW TO PLAY during the tutorial (debug: screenshots with DebugTutorTour): from the start again
+		d.t0, d.misses, d.wildAt, d.holdAt, d.holdUntil = now, 0, nil, nil, 0
+		go(s, "A", now)
+		return
+	end
 	if verb ~= Net.Action.tut or s.st ~= "round" or d.wait == 0 or arg ~= d.wait then
 		return
 	end

@@ -419,6 +419,7 @@ for _, k in
 do
 	check(string.find(keys, k, 1, true), `cue {k}`)
 end
+check(not string.find(keys, "C:go C:out", 1, true), "a good tap in C is a KO the first time")
 check(ann.p:GetAttribute("TutorialDone") == true and Tutorial.isDone(ann.p), "flag TutorialDone set")
 check(#hooked == 1 and hooked[1].name == "Ann" and hooked[1].info.first == true, "T2.2 hook onDone called once, first")
 run(Config.RESULT_TIME + 1)
