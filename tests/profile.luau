@@ -330,6 +330,80 @@ do
 	check(short > 0, "short side gets balls from all")
 end
 
+-- 7b. The next level ball is chosen ahead: shown = given, saved, none after the last level ball --------------------
+do
+	local allowed = {}
+	for _, t in cfg.LEVEL_TIERS do
+		for _, e in cfg.TIERS[t] do
+			allowed[e] = true
+		end
+	end
+	local d0 = Progress.migrate({ v = 2, nextBall = 99 })
+	check(d0.nextBall == nil, "nextBall out of range is dropped")
+	d0 = Progress.migrate({ v = 2, nextBall = 2.5 })
+	check(d0.nextBall == nil, "nextBall fractional is dropped")
+	d0 = Progress.migrate({ v = 1, level = 3 })
+	check(d0.nextBall == nil, "an older record has no nextBall until planned")
+	local bad, shown = 0, {}
+	for seed = 1, 200 do
+		local r = rng(seed)
+		local d = Progress.new()
+		Progress.tutorialReward(d, 0, cfg, r)
+		local seen = {}
+		for lv = 2, cfg.LEVEL_BALLS do
+			local nb = d.nextBall
+			if nb == nil or Progress.owns(d, nb) or not allowed[nb] then
+				bad += 1
+			end
+			-- saved and loaded between two level ups: the same ball comes
+			if seed % 2 == 0 then
+				local copy = Progress.migrate(Progress.migrate(d))
+				if copy.nextBall ~= nb then
+					bad += 1
+				end
+				d = copy
+			end
+			local ups = Progress.addXp(d, Progress.need(d.level, cfg), cfg, r)
+			if #ups ~= 1 or ups[1].e ~= nb or not Progress.owns(d, nb :: number) or seen[nb :: number] then
+				bad += 1
+			end
+			seen[nb :: number] = true
+			shown[nb :: number] = true
+		end
+		if d.nextBall ~= nil then
+			bad += 1
+		end
+		-- levels after the last level ball: still none, and coins instead
+		Progress.addXp(d, Progress.need(d.level, cfg), cfg, r)
+		if d.nextBall ~= nil then
+			bad += 1
+		end
+	end
+	check(bad == 0, `level ball: given = shown ahead, never owned, saved, nil after level {cfg.LEVEL_BALLS} ({bad})`)
+	local n = 0
+	for _ in shown do
+		n += 1
+	end
+	check(n >= 15, `different players get different balls over seeds ({n} distinct)`)
+	-- several level ups in one go: each gets its own planned ball, in order
+	local r = rng(5)
+	local d = Progress.new()
+	Progress.tutorialReward(d, 0, cfg, r)
+	local first = d.nextBall
+	local ups = Progress.addXp(d, 100000, cfg, r)
+	check(#ups >= 8 and ups[1].e == first, "a big XP gain: the first level gives the shown ball")
+	check(d.level > cfg.LEVEL_BALLS and d.nextBall == nil, "past the last level ball the field is empty")
+	-- a ball that became owned by other ways is not promised any more
+	local d2 = Progress.new()
+	Progress.tutorialReward(d2, 0, cfg, rng(9))
+	local was = d2.nextBall :: number
+	table.insert(d2.balls, was)
+	Progress.plan(d2, cfg, rng(10))
+	check(d2.nextBall ~= nil and d2.nextBall ~= was and not Progress.owns(d2, d2.nextBall), "owned pick is replaced")
+	Progress.giveAll(d2, cfg, rng(11))
+	check(#d2.balls == 27 and d2.nextBall == nil, "giveAll: 27 balls, nothing left to show")
+end
+
 -- 8. The whole server: tutorial -> reward -> plaza -> duel XP -> restart -> plaza --------------------------------
 type Client = { p: any, st: any, prof: any, profs: number, news: { any }, answered: any, afk: boolean? }
 
@@ -422,6 +496,7 @@ local function server(stores: any?)
 		end
 	end
 	return {
+		config = load("src/server/Config.luau"),
 		world = world,
 		logs = logs,
 		warns = warns,
@@ -534,11 +609,45 @@ do
 	check(c.prof.coins == coinsBefore and c.prof.xp == xpBefore and c.prof.level == lvBefore, "AFK: profile same")
 	c.afk = false
 	-- debug XP: level 2 gives a new ball
+	local shownBall = c.prof.nextBall
+	check(shownBall ~= nil and not table.find(c.prof.balls, shownBall), "the profile view shows a next ball not owned")
 	s1.world.services.ServerScriptService:SetAttribute("DebugXp", 400)
 	s1.run(0.2)
 	local news = c.news[#c.news]
+	check(news and news[1].e == shownBall, "server: the ball given at level 2 is the one shown before")
+	check(c.prof.nextBall ~= nil and c.prof.nextBall ~= shownBall, "server: after the level up the next one is shown")
 	check(news and news[1].level == 2 and news[1].e ~= nil, "level 2: NEW BALL news")
 	check(c.prof and #c.prof.balls >= 6, "6 balls after level 2")
+	-- next ball: the server shows it, level 2 gives exactly it (shown = given), then a new one is shown
+	-- (checked on a fresh profile in the dev test below; here the profile is past level 2)
+	check(c.prof and (c.prof.nextBall == nil or not table.find(c.prof.balls, c.prof.nextBall)), "nextBall not owned")
+	-- DEV: ALL BALLS: refused on a live server for a stranger, allowed for the owner, a listed id, and in Studio
+	local rs = s1.world.services.RunService
+	rs.studio = false
+	check(c.prof.dev == nil, "a stranger gets no dev flag")
+	s1.action(c, "devballs", nil)
+	s1.run(0.2)
+	check(#c.prof.balls < 27, "dev request of a stranger is refused")
+	table.insert(s1.config.DEV_USERS, 701)
+	s1.action(c, "devballs", nil)
+	s1.run(0.2)
+	check(#c.prof.balls == 27 and c.prof.dev == true and c.prof.nextBall == nil, "DEV_USERS: all 27 balls, flag set")
+	table.remove(s1.config.DEV_USERS)
+	do
+		local s3 = server()
+		local owner = s3.join(900001, "Owner")
+		s3.run(1)
+		check(owner.prof and owner.prof.dev == true, "the place owner gets the dev flag")
+		local other = s3.join(702, "Other")
+		s3.run(1)
+		s3.action(other, "devballs", nil)
+		s3.run(0.2)
+		check(other.prof and other.prof.dev == nil and #other.prof.balls < 27, "others: no flag, request refused")
+		s3.world.services.RunService.studio = true
+		s3.action(other, "devballs", nil)
+		s3.run(0.2)
+		check(#other.prof.balls == 27, "Studio: allowed")
+	end
 	local level, balls = c.prof.level, #c.prof.balls
 	s1.run(cfg.RESULT_TIME + 2)
 	s1.leave(c)

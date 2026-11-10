@@ -385,6 +385,7 @@ function UI.start()
 		if typeof(v) == "table" and type(v.level) == "number" and typeof(v.balls) == "table" then
 			Level.setProfile(level, v)
 			Wallet.setProfile(wallet, v)
+			Plaza.setDev(plaza, v.dev == true)
 		end
 	end)
 

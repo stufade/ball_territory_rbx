@@ -5,6 +5,7 @@
 -- M3.1: coins and crystals, match coins, login reward, daily quests, reaction book (Logic/Award, Daily), analytics.
 local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Analytics = require("./Analytics")
@@ -62,6 +63,18 @@ end
 
 local NAMES = Rules.Config.REACTIONS
 
+-- TODO(REMOVE BEFORE LAUNCH): dev button. Studio, the place owner, or Config.DEV_USERS.
+function Profiles.isDev(player: Player): boolean
+	if RunService:IsStudio() then
+		return true
+	end
+	local id = player.UserId
+	if id <= 0 then
+		return false
+	end
+	return (game.CreatorType.Name == "User" and id == game.CreatorId) or table.find(Config.DEV_USERS, id) ~= nil
+end
+
 -- The client's view: level bar, boost badge, collection; `news` = level ups to show now; `extra` = one-off fields
 -- of this change (gains, found, done, claim).
 function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [string]: any }?)
@@ -80,6 +93,8 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [st
 		boostEnds = if left > 0 then serverNow() + left else nil,
 		boostMult = Config.XP.boost,
 		levelBalls = Config.LEVEL_BALLS,
+		nextBall = d.nextBall,
+		dev = if Profiles.isDev(player) then true else nil,
 		news = news,
 	}
 	for k, v in Award.view(d, clock(), serverNow(), Config, #NAMES) do
@@ -197,6 +212,7 @@ function Profiles.join(player: Player)
 		end
 		p.day = Daily.day(now)
 		Daily.quests(p.data, now, Config.ECON, rand)
+		Progress.plan(p.data, Config :: any, rand)
 		p.ready = true
 		if p.data.tut then
 			Tutorial.setDone(player, true)
@@ -300,6 +316,19 @@ function Profiles.award(player: Player, info: Award.Info): Award.Result?
 		done = if #res.quests > 0 then res.quests else nil,
 	})
 	return res
+end
+
+-- TODO(REMOVE BEFORE LAUNCH): dev button. All 27 balls into the collection; refused for everybody who is not a dev.
+function Profiles.devAllBalls(player: Player): boolean
+	local p = Profiles.get(player)
+	if not p or not Profiles.isDev(player) then
+		return false
+	end
+	Progress.giveAll(p.data, Config :: any, rand)
+	p.dirty = true
+	attrs(p)
+	Profiles.send(player)
+	return true
 end
 
 -- Action daily: today's login reward (once per UTC day). Saved soon (VOID on the 7th day).

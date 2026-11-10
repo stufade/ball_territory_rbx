@@ -118,6 +118,8 @@ return {
 	-- spins and the 7th day; brief «Прогрессия»: 8 random balls for levels 2-9)
 	LEVEL_BALLS = 9,
 	LEVEL_TIERS = { "common", "rare", "epic" },
+	-- UserIds that may use the developer buttons besides the place owner and Studio (TODO(REMOVE BEFORE LAUNCH): dev button)
+	DEV_USERS = {} :: { number },
 	-- the reward screen moves on by itself after this long (AFK)
 	REWARD_MAX = 90,
 }

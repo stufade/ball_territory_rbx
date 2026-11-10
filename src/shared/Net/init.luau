@@ -51,6 +51,8 @@ Net.Action = {
 	tutor = "tutor",
 	-- T2.2: the tutorial reward screen is over (State reward -> lobby)
 	claim = "claim",
+	-- TODO(REMOVE BEFORE LAUNCH): dev button (the server decides who may)
+	devballs = "devballs",
 	-- M3.1: take today's login reward (once per UTC day, the server decides)
 	daily = "daily",
 }
@@ -181,6 +183,10 @@ export type ProfileView = {
 	boostMult: number,
 	-- levels up to this one give a ball
 	levelBalls: number,
+	-- the ball the next level up gives (chosen ahead by the server; nil = no level balls left)
+	nextBall: number?,
+	-- true: this person may use the developer buttons (TODO(REMOVE BEFORE LAUNCH): dev button)
+	dev: boolean?,
 	-- level ups of this change, to show as NEW BALL! (e = the ball, nil = no ball at that level)
 	news: { LevelUp }?,
 	-- M3.1 economy (all optional: an older server leaves them out)

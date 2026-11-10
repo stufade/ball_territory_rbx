@@ -21,6 +21,8 @@ export type Data = {
 	-- owned balls (element ids), in the order they came
 	balls: { number },
 	level: number,
+	-- the ball the next level up (<= LEVEL_BALLS) gives, picked ahead; nil once the level balls are over
+	nextBall: number?,
 	-- XP inside the current level
 	xp: number,
 	-- 2x XP until this os.time() second (0 = none)
@@ -130,6 +132,8 @@ function Progress.migrate(raw: any): Data
 		end
 	end
 	d.level = int(raw.level, 1, 1000, 1)
+	local nb = int(raw.nextBall, -1, NEL - 1, -1)
+	d.nextBall = if nb >= 0 and nb == raw.nextBall then nb else nil
 	d.xp = int(raw.xp, 0, 1e9, 0)
 	d.boostUntil = int(raw.boostUntil, 0, 2 ^ 40, 0)
 	d.matches = int(raw.matches, 0, 1e9, 0)
@@ -202,6 +206,21 @@ function Progress.levelPool(d: Data, cfg: Cfg): { number }
 	return out
 end
 
+-- The ball of the next level up, chosen ahead. A valid choice stays (not owned, still in the pool, a level ball is
+-- due); otherwise a random ball of the pool, or nil when the level balls are over. What the client shows is
+-- d.nextBall, and addXp gives exactly it.
+function Progress.plan(d: Data, cfg: Cfg, rand: () -> number, forLevel: number?)
+	if (forLevel or d.level + 1) > cfg.LEVEL_BALLS then
+		d.nextBall = nil
+		return
+	end
+	local pool = Progress.levelPool(d, cfg)
+	if d.nextBall and table.find(pool, d.nextBall) then
+		return
+	end
+	d.nextBall = if #pool > 0 then pool[math.floor(rand() * #pool) + 1] else nil
+end
+
 -- Adds XP (already multiplied), levels up as far as it reaches. Levels 2..LEVEL_BALLS give a random ball of the pool,
 -- later levels LEVEL_COINS coins and every LEVEL_CRYSTALS_EVERY-th also crystals (flows in `log`).
 function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number, log: { Wallet.Flow }?): { LevelUp }
@@ -212,11 +231,11 @@ function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number, l
 		d.level += 1
 		local up: LevelUp = { level = d.level, e = nil }
 		if d.level <= cfg.LEVEL_BALLS then
-			local pool = Progress.levelPool(d, cfg)
-			if #pool > 0 then
-				local e = pool[math.floor(rand() * #pool) + 1]
-				give(d, e)
-				up.e = e
+			-- the level before this one picked the ball; a pick that became owned meanwhile is re-picked
+			Progress.plan(d, cfg, rand, d.level)
+			if d.nextBall then
+				give(d, d.nextBall)
+				up.e = d.nextBall
 			end
 		else
 			local E = cfg.ECON
@@ -226,6 +245,7 @@ function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number, l
 				up.crystals = Wallet.add(d, "crystals", E.LEVEL_CRYSTALS, why, "Gameplay", log)
 			end
 		end
+		Progress.plan(d, cfg, rand, d.level + 1)
 		table.insert(ups, up)
 	end
 	return ups
@@ -261,6 +281,14 @@ function Progress.spin(d: Data, cfg: Cfg, rand: () -> number): number
 	return pool[math.floor(rand() * #pool) + 1]
 end
 
+-- Developer button: every ball into the collection.
+function Progress.giveAll(d: Data, cfg: Cfg, rand: () -> number)
+	for e = 0, NEL - 1 do
+		give(d, e)
+	end
+	Progress.plan(d, cfg, rand)
+end
+
 export type Reward = { balls: { number }, legend: number, boost: number }
 
 -- The tutorial reward, once per profile: the 4 starters, a legendary of the spin, the boost. nil when given before.
@@ -276,6 +304,7 @@ function Progress.tutorialReward(d: Data, now: number, cfg: Cfg, rand: () -> num
 	local legend = Progress.spin(d, cfg, rand)
 	give(d, legend)
 	d.boostUntil = math.max(d.boostUntil, now) + cfg.XP.boostTime
+	Progress.plan(d, cfg, rand)
 	return { balls = table.clone(cfg.BASE_BALLS), legend = legend, boost = cfg.XP.boostTime }
 end
 

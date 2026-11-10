@@ -31,6 +31,10 @@ export type Plaza = {
 	noteUntil: number,
 	-- T2.2: PLAY was pressed once: no more glow on this client
 	pressed: boolean,
+	-- HOW TO PLAY asks "PLAY TUTORIAL AGAIN?" first
+	confirm: boolean,
+	-- the server says this person may use the developer button (TODO(REMOVE BEFORE LAUNCH): dev button)
+	dev: boolean,
 }
 
 local Plaza = {}
@@ -130,7 +134,8 @@ local function buttons(p: Plaza, layer: Frame)
 	local how = small(layer, "HOW TO PLAY", 176, 50, x, y + 152, Theme.SLOT)
 	how.Activated:Connect(function()
 		p.playOpen = false
-		act(Net.Action.tutor)
+		p.confirm = true
+		Plaza.render(p)
 	end)
 	partyBtn.Activated:Connect(function()
 		if n == 0 then
@@ -139,6 +144,48 @@ local function buttons(p: Plaza, layer: Frame)
 		else
 			PartyPanel.open(p.panel, not p.panel.open)
 		end
+	end)
+end
+
+-- "PLAY TUTORIAL AGAIN?" YES / NO: the tutorial takes the player off the plaza (and out of a search), so it is asked.
+local function confirmBox(p: Plaza, layer: Frame)
+	local cv = p.ctx.canvas
+	local box = Theme.frame(layer, UDim2.fromOffset(380, 150), UDim2.fromOffset(cv.X / 2, cv.Y / 2), Theme.PANEL, MID)
+	box.Name = "TutorConfirm"
+	Theme.round(box, 24)
+	Theme.stroke(box, 4, Theme.INK)
+	Theme.text(box, "PLAY TUTORIAL AGAIN?", 28, UDim2.fromOffset(350, 40), UDim2.fromOffset(190, 38), {
+		anchor = MID,
+	})
+	local yes = Theme.button(box, "YES", UDim2.fromOffset(150, 62), UDim2.fromOffset(20, 76), Theme.GO, Theme.INK, 32)
+	local no = Theme.button(box, "NO", UDim2.fromOffset(150, 62), UDim2.fromOffset(210, 76), Theme.BAD, nil, 32)
+	yes.Name, no.Name = "Yes", "No"
+	yes.Activated:Connect(function()
+		p.confirm = false
+		p.ctx.act(Net.Action.tutor)
+		Plaza.render(p)
+	end)
+	no.Activated:Connect(function()
+		p.confirm = false
+		Plaza.render(p)
+	end)
+	Theme.pop(box, 0, 0.5)
+end
+
+-- TODO(REMOVE BEFORE LAUNCH): dev button. Small, on the left edge; the server decides who gets it and who may use it.
+local function devButton(p: Plaza, layer: Frame)
+	local b = Theme.button(
+		layer,
+		"DEV: ALL BALLS",
+		UDim2.fromOffset(170, 36),
+		UDim2.fromOffset(14, p.ctx.canvas.Y * 0.45),
+		Theme.SLOT,
+		nil,
+		18
+	)
+	b.Name = "DevBalls"
+	b.Activated:Connect(function()
+		p.ctx.act(Net.Action.devballs)
 	end)
 end
 
@@ -207,6 +254,12 @@ function Plaza.render(p: Plaza)
 		pill(p, layer, st)
 	else
 		buttons(p, layer)
+		if p.dev then
+			devButton(p, layer)
+		end
+		if p.confirm then
+			confirmBox(p, layer)
+		end
 	end
 	note(p, layer)
 end
@@ -229,6 +282,8 @@ function Plaza.new(parent: Instance, ctx: Ctx): Plaza
 		note = nil,
 		noteUntil = 0,
 		pressed = false,
+		confirm = false,
+		dev = false,
 	}
 	p.panel = PartyPanel.new(parent, ctx, function(text)
 		Plaza.flash(p, text)
@@ -254,9 +309,17 @@ end
 function Plaza.setState(p: Plaza, st: Net.State)
 	if st.ph ~= "lobby" then
 		p.playOpen = false
+		p.confirm = false
 	end
 	p.st = st
 	Plaza.render(p)
+end
+
+function Plaza.setDev(p: Plaza, on: boolean)
+	if p.dev ~= on then
+		p.dev = on
+		Plaza.render(p)
+	end
 end
 
 function Plaza.setParty(p: Plaza, v: Net.PartyView)

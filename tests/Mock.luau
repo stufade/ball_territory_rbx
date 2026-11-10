@@ -259,6 +259,11 @@ function Mock.world(): any
 	function RunService.IsServer(_self: any)
 		return true
 	end
+	-- tests flip RunService.studio (a live server by default)
+	RunService.studio = false
+	function RunService.IsStudio(self: any)
+		return self.studio == true
+	end
 
 	local CollectionService = new("CollectionService")
 	function CollectionService.GetTagged(_self: any, tag: string)
@@ -322,7 +327,12 @@ function Mock.world(): any
 		HttpService = HttpService,
 		TeleportService = TeleportService,
 	}
-	local game = new("DataModel", "game", { PlaceId = 96446158283661, JobId = "job-here" })
+	local game = new("DataModel", "game", {
+		PlaceId = 96446158283661,
+		JobId = "job-here",
+		CreatorId = 900001,
+		CreatorType = { Name = "User" },
+	})
 	function game.GetService(_self: any, name: string)
 		return services[name] or error("no service " .. name)
 	end

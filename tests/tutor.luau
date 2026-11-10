@@ -228,6 +228,7 @@ type Client = {
 	modes: { [string]: boolean },
 	frame: any,
 	gone: boolean,
+	rewardSeen: boolean?,
 }
 local clients: { Client } = {}
 
@@ -321,6 +322,9 @@ local function client(c: Client)
 		local a = m.args
 		if m.remote == "State" then
 			c.st = a[1]
+			if a[1].ph == "reward" then
+				c.rewardSeen = true
+			end
 			if a[1].ph == "result" then
 				c.results += 1
 				c.win = a[1].win
@@ -451,6 +455,7 @@ local ann2 = join(501, "Ann", 1, 0, false)
 run(2)
 check(ann2.st and ann2.st.ph == "lobby" and ann2.match == nil, "re-join: plaza, no tutorial")
 -- HOW TO PLAY: the tutorial again, then the plaza
+local ballsBefore = ann2.p:GetAttribute("Balls")
 action(ann2, "tutor")
 run(1)
 check(ann2.match and ann2.match.mode == "tutor", "HOW TO PLAY starts the tutorial")
@@ -463,6 +468,8 @@ check(ann2.win == true, "replay won")
 check(#hooked == 2 and hooked[2].info.first == false, "hook on replay, first = false")
 run(Config.RESULT_TIME + 1)
 check(ann2.st and ann2.st.ph == "lobby", "replay ends on the plaza")
+check(ann2.p:GetAttribute("Balls") == ballsBefore, "replay: no balls given a second time")
+check(ann2.rewardSeen ~= true, "replay: no reward screen")
 -- the PLAY glow goes once the player queues
 action(ann2, "queue", 1)
 run(0.5)

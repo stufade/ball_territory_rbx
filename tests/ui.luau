@@ -21,6 +21,8 @@ local world = Gui.world()
 local load = Gui.loader(world)
 local Wallet = load("src/client/UI/Wallet.luau")
 local Money = load("src/client/UI/Money.luau")
+local Plaza = load("src/client/UI/Plaza.luau")
+local Level = load("src/client/UI/Level.luau")
 local Rules = load("src/shared/Rules/init.luau")
 local V2 = function(x: number, y: number): any
 	return { X = x, Y = y }
@@ -266,6 +268,76 @@ do
 	Money.result(a, { afk = true, coins = 0 }, 300, 468)
 	check(find(a, "Afk") ~= nil and find(a, "Coins") == nil, "result: AFK line")
 	check(Money.fmt(1234567) == "1,234,567" and Money.fmt(12) == "12" and Money.fmt(100) == "100", "fmt")
+end
+
+-- HOW TO PLAY asks first; the dev button only when the server says so; the next level ball on the level bar --------
+do
+	local cv = V2(1168, 540)
+	Gui.canvas = cv
+	local canvas = Gui.new("Frame")
+	canvas.Size = { X = { Scale = 0, Offset = cv.X }, Y = { Scale = 0, Offset = cv.Y } }
+	local acts = {}
+	local ctx = {
+		act = function(verb: string, arg: number?)
+			table.insert(acts, { verb, arg })
+		end,
+		canvas = cv,
+		topbar = V2(354, 86),
+	}
+	local function btn(root: any, text: string): any
+		for _, d in root:GetDescendants() do
+			if d._p.ClassName == "TextButton" then
+				for _, t in Gui.texts(d) do
+					if t == text then
+						return d
+					end
+				end
+			end
+		end
+		return nil
+	end
+	local noSignal = { Connect = function() end }
+	world.services.Players.PlayerAdded, world.services.Players.PlayerRemoving = noSignal, noSignal
+	local p = Plaza.new(canvas, ctx)
+	Plaza.setState(p, { ph = "lobby" })
+	check(find(p.root, "TutorConfirm") == nil and find(p.root, "DevBalls") == nil, "plaza: no dialog, no dev button")
+	local how = btn(p.root, "HOW TO PLAY")
+	check(how ~= nil, "plaza: HOW TO PLAY button")
+	how.Activated:Fire()
+	check(#acts == 0, "HOW TO PLAY alone sends nothing")
+	local box = find(p.root, "TutorConfirm")
+	check(
+		box ~= nil and table.find(Gui.texts(box), "PLAY TUTORIAL AGAIN?") ~= nil,
+		"HOW TO PLAY asks PLAY TUTORIAL AGAIN?"
+	)
+	find(p.root, "No").Activated:Fire()
+	check(#acts == 0 and find(p.root, "TutorConfirm") == nil, "NO: closed, nothing sent")
+	btn(p.root, "HOW TO PLAY").Activated:Fire()
+	find(p.root, "Yes").Activated:Fire()
+	check(#acts == 1 and acts[1][1] == "tutor", "YES: the tutor action goes out once")
+	btn(p.root, "HOW TO PLAY").Activated:Fire()
+	Plaza.setState(p, { ph = "match" })
+	Plaza.setState(p, { ph = "lobby" })
+	check(find(p.root, "TutorConfirm") == nil, "a match closes the dialog")
+	Plaza.setDev(p, true)
+	local dev = find(p.root, "DevBalls")
+	check(dev ~= nil, "dev flag: DEV: ALL BALLS shown")
+	dev.Activated:Fire()
+	check(acts[#acts][1] == "devballs", "dev button sends devballs")
+	Plaza.setDev(p, false)
+	check(find(p.root, "DevBalls") == nil, "no dev flag: no button")
+
+	local l = Level.new(canvas, { canvas = cv, topbar = V2(354, 86) })
+	Level.setState(l, { ph = "lobby" })
+	Level.setProfile(
+		l,
+		{ level = 3, xp = 10, need = 350, balls = { 0 }, total = 27, boostMult = 2, levelBalls = 9, nextBall = 13 }
+	)
+	local nb = find(l.root, "NextBall")
+	check(nb ~= nil and nb:GetAttribute("Ball") == 13, "level bar: icon of the next ball")
+	check(find(l.root, "NextWord") ~= nil and table.find(Gui.texts(l.root), "NEXT") ~= nil, "level bar: NEXT")
+	Level.setProfile(l, { level = 9, xp = 10, need = 350, balls = { 0 }, total = 27, boostMult = 2, levelBalls = 9 })
+	check(find(l.root, "NextBall") == nil and find(l.root, "NextWord") == nil, "no next ball: hidden")
 end
 
 print(`{passed} passed, {fails} failed`)

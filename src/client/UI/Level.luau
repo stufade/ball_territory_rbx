@@ -80,25 +80,30 @@ function Level.render(l: Level)
 		box,
 		string.format("LEVEL %d · %d/%d XP", v.level, v.xp, v.need),
 		20,
-		UDim2.fromOffset(250, 24),
+		UDim2.fromOffset(210, 24),
 		UDim2.fromOffset(66, 5),
 		{ align = Enum.TextXAlignment.Left, anchor = V2(0, 0) }
 	)
 	label.Name = "Label"
-	local track = Theme.frame(box, UDim2.fromOffset(250, 14), UDim2.fromOffset(66, 33), Theme.SLOT)
+	local track = Theme.frame(box, UDim2.fromOffset(210, 14), UDim2.fromOffset(66, 33), Theme.SLOT)
 	Theme.round(track, 7)
 	local k = math.clamp(v.xp / math.max(1, v.need), 0, 1)
 	local fill =
 		Theme.frame(track, UDim2.fromScale(math.max(0.04, k), 1), nil, if more then Theme.GOOD else Theme.YELLOW)
 	fill.Name = "Fill"
 	Theme.round(fill, 7)
-	if more then
-		-- the next level gives a ball: a small ball icon at the end of the bar
-		local q = Theme.text(track, "?", 20, UDim2.fromOffset(24, 24), UDim2.new(1, 4, 0.5, 0), {
-			anchor = V2(0, 0.5),
+	-- the ball the next level gives (the server picked it ahead); hidden when the level balls are over
+	local nb = v.nextBall
+	if more and nb ~= nil then
+		local icon = Theme.ball(box, nb, 30, UDim2.fromOffset(298, 20), MID)
+		icon.Name = "NextBall"
+		icon:SetAttribute("Ball", nb)
+		local word = Theme.text(box, "NEXT", 13, UDim2.fromOffset(50, 14), UDim2.fromOffset(298, 44), {
+			anchor = MID,
 			color = Theme.YELLOW_TXT,
+			stroke = 2,
 		})
-		q.Name = "NextBall"
+		word.Name = "NextWord"
 	end
 	l.fill, l.label = fill, label
 	if v.boostEnds and v.boostEnds > workspace:GetServerTimeNow() then

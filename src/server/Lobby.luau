@@ -193,6 +193,12 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 		Profiles.claimDaily(r.player)
 		return
 	end
+	-- (works anywhere, the server checks who)
+	if verb == A.devballs then
+		-- TODO(REMOVE BEFORE LAUNCH): dev button
+		Profiles.devAllBalls(r.player)
+		return
+	end
 	-- party verbs work anywhere (in a match too); a queue request of a party member is the host's party search
 	if verb ~= A.queue and Party.action(r, verb, arg, now) then
 		return

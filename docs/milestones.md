@@ -130,4 +130,5 @@
 - название, иконка, превью;
 - проверка безопасности `roblox-code-review`, аналитика экономики;
 - план доступа к аудитории до 16 лет: взнос или Plus, 250 вовлечённых запусков;
-- рилсы, софт-запуск.
+- рилсы, софт-запуск;
+- убрать DEV: ALL BALLS (поиск по `TODO(REMOVE BEFORE LAUNCH)`: Plaza.luau, Net `devballs`, Lobby.luau, Profiles.luau, Config `DEV_USERS`, поле `dev` в ProfileView).
