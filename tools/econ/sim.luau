@@ -5,7 +5,9 @@
 -- lune run tools/econ/sim [players]      (default 400 per kind)
 local process = require("@lune/process")
 local E = require("../../src/shared/Economy")
-local Config = require("../../src/server/Config")
+-- Config reads Economy through ReplicatedStorage (M3.1): load it with the test loader that maps Roblox paths
+local Mock = require("../../tests/Mock")
+local Config = Mock.loader(Mock.world(), {}, {})("src/server/Config.luau")
 local XP = Config.XP
 
 -- Assumptions of play (not game values): minutes per match with queue, draft, rounds, result and the walk on the
