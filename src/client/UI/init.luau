@@ -9,6 +9,7 @@ local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")
 local Remotes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"):WaitForChild("Remotes"))
 local Screen = require("./Screen")
 local Hud = require("@self/Hud")
+local Level = require("@self/Level")
 local Menus = require("@self/Menus")
 local Plaza = require("@self/Plaza")
 local Theme = require("@self/Theme")
@@ -139,6 +140,8 @@ function UI.start()
 	local plaza = Plaza.new(canvas, ctx :: any)
 	-- T2.1 tutorial overlay over the HUD
 	local tutor = Tutor.new(canvas, ctx :: any)
+	-- T2.2 level bar, 2x XP badge and NEW BALL! on the plaza (over the plaza buttons)
+	local level = Level.new(canvas, ctx :: any)
 
 	local function rebuild()
 		table.clear(ctx.tickers)
@@ -147,6 +150,7 @@ function UI.start()
 		local st = lastState
 		if st then
 			Plaza.setState(plaza, st)
+			Level.setState(level, st)
 		end
 		if st and st.ph ~= "match" and st.ph ~= "lobby" and st.ph ~= "queue" then
 			menu.Visible = true
@@ -194,6 +198,7 @@ function UI.start()
 				rebuild()
 			elseif before ~= ctx.canvas then
 				Plaza.render(plaza)
+				Level.render(level)
 			end
 		end)
 	end
@@ -225,6 +230,7 @@ function UI.start()
 		lastState = st
 		if st.ph == "match" then
 			Plaza.setState(plaza, st)
+			Level.setState(level, st)
 			table.clear(ctx.tickers)
 			table.clear(ctx.frames)
 			menu:ClearAllChildren()
@@ -260,7 +266,9 @@ function UI.start()
 	inject.Parent = gui
 	local onMatch: (kind: string, data: any) -> ()
 	inject.Event:Connect(function(kind: string, data: any)
-		if kind == "State" then
+		if kind == "Profile" and typeof(data) == "table" then
+			Level.setProfile(level, data)
+		elseif kind == "State" then
 			local hold = workspace:GetAttribute("BTHold")
 			workspace:SetAttribute("BTHold", nil)
 			onState(data)
@@ -359,6 +367,12 @@ function UI.start()
 		end
 	end)
 
+	Remotes.Profile.OnClientEvent:Connect(function(v: Net.ProfileView)
+		if typeof(v) == "table" and type(v.level) == "number" and typeof(v.balls) == "table" then
+			Level.setProfile(level, v)
+		end
+	end)
+
 	Remotes.Snap.OnClientEvent:Connect(function(buf: buffer)
 		local f = Net.Snap.decode(dec, buf)
 		if f and hud then
@@ -372,6 +386,7 @@ function UI.start()
 			Hud.step(hud, dt)
 		end
 		Tutor.step(tutor, dt)
+		Level.step(level, dt)
 		for _, f in ctx.frames do
 			f(dt)
 		end

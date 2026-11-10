@@ -29,6 +29,8 @@ export type Plaza = {
 	tick: (() -> ())?,
 	note: string?,
 	noteUntil: number,
+	-- T2.2: PLAY was pressed once: no more glow on this client
+	pressed: boolean,
 }
 
 local Plaza = {}
@@ -80,10 +82,12 @@ local function buttons(p: Plaza, layer: Frame)
 	local play =
 		Theme.button(layer, "PLAY", UDim2.fromOffset(176, 78), UDim2.fromOffset(x, y), Theme.GO, Theme.INK, 44, RIGHT)
 	local st = p.st
-	if st and st.glow == "play" and not p.playOpen then
+	if st and st.glow == "play" and not p.playOpen and not p.pressed then
 		glow(layer, play, x, y)
+		play.Name = "PlayLit"
 	end
 	play.Activated:Connect(function()
+		p.pressed = true
 		p.playOpen = not p.playOpen
 		Plaza.render(p)
 	end)
@@ -224,6 +228,7 @@ function Plaza.new(parent: Instance, ctx: Ctx): Plaza
 		tick = nil,
 		note = nil,
 		noteUntil = 0,
+		pressed = false,
 	}
 	p.panel = PartyPanel.new(parent, ctx, function(text)
 		Plaza.flash(p, text)
