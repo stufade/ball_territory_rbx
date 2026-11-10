@@ -331,9 +331,10 @@ local function spin(root: Frame, ctx: Ctx, pool: { number }, legend: number, don
 end
 
 -- Where the plaza's 2x XP badge sits (centre, design px): UI/Level lays the bar and the badge out by this.
+-- Where the 2x XP medal lives on the plaza (top centre): right of the level bar at the bottom (Theme.plaza, U1).
 function Reward.badgeAt(cv: Vector2, topbar: Vector2): Vector2
-	local cx = math.max(cv.X / 2, topbar.X + 255)
-	return V2(cx + 170, 40)
+	local L = Theme.plaza(cv, topbar)
+	return V2(L.barX + L.barW / 2 + 14 + 36, L.barY - 8)
 end
 
 function Reward.build(parent: Frame, st: Net.State, ctx: Ctx)

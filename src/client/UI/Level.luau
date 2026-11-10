@@ -1,6 +1,6 @@
 --!strict
--- T2.2 on the plaza: a compact level bar at the top middle ("LV 2", XP bar, "120/200 XP"), the "2x XP 14:32"
--- badge next to it while the boost runs, and NEW BALL! for a level up with a ball (card flip, rays, confetti).
+-- T2.2 / U1 on the plaza: the level bar at the bottom middle (level disc, "LEVEL 2", "120/200 XP", XP bar, the
+-- next level's ball), the 2x XP medal with its timer right of it while the boost runs, and NEW BALL! for a level up with a ball (card flip, rays, confetti).
 -- Data: the Profile remote (Net.ProfileView). Shown with the plaza (State lobby/queue), NEW BALL! only in the lobby.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -46,7 +46,49 @@ local function onPlaza(l: Level): boolean
 	return st ~= nil and (st.ph == "lobby" or st.ph == "queue")
 end
 
--- Bar and badge (rebuilt on every change; cheap).
+-- 2x XP icon: a round gold medal with "2x" and "XP", the time left in a pill under it (top centre at `at`).
+local function boostIcon(l: Level, at: Vector2, mult: number): Frame
+	local f = Theme.clear(l.root, UDim2.fromOffset(72, 76), UDim2.fromOffset(at.X, at.Y), TOP_MID)
+	f.Name = "Boost"
+	Instance.new("UIScale").Parent = f
+	local disc = Theme.disc(f, 62, Theme.YELLOW, UDim2.fromOffset(36, 31))
+	disc.Name = "Medal"
+	Theme.stroke(disc, 3, Theme.INK)
+	local g = Instance.new("UIGradient")
+	g.Rotation = 90
+	g.Color = ColorSequence.new(Color3.fromHex("#fff3a0"), Color3.fromHex("#ff9f1c"))
+	g.Parent = disc
+	local inner = Theme.ring(disc, 50, Color3.fromHex("#fff8d0"), 2, UDim2.fromScale(0.5, 0.5))
+	inner.Name = "Inner"
+	local k = Theme.label(disc, `{mult}x`, 30, UDim2.fromOffset(60, 30), UDim2.fromOffset(31, 25), {
+		anchor = MID,
+		stroke = 3,
+		z = 3,
+	})
+	k.Name = "Mult"
+	Theme.label(disc, "XP", 20, UDim2.fromOffset(60, 20), UDim2.fromOffset(31, 46), {
+		anchor = MID,
+		stroke = 2,
+		z = 3,
+		bold = true,
+	})
+	local pill = Theme.frame(f, UDim2.fromOffset(76, 26), UDim2.fromOffset(36, 63), Theme.GO, TOP_MID)
+	pill.Name = "Time"
+	pill.ZIndex = 4
+	Theme.round(pill, 13)
+	Theme.stroke(pill, 2.5, Theme.INK)
+	local t = Theme.label(pill, "", 20, UDim2.fromScale(1, 1), UDim2.fromScale(0.5, 0.5), {
+		anchor = MID,
+		stroke = 2,
+		z = 5,
+	})
+	t.Name = "Text"
+	l.timer, l.badge = t, f
+	return f
+end
+
+-- Bar and badge (rebuilt on every change; cheap). Bottom middle, between the stick and the jump button:
+-- [level disc] LEVEL 3 ........ 120/350 XP [next ball], the XP bar under the words; the 2x XP medal right of it.
 function Level.render(l: Level)
 	l.root:ClearAllChildren()
 	l.fill, l.label, l.timer, l.badge = nil, nil, nil, nil
@@ -56,70 +98,84 @@ function Level.render(l: Level)
 		return
 	end
 	local cv = l.ctx.canvas
-	local at = Reward.badgeAt(cv, l.ctx.topbar)
-	local cx = at.X - 170
-	-- in the search the pill takes the top: the bar goes under it
-	local y = if l.st and l.st.ph == "queue" then 84 else 12
-	local box = Theme.frame(l.root, UDim2.fromOffset(330, 56), UDim2.fromOffset(cx - 90, y), Theme.PANEL, TOP_MID)
+	local L = Theme.plaza(cv, l.ctx.topbar)
+	local W, H = L.barW, L.barH
+	local box = Theme.frame(l.root, UDim2.fromOffset(W, H), UDim2.fromOffset(L.barX, L.barY), Theme.PANEL, TOP_MID)
 	box.Name = "Bar"
 	box.BackgroundTransparency = 0.1
-	Theme.round(box, 28)
+	Theme.round(box, H / 2)
 	Theme.stroke(box, 3, Theme.INK)
-	local disc = Theme.disc(box, 56, Theme.YELLOW, UDim2.fromOffset(28, 28))
+	local disc = Theme.disc(box, 72, Theme.YELLOW, UDim2.fromOffset(30, H / 2))
 	disc.ZIndex = 3
 	Theme.stroke(disc, 3, Theme.INK)
-	local num = Theme.text(disc, tostring(v.level), 30, UDim2.fromScale(0.8, 0.8), UDim2.fromScale(0.5, 0.5), {
-		anchor = MID,
-		color = Theme.INK,
-		stroke = 0,
-		z = 4,
-	})
+	local dg = Instance.new("UIGradient")
+	dg.Rotation = 90
+	dg.Color = ColorSequence.new(Color3.fromHex("#fff08a"), Color3.fromHex("#ffb020"))
+	dg.Parent = disc
+	local num = Theme.label(
+		disc,
+		tostring(v.level),
+		if v.level >= 100 then 26 else 34,
+		UDim2.fromScale(1, 1),
+		UDim2.fromScale(0.5, 0.5),
+		{
+			anchor = MID,
+			stroke = 3,
+			z = 4,
+		}
+	)
 	num.Name = "Num"
 	local more = v.level < v.levelBalls
-	local label = Theme.text(
-		box,
-		string.format("LEVEL %d · %d/%d XP", v.level, v.xp, v.need),
-		20,
-		UDim2.fromOffset(210, 24),
-		UDim2.fromOffset(66, 5),
-		{ align = Enum.TextXAlignment.Left, anchor = V2(0, 0) }
-	)
+	local nb = v.nextBall
+	local slot = more and nb ~= nil
+	local x0 = 76
+	local x1 = if slot then W - 70 else W - 24
+	local label = Theme.label(box, `LEVEL {v.level}`, 24, UDim2.fromOffset(x1 - x0, 26), UDim2.fromOffset(x0, 5), {
+		align = Enum.TextXAlignment.Left,
+	})
 	label.Name = "Label"
-	local track = Theme.frame(box, UDim2.fromOffset(210, 14), UDim2.fromOffset(66, 33), Theme.SLOT)
-	Theme.round(track, 7)
+	local xp = Theme.label(box, `{v.xp}/{v.need} XP`, 20, UDim2.fromOffset(x1 - x0, 26), UDim2.fromOffset(x0, 6), {
+		align = Enum.TextXAlignment.Right,
+		color = Theme.DIM,
+		bold = true,
+	})
+	xp.Name = "Xp"
+	local track = Theme.frame(box, UDim2.fromOffset(x1 - x0, 18), UDim2.fromOffset(x0, 36), Theme.BG)
+	Theme.round(track, 9)
+	Theme.stroke(track, 2, Theme.INK)
 	local k = math.clamp(v.xp / math.max(1, v.need), 0, 1)
 	local fill =
-		Theme.frame(track, UDim2.fromScale(math.max(0.04, k), 1), nil, if more then Theme.GOOD else Theme.YELLOW)
+		Theme.frame(track, UDim2.fromScale(math.max(0.06, k), 1), nil, if more then Theme.GOOD else Theme.YELLOW)
 	fill.Name = "Fill"
-	Theme.round(fill, 7)
-	-- the ball the next level gives (the server picked it ahead); hidden when the level balls are over
-	local nb = v.nextBall
-	if more and nb ~= nil then
-		local icon = Theme.ball(box, nb, 30, UDim2.fromOffset(298, 20), MID)
+	Theme.round(fill, 9)
+	local fg = Instance.new("UIGradient")
+	fg.Rotation = 90
+	fg.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 190, 190))
+	fg.Parent = fill
+	-- the ball the next level gives (the server picked it ahead) in a slot at the right end, "NEXT" tag on top;
+	-- hidden when the level balls are over
+	if slot and nb ~= nil then
+		local ring = Theme.disc(box, 56, Theme.SLOT, UDim2.fromOffset(W - 34, H / 2))
+		ring.Name = "NextSlot"
+		Theme.stroke(ring, 3, Theme.YELLOW)
+		local icon = Theme.ball(ring, nb, 44, UDim2.fromScale(0.5, 0.5), MID)
 		icon.Name = "NextBall"
 		icon:SetAttribute("Ball", nb)
-		local word = Theme.text(box, "NEXT", 13, UDim2.fromOffset(50, 14), UDim2.fromOffset(298, 44), {
+		local tag = Theme.frame(box, UDim2.fromOffset(66, 24), UDim2.fromOffset(W - 34, -8), Theme.YELLOW, MID)
+		tag.Name = "NextTag"
+		tag.ZIndex = 4
+		Theme.round(tag, 12)
+		Theme.stroke(tag, 2, Theme.INK)
+		local word = Theme.label(tag, "NEXT", 20, UDim2.fromScale(1, 1), UDim2.fromScale(0.5, 0.5), {
 			anchor = MID,
-			color = Theme.YELLOW_TXT,
 			stroke = 2,
+			z = 5,
 		})
 		word.Name = "NextWord"
 	end
 	l.fill, l.label = fill, label
 	if v.boostEnds and v.boostEnds > workspace:GetServerTimeNow() then
-		local badge = Theme.frame(l.root, UDim2.fromOffset(170, 52), UDim2.fromOffset(at.X, y + 2), Theme.GO, TOP_MID)
-		badge.Name = "Boost"
-		Theme.round(badge, 26)
-		Theme.stroke(badge, 3, Theme.INK)
-		local t = Theme.text(badge, "", 26, UDim2.new(1, -16, 1, -10), UDim2.fromScale(0.5, 0.5), {
-			anchor = MID,
-			color = Theme.INK,
-			stroke = 0,
-			z = 3,
-		})
-		t.Name = "Text"
-		Instance.new("UIScale").Parent = badge
-		l.timer, l.badge = t, badge
+		boostIcon(l, Reward.badgeAt(cv, l.ctx.topbar), v.boostMult)
 		Level.step(l, 0)
 	end
 	if v.level ~= l.lastLevel and l.lastLevel > 0 then
@@ -289,11 +345,11 @@ function Level.step(l: Level, dt: number)
 			Level.render(l)
 			return
 		end
-		t.Text = string.format("%dx XP %s", v.boostMult, fmt(left))
+		t.Text = fmt(left)
 		local b = l.badge
 		local s = if b then b:FindFirstChildOfClass("UIScale") else nil
 		if s and not Theme.reduced() then
-			s.Scale = 1 + 0.03 * math.sin(os.clock() * 4)
+			s.Scale = 1 + 0.04 * math.sin(os.clock() * 3)
 		end
 	end
 end

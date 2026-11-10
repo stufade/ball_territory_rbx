@@ -56,52 +56,74 @@ local function onPlaza(w: Wallet): boolean
 	return st ~= nil and (st.ph == "lobby" or st.ph == "queue")
 end
 
--- Right column (the PLAY column of Plaza): right edge x, and the top of PLAY.
-local function column(w: Wallet): (number, number)
-	return w.ctx.canvas.X - 14, math.max(w.ctx.topbar.Y, 96)
+local function layout(w: Wallet): Theme.PlazaLayout
+	return Theme.plaza(w.ctx.canvas, w.ctx.topbar)
 end
 
+-- Coin / crystal counter at the top right.
 local function pill(w: Wallet, layer: Frame, cur: string, y: number, roll: Money.Roll)
-	local x = column(w)
-	local box = Theme.frame(layer, UDim2.fromOffset(176, 36), UDim2.fromOffset(x, y), Theme.PANEL, RIGHT)
+	local L = layout(w)
+	local box =
+		Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.right, y), Theme.PANEL, RIGHT)
 	box.Name = if cur == "coins" then "Coins" else "Crystals"
 	box.BackgroundTransparency = 0.1
-	Theme.round(box, 18)
+	Theme.round(box, L.moneyH / 2)
 	Theme.stroke(box, 3, Theme.INK)
 	Instance.new("UIScale").Parent = box
-	Money.icon(box, cur, 34, UDim2.fromOffset(18, 18)).ZIndex = 3
-	local t = Theme.text(box, Money.fmt(roll.shown + 0.5), 26, UDim2.fromOffset(124, 30), UDim2.new(1, -12, 0.5, 0), {
-		anchor = V2(1, 0.5),
-		align = Enum.TextXAlignment.Right,
-		color = if cur == "coins" then Money.COIN else Money.GEM,
-	})
+	Money.icon(box, cur, 40, UDim2.fromOffset(20, L.moneyH / 2)).ZIndex = 3
+	local t = Theme.label(
+		box,
+		Money.fmt(roll.shown + 0.5),
+		28,
+		UDim2.fromOffset(L.moneyW - 54, 30),
+		UDim2.new(1, -14, 0.5, 0),
+		{
+			anchor = V2(1, 0.5),
+			align = Enum.TextXAlignment.Right,
+			color = if cur == "coins" then Money.COIN else Money.GEM,
+		}
+	)
 	t.Name = "Value"
 	roll.label, roll.box = t, box
 end
 
-local function small(layer: Frame, name: string, icon: string, sub: string, x: number, y: number): TextButton
-	local b = Theme.button(layer, "", UDim2.fromOffset(56, 64), UDim2.fromOffset(x, y), Theme.SLOT, nil, nil, RIGHT)
+-- Icon of the top-left row (slot 0..2; Plaza puts HELP in slot 3). "Sub" is the count badge.
+local function small(
+	w: Wallet,
+	layer: Frame,
+	name: string,
+	icon: string,
+	caption: string,
+	slot: number,
+	color: Color3
+): TextButton
+	local L = layout(w)
+	local b = Theme.iconButton(
+		layer,
+		icon,
+		caption,
+		L.icon,
+		UDim2.fromOffset(L.rowX + slot * (L.icon + L.gap), L.rowY),
+		color
+	)
 	b.Name = name
-	Theme.text(b, icon, 30, UDim2.fromOffset(40, 32), UDim2.new(0.5, 0, 0, 4), { anchor = TOP_MID, stroke = 0, z = 3 })
-	local l = Theme.text(b, sub, 20, UDim2.fromOffset(52, 22), UDim2.new(0.5, 0, 0, 36), {
-		anchor = TOP_MID,
-		bold = true,
-		z = 3,
-	})
-	l.Name = "Sub"
 	return b
 end
 
+local function count(b: GuiObject, text: string)
+	if text ~= "" then
+		local d = Theme.badge(b, text, Theme.SLOT, "Count")
+		local t = d:FindFirstChild("Text") :: TextLabel
+		t.Name = "Sub"
+	end
+end
+
 local function dot(b: GuiObject)
-	local d = Theme.disc(b, 24, Theme.BAD, UDim2.new(1, -2, 0, 2))
-	d.Name = "Dot"
-	d.ZIndex = 5
-	Theme.stroke(d, 2, Theme.INK)
-	Theme.text(d, "!", 20, UDim2.fromScale(1, 1), UDim2.fromScale(0.5, 0.5), {
-		anchor = V2(0.5, 0.5),
-		z = 6,
-		stroke = 0,
-	})
+	local old = b:FindFirstChild("Count")
+	if old then
+		old:Destroy()
+	end
+	Theme.badge(b, "!", Theme.BAD, "Dot")
 end
 
 local function closePop(w: Wallet)
@@ -127,8 +149,10 @@ local function openPop(w: Wallet, which: string, claim: any?)
 	if which == "daily" then
 		Daily.build(w.pop, v, { canvas = w.ctx.canvas, act = w.ctx.act, close = close, fx = w.fx }, claim)
 	elseif which == "quests" then
-		local x, y = column(w)
-		Quests.build(w.pop, v, { frames = w.fx.frames, close = close }, x - 176 - 12, y)
+		-- under the icon row, left of PLAY
+		local L = layout(w)
+		local right = math.min(L.rowX + 430, L.right - L.playW - 12)
+		Quests.build(w.pop, v, { frames = w.fx.frames, close = close }, right, L.rowY + L.icon + 12)
 	else
 		Book.build(w.pop, v, { canvas = w.ctx.canvas, frames = w.fx.frames, close = close }, w.fresh)
 		table.clear(w.fresh)
@@ -151,18 +175,17 @@ function Wallet.render(w: Wallet)
 	local coins = w.coins or Money.roll(v.coins or 0)
 	local gems = w.gems or Money.roll(v.crystals or 0)
 	w.coins, w.gems = coins, gems
-	pill(w, layer, "coins", 12, coins)
-	pill(w, layer, "crystals", 52, gems)
+	local L = layout(w)
+	pill(w, layer, "coins", L.moneyY[1], coins)
+	pill(w, layer, "crystals", L.moneyY[2], gems)
 	-- shown on the plaza: roll to the new values now
 	Money.target(coins, v.coins or 0)
 	Money.target(gems, v.crystals or 0)
 	if w.st and w.st.ph == "queue" then
 		return
 	end
-	local x, top = column(w)
-	local y = top + 210
 	local d = v.daily
-	local daily = small(layer, "DailyBtn", "🎁", if d then `{d.pos}/7` else "", x - 120, y)
+	local daily = small(w, layer, "DailyBtn", "🎁", "DAILY", 0, Theme.ORANGE)
 	if d and d.ready then
 		dot(daily)
 	end
@@ -172,18 +195,16 @@ function Wallet.render(w: Wallet)
 	for _, r in list do
 		done += if r.done then 1 else 0
 	end
-	local quests = small(layer, "QuestsBtn", "📜", if q then `{done}/{#q.list}` else "", x - 60, y)
-	local book = small(layer, "BookBtn", "📖", tostring(#(v.book or {})), x, y)
+	local quests = small(w, layer, "QuestsBtn", "📜", "QUESTS", 1, Theme.SLOT)
+	count(quests, if q then `{done}/{#q.list}` else "")
+	local book = small(w, layer, "BookBtn", "📖", "BOOK", 2, Theme.SLOT)
+	count(book, tostring(#(v.book or {})))
 	if next(w.fresh) then
 		dot(book)
 	end
 	local btns: { [string]: TextButton } = { daily = daily, quests = quests, book = book }
 	for name, b in btns do
-		local edge = b:FindFirstChildOfClass("UIStroke")
-		if w.open == name and edge then
-			edge.Color = Theme.YELLOW
-			edge.Thickness = 4
-		end
+		Theme.select(b, w.open == name)
 		b.Activated:Connect(function()
 			if w.open == name then
 				closePop(w)
@@ -201,14 +222,15 @@ end
 
 -- "+25" rising from a counter.
 local function float(w: Wallet, cur: string, n: number)
-	local x = column(w)
-	local y = if cur == "coins" then 12 else 52
-	local f = Theme.text(w.pop.Parent :: Instance, `+{Money.fmt(n)}`, 28, UDim2.fromOffset(120, 32), nil, {
+	local L = layout(w)
+	local x = L.right - L.moneyW
+	local y = if cur == "coins" then L.moneyY[1] else L.moneyY[2]
+	local f = Theme.label(w.pop.Parent :: Instance, `+{Money.fmt(n)}`, 28, UDim2.fromOffset(120, 32), nil, {
 		anchor = V2(1, 0),
 		color = if cur == "coins" then Money.COIN else Money.GEM,
 	})
 	f.Name = "Float"
-	f.Position = UDim2.fromOffset(x - 186, y + 2)
+	f.Position = UDim2.fromOffset(x - 10, y + 4)
 	f.ZIndex = 60
 	table.insert(w.floats, { f = f, t = 0, y = y + 2 })
 end
@@ -301,7 +323,7 @@ function Wallet.step(w: Wallet, dt: number)
 	if on and #w.toasts > 0 and #w.live < 3 then
 		local t = table.remove(w.toasts, 1) :: Toast
 		local cv = w.ctx.canvas
-		local f = Theme.text(w.pop.Parent :: Instance, t.text, 26, UDim2.fromOffset(520, 32), nil, {
+		local f = Theme.label(w.pop.Parent :: Instance, t.text, 26, UDim2.fromOffset(520, 32), nil, {
 			anchor = TOP_MID,
 			color = t.color,
 		})
@@ -309,7 +331,7 @@ function Wallet.step(w: Wallet, dt: number)
 		f.ZIndex = 60
 		local y = if st0 and st0.ph == "queue" then 150 else 120
 		f.Position = UDim2.fromOffset(math.max(cv.X / 2, w.ctx.topbar.X + 270), y + #w.live * 34)
-		Theme.pop(f, 0, 0.5)
+		Theme.pop(f)
 		table.insert(w.live, { f = f, t = 0 })
 	end
 	local v, st = w.view, w.st

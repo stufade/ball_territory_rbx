@@ -50,74 +50,94 @@ local function isHost(p: Plaza): boolean
 	return v ~= nil and v.id ~= nil and v.host == game:GetService("Players").LocalPlayer.UserId
 end
 
-local function small(parent: Instance, text: string, w: number, h: number, x: number, y: number, color: Color3)
-	return Theme.button(parent, text, UDim2.fromOffset(w, h), UDim2.fromOffset(x, y), color, nil, 28, RIGHT)
-end
-
 -- After the tutorial (State lobby glow = "play"): PLAY pulses inside a yellow ring and a hand points at it.
-local function glow(layer: Frame, play: TextButton, x: number, y: number)
-	local reduced = Theme.reduced()
-	local ring = Theme.frame(layer, UDim2.fromOffset(196, 98), UDim2.fromOffset(x + 10, y - 10), Theme.YELLOW, RIGHT)
+-- The pulse scales the wrapper, the press scales the button: they multiply and never fight over one UIScale.
+local function glow(layer: Frame, wrap: Frame, L: Theme.PlazaLayout)
+	local ring = Theme.frame(wrap, UDim2.new(1, 18, 1, 18), UDim2.fromScale(0.5, 0.5), Theme.YELLOW, MID)
+	ring.Name = "Ring"
 	ring.BackgroundTransparency = 1
-	Theme.round(ring, 18)
+	Theme.round(ring, 24)
 	Theme.stroke(ring, 6, Theme.YELLOW)
-	local hand = Theme.text(layer, "👉", 84, UDim2.fromOffset(96, 96), UDim2.fromOffset(x - 186, y + 39), {
+	local cy = L.playY + L.playH / 2
+	local hx = L.right - L.playW - 14
+	local hand = Theme.label(layer, "👉", 72, UDim2.fromOffset(90, 90), UDim2.fromOffset(hx, cy), {
 		anchor = V2(1, 0.5),
 		stroke = 0,
 	})
-	if reduced then
+	if Theme.reduced() then
 		return
 	end
-	local info = TweenInfo.new(0.45, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-	for _, o in { ring :: GuiObject, play } do
-		local s = Instance.new("UIScale")
-		s.Parent = o
-		TweenService:Create(s, info, { Scale = 1.08 }):Play()
-	end
-	TweenService:Create(hand, info, { Position = UDim2.fromOffset(x - 172, y + 39) }):Play()
+	local info = TweenInfo.new(0.55, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+	TweenService:Create(Theme.scaleOf(wrap), info, { Scale = 1.06 }):Play()
+	TweenService:Create(hand, info, { Position = UDim2.fromOffset(hx + 14, cy) }):Play()
 end
 
--- PLAY and its choices, PARTY under it (right edge, above the jump button).
+-- PLAY (the biggest, green) and PARTY under it at the right edge, above the jump button; PLAY opens its choices
+-- to the left. The help button ("?") sits in the icon row at the top left (Wallet draws DAILY / QUESTS / BOOK).
 local function buttons(p: Plaza, layer: Frame)
-	local cv, act = p.ctx.canvas, p.ctx.act
-	local x = cv.X - 14
-	local y = math.max(p.ctx.topbar.Y, 96)
+	local act = p.ctx.act
+	local L = Theme.plaza(p.ctx.canvas, p.ctx.topbar)
 	local party = inParty(p)
 	local host = isHost(p)
-	local play =
-		Theme.button(layer, "PLAY", UDim2.fromOffset(176, 78), UDim2.fromOffset(x, y), Theme.GO, Theme.INK, 44, RIGHT)
+	local wrap = Theme.clear(
+		layer,
+		UDim2.fromOffset(L.playW, L.playH),
+		UDim2.fromOffset(L.right - L.playW / 2, L.playY + L.playH / 2),
+		MID
+	)
+	wrap.Name = "PlayWrap"
+	local play = Theme.button(wrap, "PLAY", UDim2.fromScale(1, 1), nil, Theme.GO, nil, 52)
+	play.Name = "Play"
 	local st = p.st
 	if st and st.glow == "play" and not p.playOpen and not p.pressed then
-		glow(layer, play, x, y)
-		play.Name = "PlayLit"
+		glow(layer, wrap, L)
+		wrap.Name = "PlayLit"
 	end
 	play.Activated:Connect(function()
+		if not play.Active then
+			return
+		end
 		p.pressed = true
 		p.playOpen = not p.playOpen
 		Plaza.render(p)
 	end)
 	if party and not host then
-		local l = play:FindFirstChild("Label") :: TextLabel?
-		if l then
-			l.Text = "HOST STARTS"
-		end
-		play.BackgroundColor3 = Theme.PANEL_HI
-		play.Active = false
+		Theme.disable(play, "HOST STARTS")
 		p.playOpen = false
 	end
 	if p.playOpen then
-		local cx = x - 176 - 10
+		Theme.select(play, true)
+		local cx = L.right - L.playW - 12
 		local duelText = if party then "DUEL EACH OTHER" else "DUEL"
 		local ffaText = if party then "4 PLAYERS TOGETHER" else "4 PLAYERS"
-		local duel = small(layer, duelText, 230, 62, cx, y - 24, Theme.GO)
-		local ffa = small(layer, ffaText, 230, 62, cx, y + 46, Theme.PURPLE)
+		local w = if party then 300 else 230
+		local duel = Theme.button(
+			layer,
+			duelText,
+			UDim2.fromOffset(w, 66),
+			UDim2.fromOffset(cx, L.playY - 18),
+			Theme.GO,
+			nil,
+			32,
+			RIGHT
+		)
+		local ffa = Theme.button(
+			layer,
+			ffaText,
+			UDim2.fromOffset(w, 66),
+			UDim2.fromOffset(cx, L.playY + 56),
+			Theme.PURPLE,
+			nil,
+			32,
+			RIGHT
+		)
+		duel.Name, ffa.Name = "Duel", "Ffa"
 		local two = not party or #(p.party :: Net.PartyView).members == 2
 		if not two then
-			duel.BackgroundColor3 = Theme.PANEL_HI
-			duel.Active = false
+			Theme.disable(duel)
 		end
-		Theme.pop(duel, 0, 0.6)
-		Theme.pop(ffa, 0.05, 0.6)
+		Theme.pop(duel, 0)
+		Theme.pop(ffa, 0.04)
 		duel.Activated:Connect(function()
 			if two then
 				p.playOpen = false
@@ -131,8 +151,28 @@ local function buttons(p: Plaza, layer: Frame)
 	end
 	local v = p.party
 	local n = if v and v.id then #v.members else 0
-	local partyBtn = small(layer, if n > 0 then `PARTY {n}/4` else "PARTY +", 176, 56, x, y + 88, Theme.PURPLE)
-	local how = small(layer, "HOW TO PLAY", 176, 50, x, y + 152, Theme.SLOT)
+	local partyBtn = Theme.button(
+		layer,
+		if n > 0 then `PARTY {n}/4` else "PARTY +",
+		UDim2.fromOffset(L.playW, L.partyH),
+		UDim2.fromOffset(L.right, L.partyY),
+		Theme.PURPLE,
+		nil,
+		34,
+		RIGHT
+	)
+	partyBtn.Name = "PartyBtn"
+	Theme.select(partyBtn, p.panel.open)
+	-- 4th icon of the top-left row: HOW TO PLAY
+	local how = Theme.iconButton(
+		layer,
+		"❓",
+		"HELP",
+		L.icon,
+		UDim2.fromOffset(L.rowX + 3 * (L.icon + L.gap), L.rowY),
+		Theme.SLOT
+	)
+	how.Name = "HowTo"
 	how.Activated:Connect(function()
 		p.playOpen = false
 		p.confirm = true
@@ -145,21 +185,33 @@ local function buttons(p: Plaza, layer: Frame)
 		else
 			PartyPanel.open(p.panel, not p.panel.open)
 		end
+		Plaza.render(p)
 	end)
 end
 
 -- "PLAY TUTORIAL AGAIN?" YES / NO: the tutorial takes the player off the plaza (and out of a search), so it is asked.
 local function confirmBox(p: Plaza, layer: Frame)
 	local cv = p.ctx.canvas
-	local box = Theme.frame(layer, UDim2.fromOffset(380, 150), UDim2.fromOffset(cv.X / 2, cv.Y / 2), Theme.PANEL, MID)
+	local dim = Theme.frame(layer, UDim2.fromScale(1, 1), nil, Theme.BG)
+	dim.BackgroundTransparency = 0.45
+	dim.Active = true
+	dim.ZIndex = 20
+	local box = Theme.frame(layer, UDim2.fromOffset(440, 196), UDim2.fromOffset(cv.X / 2, cv.Y / 2), Theme.PANEL, MID)
 	box.Name = "TutorConfirm"
+	box.ZIndex = 21
 	Theme.round(box, 24)
 	Theme.stroke(box, 4, Theme.INK)
-	Theme.text(box, "PLAY TUTORIAL AGAIN?", 28, UDim2.fromOffset(350, 40), UDim2.fromOffset(190, 38), {
-		anchor = MID,
+	Theme.label(box, "PLAY TUTORIAL AGAIN?", 32, UDim2.fromOffset(400, 40), UDim2.fromOffset(220, 22), {
+		anchor = TOP_MID,
+		color = Theme.YELLOW,
 	})
-	local yes = Theme.button(box, "YES", UDim2.fromOffset(150, 62), UDim2.fromOffset(20, 76), Theme.GO, Theme.INK, 32)
-	local no = Theme.button(box, "NO", UDim2.fromOffset(150, 62), UDim2.fromOffset(210, 76), Theme.BAD, nil, 32)
+	Theme.label(box, "YOU GET NO REWARD THE 2ND TIME", 20, UDim2.fromOffset(400, 24), UDim2.fromOffset(220, 64), {
+		anchor = TOP_MID,
+		color = Theme.DIM,
+		bold = true,
+	})
+	local yes = Theme.button(box, "YES", UDim2.fromOffset(176, 70), UDim2.fromOffset(30, 104), Theme.GO, nil, 36)
+	local no = Theme.button(box, "NO", UDim2.fromOffset(176, 70), UDim2.fromOffset(234, 104), Theme.BAD, nil, 36)
 	yes.Name, no.Name = "Yes", "No"
 	yes.Activated:Connect(function()
 		p.confirm = false
@@ -170,19 +222,21 @@ local function confirmBox(p: Plaza, layer: Frame)
 		p.confirm = false
 		Plaza.render(p)
 	end)
-	Theme.pop(box, 0, 0.5)
+	Theme.pop(box)
 end
 
--- TODO(REMOVE BEFORE LAUNCH): dev button. Small, on the left edge; the server decides who gets it and who may use it.
+-- TODO(REMOVE BEFORE LAUNCH): dev button. Small, in the bottom left corner under the stick (clear of the stick, the
+-- jump button and the Roblox buttons); the server decides who gets it and who may use it.
 local function devButton(p: Plaza, layer: Frame)
 	local b = Theme.button(
 		layer,
 		"DEV: ALL BALLS",
-		UDim2.fromOffset(170, 36),
-		UDim2.fromOffset(14, p.ctx.canvas.Y * 0.45),
+		UDim2.fromOffset(196, 36),
+		UDim2.fromOffset(8, p.ctx.canvas.Y - 6),
 		Theme.SLOT,
 		nil,
-		18
+		20,
+		V2(0, 1)
 	)
 	b.Name = "DevBalls"
 	b.Activated:Connect(function()
@@ -193,24 +247,26 @@ end
 -- "SEARCHING... 2 PLAYERS · BOTS IN 4s  [CANCEL]" at the top middle.
 local function pill(p: Plaza, layer: Frame, st: Net.State)
 	local cv = p.ctx.canvas
-	-- centred, but never over the Roblox topbar buttons at the top left
-	local cx = math.max(cv.X / 2, p.ctx.topbar.X + 245)
-	local box = Theme.frame(layer, UDim2.fromOffset(470, 64), UDim2.fromOffset(cx, 12), Theme.PANEL, TOP_MID)
+	-- between the Roblox buttons (top left) and the coins (top right)
+	local L = Theme.plaza(cv, p.ctx.topbar)
+	local x0, x1 = L.rowX, L.right - L.moneyW - 10
+	local bw = math.min(470, x1 - x0)
+	local box = Theme.frame(layer, UDim2.fromOffset(bw, 64), UDim2.fromOffset((x0 + x1) / 2, 12), Theme.PANEL, TOP_MID)
 	box.BackgroundTransparency = 0.1
 	Theme.round(box, 32)
 	Theme.stroke(box, 3, Theme.INK)
 	local mode = if st.mode == "ffa" then "4 PLAYERS" else "DUEL"
-	local word = Theme.text(box, "", 26, UDim2.fromOffset(300, 30), UDim2.fromOffset(20, 6), {
+	local word = Theme.label(box, "", 24, UDim2.fromOffset(bw - 170, 30), UDim2.fromOffset(20, 6), {
 		anchor = V2(0, 0),
 		align = Enum.TextXAlignment.Left,
 	})
-	local sub = Theme.text(box, "", 20, UDim2.fromOffset(300, 22), UDim2.fromOffset(20, 36), {
+	local sub = Theme.label(box, "", 20, UDim2.fromOffset(bw - 170, 22), UDim2.fromOffset(20, 36), {
 		anchor = V2(0, 0),
 		align = Enum.TextXAlignment.Left,
 		color = Theme.YELLOW_TXT,
 	})
 	local cancel =
-		Theme.button(box, "CANCEL", UDim2.fromOffset(134, 48), UDim2.new(1, -8, 0.5, 0), Theme.BAD, nil, 24, V2(1, 0.5))
+		Theme.button(box, "CANCEL", UDim2.fromOffset(140, 50), UDim2.new(1, -8, 0.5, 0), Theme.BAD, nil, 24, V2(1, 0.5))
 	cancel.Activated:Connect(function()
 		p.ctx.act(Net.Action.cancel)
 	end)
@@ -224,7 +280,7 @@ local function pill(p: Plaza, layer: Frame, st: Net.State)
 	end
 	p.tick = tick
 	tick()
-	Theme.pop(box, 0, 0.7)
+	Theme.pop(box)
 end
 
 local function note(p: Plaza, layer: Frame)
@@ -233,7 +289,7 @@ local function note(p: Plaza, layer: Frame)
 		return
 	end
 	local cv = p.ctx.canvas
-	local t = Theme.text(layer, string.upper(text), 24, UDim2.fromOffset(560, 32), UDim2.fromOffset(cv.X / 2, 84), {
+	local t = Theme.text(layer, string.upper(text), 24, UDim2.fromOffset(560, 32), UDim2.fromOffset(cv.X / 2, 102), {
 		anchor = TOP_MID,
 		color = Theme.YELLOW_TXT,
 	})

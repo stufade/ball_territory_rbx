@@ -6,14 +6,15 @@
 DIR=${1:?folder}; SECS=${2:-80}; STEP=${3:-1.5}
 HERE=${0:A:h}
 mkdir -p $DIR
-ID=$(swift $HERE/wins.swift 2>/dev/null | grep " - Roblox Studio " | head -1 | awk '{print $1}')
-[ -z "$ID" ] && { echo "Studio window not found"; exit 1; }
+# window bounds (x,y,w,h): screencapture -l <id> stopped writing files, -R of the window rect works
+R=$(swift $HERE/wins.swift 2>/dev/null | grep " - Roblox Studio " | head -1 | awk '{print $(NF-1)","$NF","$(NF-4)","$(NF-3)}')
+[ -z "$R" ] && { echo "Studio window not found"; exit 1; }
 caffeinate -u -t $SECS &
 open -a /Applications/RobloxStudio.app; sleep 1
 END=$((SECONDS + SECS)); N=0
 while [ $SECONDS -lt $END ]; do
   N=$((N + 1)); F=$(printf "%s/burst_%03d.png" $DIR $N)
-  screencapture -x -o -l $ID $F && ffmpeg -loglevel error -y -i $F -vf "crop=iw*0.744:ih*0.786:0:ih*0.133,scale=800:-2" $F.tmp.png && mv $F.tmp.png $F
+  screencapture -x -o -R$R /tmp/bt_burst.png && ffmpeg -loglevel error -y -i /tmp/bt_burst.png -vf "crop=iw*0.744:ih*0.786:0:ih*0.133,scale=800:-2" $F
   sleep $STEP
 done
 echo "$N shots in $DIR"

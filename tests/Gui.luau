@@ -97,7 +97,15 @@ local Enum = setmetatable({}, {
 -- Instances -------------------------------------------------------------------------------------------------------
 local Inst = {}
 local MT = {}
-local SIGNALS = { Activated = true, InputBegan = true, InputEnded = true, MouseButton1Click = true, Event = true }
+local SIGNALS = {
+	Activated = true,
+	InputBegan = true,
+	InputEnded = true,
+	MouseButton1Click = true,
+	MouseEnter = true,
+	MouseLeave = true,
+	Event = true,
+}
 
 local function new(class: string): any
 	local o = { _p = { ClassName = class, Name = class, Visible = true, ZIndex = 1 }, _c = {}, _a = {} }

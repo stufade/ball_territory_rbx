@@ -179,7 +179,7 @@ function Theme.disc(parent: Instance, d: number, color: Color3, pos: UDim2?, alp
 	return f
 end
 
-local function scaleOf(o: GuiObject): UIScale
+function Theme.scaleOf(o: GuiObject): UIScale
 	local s = o:FindFirstChildOfClass("UIScale")
 	if s then
 		return s
@@ -188,60 +188,116 @@ local function scaleOf(o: GuiObject): UIScale
 	n.Parent = o
 	return n
 end
+local scaleOf = Theme.scaleOf
 
--- Pop in: UIScale from `from` to 1 with an overshoot, after `delay` seconds.
+-- Text with a fixed size (no TextScaled): stays still while its button or window scales. Use it inside anything
+-- that animates; Theme.text (TextScaled) re-fits on every frame of a UIScale tween and its glyphs jump.
+function Theme.label(parent: Instance, text: string, size: number, box: UDim2, pos: UDim2?, opts: TextOpts?): TextLabel
+	local t = Theme.text(parent, text, size, box, pos, opts)
+	t.TextScaled = false
+	t.TextSize = math.max(Theme.MIN_TEXT, size)
+	local c = t:FindFirstChildOfClass("UITextSizeConstraint")
+	if c then
+		c:Destroy()
+	end
+	return t
+end
+
+-- Heavy-font size that fits `text` on one line into w x h (rough glyph width 0.7 em), never under MIN_TEXT.
+function Theme.fit(text: string, size: number, w: number, h: number): number
+	local n = math.max(1, utf8.len(text) or #text)
+	return math.max(Theme.MIN_TEXT, math.floor(math.min(size, w / (n * 0.7), h * 0.72)))
+end
+
+-- Soft pop of a window, card or badge: UIScale `from` (0.85) -> 1, 0.28 s, small overshoot, after `delay` seconds.
+-- One curve for every popup; big rewards pass a lower `from` for a stronger pop.
 function Theme.pop(o: GuiObject, delay: number?, from: number?)
 	if Theme.reduced() then
 		return
 	end
 	local s = scaleOf(o)
-	s.Scale = from or 0.4
+	s.Scale = from or 0.85
 	local tw = TweenService:Create(
 		s,
-		TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, delay or 0),
+		TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, delay or 0),
 		{ Scale = 1 }
 	)
 	tw:Play()
 end
 
--- Press feedback: shrink while held, spring back on release.
+local HOVER, PRESSED = 1.04, 0.93
+local EASE_IN = TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local EASE_OUT = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+-- Press and hover: the whole button scales as one piece (its UIScale), smoothly, no bounce; the text has a fixed
+-- size so nothing inside moves on its own.
 function Theme.press(b: GuiButton)
 	local s = scaleOf(b)
+	local over, down = false, false
+	local function go(info: TweenInfo)
+		if Theme.reduced() then
+			s.Scale = 1
+			return
+		end
+		local k = if down and b.Active then PRESSED elseif over and b.Active then HOVER else 1
+		TweenService:Create(s, info, { Scale = k }):Play()
+	end
+	b.MouseEnter:Connect(function()
+		over = true
+		go(EASE_OUT)
+	end)
+	b.MouseLeave:Connect(function()
+		over, down = false, false
+		go(EASE_OUT)
+	end)
 	b.InputBegan:Connect(function(input)
 		local t = input.UserInputType
-		if
-			not Theme.reduced()
-			and (t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch)
-			and b.Active
-		then
-			TweenService:Create(s, TweenInfo.new(0.08), { Scale = 0.9 }):Play()
+		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+			down = true
+			go(EASE_IN)
 		end
 	end)
 	b.InputEnded:Connect(function(input)
 		local t = input.UserInputType
 		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
-			TweenService:Create(s, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-				:Play()
+			down = false
+			if t == Enum.UserInputType.Touch then
+				over = false
+			end
+			go(EASE_OUT)
 		end
 	end)
 end
 
--- Flat web button with a darker bottom lip, ink outline and press feedback.
+local function lipOf(c: Color3): Color3
+	return c:Lerp(Color3.new(0, 0, 0), 0.38)
+end
+
+-- The one button of the game. Layers (all inside the button, so a UIScale moves them together):
+--   Body  - full size, the darker lip colour, rounded, ink outline around the whole shape (the lip never covers it)
+--   Face  - the fill, LIP px shorter, so the lip shows under it; a light-to-dark gradient and a soft shine on top
+--   Label - fixed-size white text with an ink outline, centred on the face (one text colour on every button)
+-- Colour: set button.BackgroundColor3 (it stays transparent; Face and Body follow). Disabled: Theme.disable.
 function Theme.button(
 	parent: Instance,
 	text: string,
 	size: UDim2,
 	pos: UDim2?,
 	color: Color3?,
-	textColor: Color3?,
+	_textColor: Color3?, -- kept for old calls: every button now has white text
 	textSize: number?,
 	anchor: Vector2?
 ): TextButton
 	local bg = color or Theme.SLOT
+	local h = if size.Y.Scale == 0 then size.Y.Offset else 60
+	local w = if size.X.Scale == 0 then size.X.Offset else 0
+	local lip = math.clamp(math.floor(h * 0.1 + 0.5), 4, 9)
+	local radius = math.min(16, math.floor(h * 0.3))
 	local b = Instance.new("TextButton")
 	b.AutoButtonColor = false
 	b.Text = ""
 	b.BackgroundColor3 = bg
+	b.BackgroundTransparency = 1
 	b.BorderSizePixel = 0
 	b.Size = size
 	if pos then
@@ -250,29 +306,161 @@ function Theme.button(
 	if anchor then
 		b.AnchorPoint = anchor
 	end
-	Theme.round(b, 12)
-	Theme.stroke(b, 3, Theme.INK)
-	local lip = Theme.frame(b, UDim2.new(1, 0, 0, 10), UDim2.new(0, 0, 1, -10), bg:Lerp(Color3.new(0, 0, 0), 0.35))
-	Theme.round(lip, 12)
-	lip.ZIndex = 1
-	local shine = Theme.frame(b, UDim2.new(1, -16, 0, 6), UDim2.fromOffset(8, 6), Color3.new(1, 1, 1))
-	shine.BackgroundTransparency = 0.8
-	Theme.round(shine, 3)
+	local body = Theme.frame(b, UDim2.fromScale(1, 1), nil, lipOf(bg))
+	body.Name = "Body"
+	Theme.round(body, radius)
+	local edge = Theme.stroke(body, 3, Theme.INK)
+	edge.Name = "Edge"
+	local face = Theme.frame(body, UDim2.new(1, 0, 1, -lip), nil, bg)
+	face.Name = "Face"
+	Theme.round(face, radius)
+	local g = Instance.new("UIGradient")
+	g.Rotation = 90
+	g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(214, 214, 214))
+	g.Parent = face
+	local shine =
+		Theme.frame(face, UDim2.new(1, -2 * radius, 0, math.max(4, math.floor(h * 0.12))), nil, Color3.new(1, 1, 1))
+	shine.Name = "Shine"
+	shine.Position = UDim2.fromOffset(radius, math.max(3, math.floor(h * 0.08)))
+	shine.BackgroundTransparency = 0.72
+	Theme.round(shine, 999)
+	b:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
+		face.BackgroundColor3 = b.BackgroundColor3
+		body.BackgroundColor3 = lipOf(b.BackgroundColor3)
+	end)
 	if text ~= "" then
-		local tc = textColor or Theme.TEXT
-		local dark = tc.R + tc.G + tc.B < 1
-		local l = Theme.text(
+		local ts = textSize or 40
+		if w > 0 then
+			ts = Theme.fit(text, ts, w - 20, h - lip)
+		end
+		local l = Theme.label(
 			b,
 			text,
-			textSize or 40,
-			UDim2.new(1, -24, 1, -18),
-			UDim2.new(0.5, 0, 0.5, -3),
-			{ anchor = Vector2.new(0.5, 0.5), color = tc, stroke = if dark then 0 else nil, z = 3 }
+			ts,
+			UDim2.new(1, -16, 1, -lip),
+			UDim2.fromScale(0.5, 0),
+			{ anchor = Vector2.new(0.5, 0), z = 3, stroke = math.max(2, math.floor(ts / 10)) }
 		)
 		l.Name = "Label"
 	end
 	b.Parent = parent
 	Theme.press(b)
+	return b
+end
+
+-- Grey, inactive button (HOST STARTS, a mode that needs two).
+function Theme.disable(b: TextButton, text: string?)
+	b.BackgroundColor3 = Theme.PANEL_HI
+	b.Active = false
+	local l = b:FindFirstChild("Label") :: TextLabel?
+	if l then
+		l.TextColor3 = Theme.DIM
+		if text then
+			l.Text = text
+		end
+	end
+end
+
+-- Outline of a button: yellow while its window is open.
+function Theme.select(b: TextButton, on: boolean)
+	local body = b:FindFirstChild("Body")
+	local edge = body and body:FindFirstChild("Edge") :: UIStroke?
+	if edge then
+		edge.Color = if on then Theme.YELLOW else Theme.INK
+		edge.Thickness = if on then 4 else 3
+	end
+end
+
+-- Small count or "!" pill on the top right corner of a button or icon.
+function Theme.badge(parent: GuiObject, text: string, color: Color3?, name: string?): Frame
+	local w = math.max(30, 14 + 11 * (utf8.len(text) or #text))
+	-- centred on the corner: sticks out of the button instead of covering its icon
+	local d =
+		Theme.frame(parent, UDim2.fromOffset(w, 30), UDim2.new(1, -4, 0, 2), color or Theme.BAD, Vector2.new(0.5, 0.5))
+	d.Name = name or "Badge"
+	d.ZIndex = 6
+	Theme.round(d, 999)
+	Theme.stroke(d, 2.5, Theme.INK)
+	local t = Theme.label(d, text, 20, UDim2.fromScale(1, 1), UDim2.fromScale(0.5, 0.5), {
+		anchor = Vector2.new(0.5, 0.5),
+		z = 7,
+		stroke = 2,
+	})
+	t.Name = "Text"
+	return d
+end
+
+-- Plaza layout (docs/ui.md «Площадка»), design px of the canvas; shared by Plaza, Wallet and Level.
+--   top left, right of the Roblox buttons: icon row DAILY / QUESTS / BOOK / HELP (secondary, opened now and then)
+--   top right: coins and crystals
+--   right edge, above the jump button: PLAY (biggest) and PARTY under it - the only main actions
+--   bottom middle, between the stick and the jump button: level, XP bar, next ball; the 2x XP icon right of it
+export type PlazaLayout = {
+	right: number,
+	playW: number,
+	playY: number,
+	playH: number,
+	partyY: number,
+	partyH: number,
+	rowX: number,
+	rowY: number,
+	icon: number,
+	gap: number,
+	moneyW: number,
+	moneyH: number,
+	moneyY: { number },
+	barW: number,
+	barH: number,
+	barX: number,
+	barY: number,
+}
+
+function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
+	local barW = 430
+	return {
+		right = cv.X - 14,
+		playW = 230,
+		playY = 138,
+		playH = 104,
+		partyY = 254,
+		partyH = 66,
+		rowX = topbar.X + 6,
+		rowY = 16,
+		icon = 80,
+		gap = 10,
+		moneyW = 180,
+		moneyH = 42,
+		moneyY = { 12, 60 },
+		barW = barW,
+		barH = 64,
+		barX = cv.X / 2,
+		barY = cv.Y - 14 - 64,
+	}
+end
+
+-- Square icon button of the plaza row: an emoji icon, a caption under it, room for a badge on the corner.
+function Theme.iconButton(
+	parent: Instance,
+	icon: string,
+	caption: string,
+	size: number,
+	pos: UDim2,
+	color: Color3
+): TextButton
+	local b = Theme.button(parent, "", UDim2.fromOffset(size, size), pos, color)
+	Theme.label(b, icon, 38, UDim2.fromOffset(size, 42), UDim2.new(0.5, 0, 0, 7), {
+		anchor = Vector2.new(0.5, 0),
+		stroke = 0,
+		z = 3,
+	}).Name =
+		"Icon"
+	local c = Theme.label(b, caption, 20, UDim2.fromOffset(size, 22), UDim2.new(0.5, 0, 0, 48), {
+		anchor = Vector2.new(0.5, 0),
+		bold = true,
+		stroke = 2,
+		z = 3,
+	})
+	c.Name = "Caption"
 	return b
 end
 

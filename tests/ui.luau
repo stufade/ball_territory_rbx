@@ -127,11 +127,13 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	local coins, gems = find(w.root, "Coins"), find(w.root, "Crystals")
 	check(coins and gems and find(coins, "Value").Text == "0", `{tag}: coin and crystal pills`)
 	local dailyBtn = find(w.root, "DailyBtn")
-	check(dailyBtn and find(dailyBtn, "Dot") and find(dailyBtn, "Sub").Text == "1/7", `{tag}: DAILY with "!"`)
+	check(dailyBtn and find(dailyBtn, "Dot") and find(dailyBtn, "Caption").Text == "DAILY", `{tag}: DAILY with "!"`)
 	check(find(find(w.root, "QuestsBtn"), "Sub").Text == "1/3", `{tag}: QUESTS 1/3`)
 	check(find(find(w.root, "BookBtn"), "Sub").Text == "3", `{tag}: BOOK 3`)
-	-- layout: inside the canvas, clear of PLAY (x >= cv.X - 190, y 96..298), the stick and the jump button
-	local play = { cv.X - 14 - 176, 96, 176, 202 }
+	-- layout (U1): inside the canvas, clear of PLAY + PARTY (right edge), the stick, the jump button and the
+	-- Roblox buttons (top left, up to x 354 / y 86)
+	local play = { cv.X - 14 - 230, 138, 230, 182 }
+	local roblox = { 0, 0, 354, 86 }
 	local stick = { 83, 298, 166, 166 }
 	local jump = { cv.X - 131, 415, 97, 97 }
 	for _, name in { "Coins", "Crystals", "DailyBtn", "QuestsBtn", "BookBtn" } do
@@ -139,7 +141,7 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 		check(r[1] >= 0 and r[2] >= 0 and r[1] + r[3] <= cv.X and r[2] + r[4] <= cv.Y, `{tag}: {name} on screen`)
 		check(not overlap(r, play), `{tag}: {name} clear of PLAY/PARTY/HOW TO PLAY`)
 		check(not overlap(r, stick) and not overlap(r, jump), `{tag}: {name} clear of the stick and jump`)
-		check(r[1] > cv.X - 14 - 176 - 1, `{tag}: {name} in the right column`)
+		check(not overlap(r, roblox), `{tag}: {name} clear of the Roblox buttons`)
 	end
 	-- NEW BALL! on screen: the login screen waits
 	Wallet.setState(w, { ph = "result", win = true })
@@ -189,7 +191,8 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	local qp = find(w.pop, "QuestPanel")
 	check(qp and w.open == "quests", `{tag}: quests panel`)
 	local qr = rectOf(qp)
-	check(qr[1] >= 0 and qr[1] + qr[3] <= cv.X - 14 - 176 and qr[2] + qr[4] <= cv.Y, `{tag}: quests left of PLAY`)
+	check(qr[1] >= 0 and qr[1] + qr[3] <= cv.X - 14 - 230 and qr[2] + qr[4] <= cv.Y, `{tag}: quests left of PLAY`)
+	check(not overlap(qr, roblox), `{tag}: quests clear of the Roblox buttons`)
 	check(not overlap(qr, stick) and not overlap(qr, jump), `{tag}: quests clear of the stick and jump`)
 	check(find(find(qp, "Quest2"), "Done") ~= nil and find(find(qp, "Quest1"), "Count").Text == "1/3", `{tag}: rows`)
 	check(find(qp, "Reset").Text == "NEW IN 4h 59m", `{tag}: reset timer ({find(qp, "Reset").Text})`)
@@ -301,7 +304,7 @@ do
 	local p = Plaza.new(canvas, ctx)
 	Plaza.setState(p, { ph = "lobby" })
 	check(find(p.root, "TutorConfirm") == nil and find(p.root, "DevBalls") == nil, "plaza: no dialog, no dev button")
-	local how = btn(p.root, "HOW TO PLAY")
+	local how = find(p.root, "HowTo")
 	check(how ~= nil, "plaza: HOW TO PLAY button")
 	how.Activated:Fire()
 	check(#acts == 0, "HOW TO PLAY alone sends nothing")
@@ -312,10 +315,10 @@ do
 	)
 	find(p.root, "No").Activated:Fire()
 	check(#acts == 0 and find(p.root, "TutorConfirm") == nil, "NO: closed, nothing sent")
-	btn(p.root, "HOW TO PLAY").Activated:Fire()
+	find(p.root, "HowTo").Activated:Fire()
 	find(p.root, "Yes").Activated:Fire()
 	check(#acts == 1 and acts[1][1] == "tutor", "YES: the tutor action goes out once")
-	btn(p.root, "HOW TO PLAY").Activated:Fire()
+	find(p.root, "HowTo").Activated:Fire()
 	Plaza.setState(p, { ph = "match" })
 	Plaza.setState(p, { ph = "lobby" })
 	check(find(p.root, "TutorConfirm") == nil, "a match closes the dialog")
@@ -324,6 +327,35 @@ do
 	check(dev ~= nil, "dev flag: DEV: ALL BALLS shown")
 	dev.Activated:Fire()
 	check(acts[#acts][1] == "devballs", "dev button sends devballs")
+	-- U1 layout on the phone canvas: PLAY and PARTY at the right edge, HELP and DEV clear of the stick, the jump
+	-- button and the Roblox buttons; every plaza text has a fixed size (nothing re-fits while a button scales)
+	local stick, jump, roblox = { 83, 298, 166, 166 }, { cv.X - 131, 415, 97, 97 }, { 0, 0, 354, 86 }
+	local function clear(name: string, o: any)
+		local r = rectOf(o)
+		check(r[1] >= 0 and r[2] >= 0 and r[1] + r[3] <= cv.X and r[2] + r[4] <= cv.Y, `plaza: {name} on screen`)
+		check(not overlap(r, stick) and not overlap(r, jump), `plaza: {name} clear of the stick and jump`)
+		check(not overlap(r, roblox), `plaza: {name} clear of the Roblox buttons`)
+		return r
+	end
+	local pr = clear("PLAY", find(p.root, "Play"))
+	local yr = clear("PARTY", find(p.root, "PartyBtn"))
+	clear("HELP", find(p.root, "HowTo"))
+	clear("DEV", dev)
+	check(pr[3] >= 220 and pr[4] >= 100 and pr[3] * pr[4] > yr[3] * yr[4], "plaza: PLAY is the biggest")
+	check(pr[1] + pr[3] >= cv.X - 20 and yr[2] >= pr[2] + pr[4], "plaza: PARTY under PLAY at the right edge")
+	local scaled = 0
+	for _, d in p.root:GetDescendants() do
+		if d._p.ClassName == "TextLabel" and d._p.TextScaled then
+			scaled += 1
+		end
+	end
+	check(scaled == 0, `plaza: no TextScaled labels ({scaled})`)
+	local lbl = find(find(p.root, "Play"), "Label")
+	check(lbl and lbl.TextSize >= 20 and not lbl.TextScaled, "PLAY label has a fixed size")
+	check(
+		find(find(p.root, "Play"), "Edge") ~= nil and find(find(p.root, "Play"), "Face") ~= nil,
+		"button: body edge, face"
+	)
 	Plaza.setDev(p, false)
 	check(find(p.root, "DevBalls") == nil, "no dev flag: no button")
 
@@ -333,9 +365,29 @@ do
 		l,
 		{ level = 3, xp = 10, need = 350, balls = { 0 }, total = 27, boostMult = 2, levelBalls = 9, nextBall = 13 }
 	)
+	local bar = clear("level bar", find(l.root, "Bar"))
+	check(math.abs(bar[1] + bar[3] / 2 - cv.X / 2) < 2 and bar[2] > cv.Y * 0.8, "level bar at the bottom middle")
 	local nb = find(l.root, "NextBall")
 	check(nb ~= nil and nb:GetAttribute("Ball") == 13, "level bar: icon of the next ball")
 	check(find(l.root, "NextWord") ~= nil and table.find(Gui.texts(l.root), "NEXT") ~= nil, "level bar: NEXT")
+	Level.setProfile(l, {
+		level = 3,
+		xp = 10,
+		need = 350,
+		balls = { 0 },
+		total = 27,
+		boostMult = 2,
+		boostEnds = 600,
+		levelBalls = 9,
+		nextBall = 13,
+	})
+	local boost = find(l.root, "Boost")
+	check(boost ~= nil and find(boost, "Mult").Text == "2x", "2x XP medal")
+	if boost then
+		local br = clear("2x XP medal", boost)
+		check(not overlap(br, bar), "2x XP medal beside the bar")
+		check(find(boost, "Text").Text:match("^%d+:%d%d$") ~= nil, `2x XP timer ({find(boost, "Text").Text})`)
+	end
 	Level.setProfile(l, { level = 9, xp = 10, need = 350, balls = { 0 }, total = 27, boostMult = 2, levelBalls = 9 })
 	check(find(l.root, "NextBall") == nil and find(l.root, "NextWord") == nil, "no next ball: hidden")
 end
