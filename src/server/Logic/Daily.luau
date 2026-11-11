@@ -3,6 +3,7 @@
 -- os.time() // 86400, so everything resets at 00:00 UTC for everyone.
 -- Login: one claim per UTC day; the n-th claim pays DAILY[(n - 1) % 7 + 1]; missed days never reset the count.
 -- The 7th claim of the first cycle is VOID (LATER_DAY7 when VOID is owned already, and on later cycles).
+-- The first time loginDays lands on an Economy.MILE day, that chest is paid once on the same claim.
 -- Quests: one of each tier a day from QUESTS.pool, progress only from matches where the player was not AFK,
 -- each pays its tier, all of the day pay allDone more.
 local Wallet = require("./Wallet")
@@ -13,7 +14,8 @@ local DAY = 86400
 local TIERS = { "easy", "mid", "hard" }
 
 export type Gift = { coins: number?, crystals: number?, ball: number?, trials: number? }
-export type Claim = { n: number, pos: number, cycle: number, gift: Gift }
+export type MilePay = { day: number, coins: number, crystals: number? }
+export type Claim = { n: number, pos: number, cycle: number, gift: Gift, mile: MilePay? }
 -- one finished, not AFK match for the quests
 export type QMatch =
 	{ mode: string, win: boolean, kills: number, rx: number, kinds: { [string]: number }, rare: boolean }
@@ -64,7 +66,20 @@ function Daily.claim(d: any, now: number, E: any, log: { Wallet.Flow }?): Claim?
 	if g.trials then
 		d.trialBonus += g.trials
 	end
-	return { n = n, pos = pos, cycle = cycle, gift = g }
+	-- Once per login-day number. A later claim has a higher n, so day 42 cannot pay day 14 again.
+	local mile: MilePay? = nil
+	local miles = E.MILE
+	if type(miles) == "table" then
+		for _, m in miles do
+			if m.day == n then
+				local pay = { coins = m.coins, crystals = m.crystals }
+				mile = { day = m.day, coins = pay.coins, crystals = pay.crystals }
+				Wallet.gift(d, pay, `mile_d{m.day}`, "TimedReward", log)
+				break
+			end
+		end
+	end
+	return { n = n, pos = pos, cycle = cycle, gift = g, mile = mile }
 end
 
 -- The 7 cards of the cycle the next claim belongs to (or of today's claim when it is taken).

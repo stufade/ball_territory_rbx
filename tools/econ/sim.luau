@@ -1,13 +1,12 @@
 --!strict
--- E3.2 economy simulation. Reads the live game values (src/shared/Economy.luau, src/server/Config.luau XP) and
--- the M3.2 design tables below (milestones, cosmetics). Plays many players of each kind day by day: matches,
+-- E3.2 economy simulation. Reads the live game values (src/shared/Economy.luau, including MILE and LOOKS, and
+-- src/server/Config.luau XP). Plays many players of each kind day by day: matches,
 -- XP and levels, coins, quests, login days, reaction book, spins, direct buys, then looks once the 27 balls
 -- are owned. Prints days to 50% / 100% of the balls, the first coin purchase, coins on hand, the empty-middle
 -- gaps, and how fast the cosmetic sink drains coins.
 -- lune run tools/econ/sim [players]      (default 400 per kind)
 --
--- MILE and LOOKS are the spec for M3.2. They are not in Economy.luau yet: M3.1 is what the game runs, and this
--- task does not change src/. luau-coder copies these tables into Economy when the shop is built.
+-- MILE and LOOKS live in Economy.luau. This sim reads those tables so the numbers cannot drift.
 local process = require("@lune/process")
 local E = require("../../src/shared/Economy")
 -- Config reads Economy through ReplicatedStorage (M3.1): load it with the test loader that maps Roblox paths
@@ -35,55 +34,9 @@ local A = {
 	days = 120,
 }
 
--- Login-day chests, once each. Missed calendar days do not skip or reset them: the counter is login days,
--- same as the 7-day track. Sized as a ball, not a daily crumb (rare is 3 000, epic 6 000, legendary 12 000).
--- Weekly, and worth a real ball: a rare is 3 000, an epic is 6 000. 6 000 every week was too much —
--- a 30-min free player then finished the 27 balls on day 28, and x2 (249 R$) only saved about 5 days.
--- 4 000 / 4 000 / 6 000 / 6 000 / 8 000 keeps a new ball about every week and leaves the paid skip ahead.
-local MILE = {
-	{ day = 14, coins = 4000 },
-	{ day = 21, coins = 4000, crystals = 50 },
-	{ day = 28, coins = 6000 },
-	{ day = 35, coins = 6000, crystals = 50 },
-	{ day = 42, coins = 8000 },
-}
-
--- Cosmetic sink. Opens only when all 27 balls are owned. No combat stats. Coin price is the free path,
--- Robux is a one-time developer product (not a gamepass, not random).
-local LOOKS = {
-	{ id = "frame_wood", coins = 2000, robux = 49 },
-	{ id = "skin_ink", coins = 2500, robux = 49 },
-	{ id = "skin_chalk", coins = 2500, robux = 49 },
-	{ id = "trail_dust", coins = 2500, robux = 49 },
-	{ id = "force_pulse", coins = 3000, robux = 49 },
-	{ id = "skin_stripe", coins = 3500, robux = 79 },
-	{ id = "skin_speckle", coins = 3500, robux = 79 },
-	{ id = "trail_sparks", coins = 4000, robux = 79 },
-	{ id = "skin_marble", coins = 5000, robux = 99 },
-	{ id = "skin_candy", coins = 5000, robux = 99 },
-	{ id = "frame_iron", coins = 5000, robux = 79 },
-	{ id = "trail_ribbon", coins = 6000, robux = 99 },
-	{ id = "force_ring", coins = 6000, robux = 99 },
-	{ id = "skin_chrome", coins = 7000, robux = 129 },
-	{ id = "skin_glass", coins = 7000, robux = 129 },
-	{ id = "frame_gold", coins = 8000, robux = 149 },
-	{ id = "trail_comet", coins = 8000, robux = 149 },
-	{ id = "skin_neon", coins = 9000, robux = 149 },
-	{ id = "skin_galaxy", coins = 9000, robux = 149 },
-	{ id = "force_burst", coins = 9000, robux = 149 },
-	{ id = "trail_rainbow", coins = 10000, robux = 199 },
-	{ id = "skin_prism", coins = 12000, robux = 199 },
-	{ id = "skin_crown", coins = 12000, robux = 199 },
-	{ id = "frame_myth", coins = 12000, robux = 199 },
-	{ id = "force_nova", coins = 14000, robux = 249 },
-	{ id = "trail_void", coins = 14000, robux = 249 },
-	-- Prestige shelf. A 2 h/day player cleared the 26 looks above by ~day 84 and then hoarded
-	-- ~80 000 coins by day 120. These four keep a next purchase in front of that player.
-	{ id = "podium_spot", coins = 18000, robux = 299 },
-	{ id = "ko_card", coins = 22000, robux = 349 },
-	{ id = "trail_eclipse", coins = 28000, robux = 399 },
-	{ id = "frame_champion", coins = 36000, robux = 499 },
-}
+-- Same tables Economy pays and the shop will sell.
+local MILE = E.MILE
+local LOOKS = E.LOOKS
 
 local NB = 27
 local REACTIONS = 42

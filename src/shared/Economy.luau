@@ -6,6 +6,8 @@
 -- Element ids as in Rules.Config (0 FIRE ... 26 CANDY).
 export type Gift = { coins: number?, crystals: number?, ball: number?, trials: number? }
 export type Quest = { id: string, tier: string, kind: string, goal: number, text: string, k: string? }
+export type Mile = { day: number, coins: number, crystals: number? }
+export type Look = { id: string, coins: number, robux: number }
 
 return {
 	-- [brief] 8/8/6/5. Same lists as Config.TIERS (server, T2.2); luau-coder: make Config.TIERS read these.
@@ -148,4 +150,53 @@ return {
 	-- Offers: at most one modal offer per OFFER_GAP seconds, never in a match; a "No" adds OFFER_COOLDOWN.
 	OFFER_GAP = 600,
 	OFFER_COOLDOWN = 1800,
+
+	-- Login-day chests, once each [docs/economy.md «Вехи д14–д42»]. Missed calendar days do not skip or reset
+	-- them: the counter is login days, same as the 7-day track. Copied from tools/econ/sim.luau (E3.2).
+	-- Weekly, and worth a real ball: a rare is 3 000, an epic is 6 000. 6 000 every week was too much —
+	-- a 30-min free player then finished the 27 balls on day 28, and x2 (249 R$) only saved about 5 days.
+	MILE = {
+		{ day = 14, coins = 4000 },
+		{ day = 21, coins = 4000, crystals = 50 },
+		{ day = 28, coins = 6000 },
+		{ day = 35, coins = 6000, crystals = 50 },
+		{ day = 42, coins = 8000 },
+	} :: { Mile },
+
+	-- Cosmetic sink. Buyable only when all 27 balls are owned. No combat stats. Coin price is the free path,
+	-- Robux is a one-time developer product. Order is the sim's buy order (cheapest first), not the shelf groups.
+	LOOKS = {
+		{ id = "frame_wood", coins = 2000, robux = 49 },
+		{ id = "skin_ink", coins = 2500, robux = 49 },
+		{ id = "skin_chalk", coins = 2500, robux = 49 },
+		{ id = "trail_dust", coins = 2500, robux = 49 },
+		{ id = "force_pulse", coins = 3000, robux = 49 },
+		{ id = "skin_stripe", coins = 3500, robux = 79 },
+		{ id = "skin_speckle", coins = 3500, robux = 79 },
+		{ id = "trail_sparks", coins = 4000, robux = 79 },
+		{ id = "skin_marble", coins = 5000, robux = 99 },
+		{ id = "skin_candy", coins = 5000, robux = 99 },
+		{ id = "frame_iron", coins = 5000, robux = 79 },
+		{ id = "trail_ribbon", coins = 6000, robux = 99 },
+		{ id = "force_ring", coins = 6000, robux = 99 },
+		{ id = "skin_chrome", coins = 7000, robux = 129 },
+		{ id = "skin_glass", coins = 7000, robux = 129 },
+		{ id = "frame_gold", coins = 8000, robux = 149 },
+		{ id = "trail_comet", coins = 8000, robux = 149 },
+		{ id = "skin_neon", coins = 9000, robux = 149 },
+		{ id = "skin_galaxy", coins = 9000, robux = 149 },
+		{ id = "force_burst", coins = 9000, robux = 149 },
+		{ id = "trail_rainbow", coins = 10000, robux = 199 },
+		{ id = "skin_prism", coins = 12000, robux = 199 },
+		{ id = "skin_crown", coins = 12000, robux = 199 },
+		{ id = "frame_myth", coins = 12000, robux = 199 },
+		{ id = "force_nova", coins = 14000, robux = 249 },
+		{ id = "trail_void", coins = 14000, robux = 249 },
+		-- Prestige shelf. A 2 h/day player cleared the 26 looks above by ~day 84 and then hoarded
+		-- ~80 000 coins by day 120. These four keep a next purchase in front of that player.
+		{ id = "podium_spot", coins = 18000, robux = 299 },
+		{ id = "ko_card", coins = 22000, robux = 349 },
+		{ id = "trail_eclipse", coins = 28000, robux = 399 },
+		{ id = "frame_champion", coins = 36000, robux = 499 },
+	} :: { Look },
 }

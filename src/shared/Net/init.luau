@@ -206,7 +206,15 @@ export type ProfileView = {
 	gains: { { cur: string, n: number, why: string } }?,
 	found: { string }?,
 	done: { { id: string, text: string, coins: number } }?,
-	claim: { n: number, pos: number, cycle: number, gift: DayCard }?,
+	-- mile: set when this claim is the first time loginDays hits an Economy.MILE day. The coins and crystals
+	-- are also in `gains` (why = "mile_dN"), so the plaza counters float "+n". No separate screen.
+	claim: {
+		n: number,
+		pos: number,
+		cycle: number,
+		gift: DayCard,
+		mile: { day: number, coins: number, crystals: number? }?,
+	}?,
 }
 
 export type DayCard = {
