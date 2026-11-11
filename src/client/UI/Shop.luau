@@ -15,7 +15,14 @@ local Theme = require("./Theme")
 local V2 = Vector2.new
 local MID = V2(0.5, 0.5)
 local NEL = 27
-local ROW = 84
+local GEM = Color3.fromHex("#7a3cff")
+local TIER_H: { [string]: number } = { common = 78, rare = 94, epic = 110, legendary = 128 }
+local TIER_COL: { [string]: Color3 } = {
+	common = Color3.fromHex("#3d6bff"),
+	rare = Color3.fromHex("#14a4ff"),
+	epic = Color3.fromHex("#c044ff"),
+	legendary = Color3.fromHex("#ffd63c"),
+}
 
 local Shop = {}
 
@@ -63,7 +70,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	end
 	local missing = {}
 	for e = 0, NEL - 1 do
-		if not owned[e] and tierOf(e) then
+		if not owned[e] and tierOf(e) and not (deal ~= nil and e == deal.e) then
 			table.insert(missing, e)
 		end
 	end
@@ -123,29 +130,76 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	close.Name = "Close"
 	close.Activated:Connect(ctx.close)
 
-	local ends = Theme.text(panel, "", 22, UDim2.fromOffset(220, 28), UDim2.new(1, -110, 0, 34), {
-		anchor = V2(1, 0),
-		align = Enum.TextXAlignment.Right,
+	local ends = Theme.text(panel, "", 22, UDim2.fromOffset(240, 28), UDim2.fromOffset(212, 214), {
+		anchor = V2(0, 0),
+		align = Enum.TextXAlignment.Left,
 		color = Theme.YELLOW_TXT,
 		bold = true,
 	})
 	ends.Name = "Ends"
+
+	local listTop = 92
+	local todayCoin: TextButton? = nil
 	if deal then
+		local cardH = 206
+		local card = Theme.frame(panel, UDim2.fromOffset(pw - 32, cardH), UDim2.fromOffset(16, 92), Theme.PANEL)
+		card.Name = "Today"
+		card.ClipsDescendants = true
+		Theme.round(card, 18)
+		Theme.stroke(card, 4, Theme.YELLOW)
+		local wash = Instance.new("UIGradient")
+		wash.Rotation = 16
+		wash.Color = ColorSequence.new(Color3.fromHex("#2a2410"), Theme.nameColor(deal.e):Lerp(Color3.fromHex("#1a1408"), 0.25))
+		wash.Parent = card
+		Theme.ball(card, deal.e, 150, UDim2.fromOffset(108, cardH / 2 + 8), MID)
+		Theme.text(card, "BALL OF THE DAY", 20, UDim2.fromOffset(250, 24), UDim2.fromOffset(196, 18), {
+			anchor = V2(0, 0),
+			align = Enum.TextXAlignment.Left,
+			color = Theme.YELLOW,
+			bold = true,
+		})
+		Theme.text(card, Rules.Config.TITLE[deal.e] or "?", 36, UDim2.fromOffset(210, 42), UDim2.fromOffset(196, 46), {
+			anchor = V2(0, 0),
+			align = Enum.TextXAlignment.Left,
+			color = Theme.nameColor(deal.e),
+			stroke = 4,
+		}).Name =
+			"Name"
+		Theme.text(card, "TODAY -30%", 22, UDim2.fromOffset(210, 26), UDim2.fromOffset(196, 94), {
+			anchor = V2(0, 0),
+			align = Enum.TextXAlignment.Left,
+			color = Theme.YELLOW_TXT,
+			bold = true,
+		}).Name =
+			"Deal"
+		ends.Position = UDim2.fromOffset(212, 216)
 		table.insert(ctx.frames, function()
 			if ends.Parent then
 				ends.Text = `ENDS {left(deal.endsAt - workspace:GetServerTimeNow())}`
 			end
 		end)
 		ends.Text = `ENDS {left(deal.endsAt - workspace:GetServerTimeNow())}`
+		if not Theme.reduced() then
+			local sc = Theme.scaleOf(card)
+			local age = 0
+			table.insert(ctx.frames, function(dt)
+				if not card.Parent then
+					return
+				end
+				age += dt
+				sc.Scale = 1 + 0.02 * math.sin(age * 2.2)
+			end)
+		end
+		listTop = 92 + cardH + 8
 	end
 
 	local list = Instance.new("ScrollingFrame")
 	list.Name = "List"
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.Position = UDim2.fromOffset(12, 92)
-	list.Size = UDim2.new(1, -24, 1, -104)
-	list.CanvasSize = UDim2.fromOffset(0, math.max(#missing, 1) * ROW)
+	list.Position = UDim2.fromOffset(12, listTop)
+	list.Size = UDim2.new(1, -24, 1, -(listTop + 12))
+	list.CanvasSize = UDim2.fromOffset(0, 0)
 	list.ScrollBarThickness = 10
 	list.ScrollingDirection = Enum.ScrollingDirection.Y
 	list.Active = true
@@ -166,53 +220,76 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		return fullPrice(e, cur)
 	end
 
-	local function pay(row: Frame, e: number, cur: string, x: number)
+	local function pay(row: Frame, e: number, cur: string, x: number, y: number, bw: number, bh: number, iconD: number?): TextButton
 		local n = priceOf(e, cur)
-		local color = if cur == "coins" then Theme.YELLOW else Theme.SLOT
-		Money.icon(row, cur, 28, UDim2.fromOffset(x, 38))
-		local b =
-			Theme.button(row, Money.fmt(n), UDim2.fromOffset(128, 64), UDim2.fromOffset(x + 32, 6), color, nil, 26)
+		local color = if cur == "coins" then Theme.YELLOW else GEM
+		local d = iconD or math.clamp(bh - 36, 26, 36)
+		local shift = if iconD then math.floor(d / 2) + 12 else 34
+		Money.icon(row, cur, d, UDim2.fromOffset(x, y + bh / 2))
+		local b = Theme.button(row, Money.fmt(n), UDim2.fromOffset(bw, bh), UDim2.fromOffset(x + shift, y), color, nil, 26)
 		b.Name = if cur == "coins" then "PayCoins" else "PayGems"
 		b:SetAttribute("E", e)
 		b:SetAttribute("Cur", cur)
 		b.Activated:Connect(function()
 			ctx.act(Net.Action.buy, e, cur)
 		end)
+		return b
+	end
+
+	if deal then
+		local card = panel:FindFirstChild("Today") :: Frame
+		local cardW = pw - 32
+		local bw, bh, iconD = 148, 80, 44
+		local shift = math.floor(iconD / 2) + 12
+		local gemBtn = cardW - 18 - bw
+		local coinBtn = gemBtn - (iconD + 28) - bw
+		local y = (206 - bh) / 2 + 10
+		local gems = pay(card, deal.e, "crystals", gemBtn - shift, y, bw, bh, iconD)
+		local coins = pay(card, deal.e, "coins", coinBtn - shift, y, bw, bh, iconD)
+		coins.NextSelectionRight = gems
+		gems.NextSelectionLeft = coins
+		todayCoin = coins
 	end
 
 	local rowW = pw - 40
-	for i, e in missing do
-		local row = Theme.frame(list, UDim2.fromOffset(rowW, ROW - 8), UDim2.fromOffset(0, (i - 1) * ROW), Theme.SLOT)
+	local y = 0
+	for _, e in missing do
+		local tier = tierOf(e) or "common"
+		local h = TIER_H[tier] or 78
+		local tint = TIER_COL[tier] or Theme.SLOT
+		local row = Theme.frame(list, UDim2.fromOffset(rowW, h), UDim2.fromOffset(0, y), Theme.SLOT:Lerp(tint, 0.5))
 		row.Name = `Row{e}`
 		Theme.round(row, 14)
-		local today = deal ~= nil and e == deal.e
-		if today then
-			row.BackgroundColor3 = Theme.SLOT:Lerp(Theme.YELLOW, 0.22)
-			Theme.stroke(row, 3, Theme.YELLOW)
-		end
-		Theme.ball(row, e, 52, UDim2.fromOffset(34, (ROW - 8) / 2), MID)
+		Theme.stroke(row, if tier == "legendary" then 3 else 2, if tier == "legendary" then Theme.YELLOW else Theme.INK)
+		local ballD = if tier == "legendary" then 84 elseif tier == "epic" then 68 elseif tier == "rare" then 58 else 48
+		Theme.ball(row, e, ballD, UDim2.fromOffset(52, h / 2), MID)
 		local title = Rules.Config.TITLE[e] or "?"
-		Theme.text(row, title, 22, UDim2.fromOffset(200, 28), UDim2.fromOffset(68, if today then 8 else 22), {
+		local nameY = if h >= 94 then 14 else (h - 28) / 2
+		Theme.text(row, title, if tier == "legendary" then 26 else 22, UDim2.fromOffset(220, 28), UDim2.fromOffset(104, nameY), {
 			anchor = V2(0, 0),
 			align = Enum.TextXAlignment.Left,
 			color = Theme.nameColor(e),
 		}).Name =
 			"Name"
-		if today then
-			Theme.text(row, "TODAY -30%", 20, UDim2.fromOffset(200, 24), UDim2.fromOffset(68, 38), {
+		if h >= 94 then
+			Theme.text(row, string.upper(tier), 20, UDim2.fromOffset(220, 22), UDim2.fromOffset(104, nameY + 30), {
 				anchor = V2(0, 0),
 				align = Enum.TextXAlignment.Left,
-				color = Theme.YELLOW_TXT,
+				color = tint:Lerp(Color3.new(1, 1, 1), 0.35),
 				bold = true,
-			}).Name =
-				"Deal"
+			})
 		end
-		-- icon 28 + button 128, crystals at the right edge, coins just left of them
-		pay(row, e, "crystals", rowW - 8 - 32 - 128)
-		pay(row, e, "coins", rowW - 8 - (32 + 128) * 2 - 12)
+		local bh = 64
+		local by = (h - bh) / 2
+		local gemX = rowW - 8 - 34 - 128
+		local coinX = gemX - 12 - 34 - 128
+		pay(row, e, "crystals", gemX, by, 128, bh)
+		pay(row, e, "coins", coinX, by, 128, bh)
+		y += h + 8
 	end
+	list.CanvasSize = UDim2.fromOffset(0, math.max(y, 1))
 
-	GuiService.SelectedObject = close
+	GuiService.SelectedObject = todayCoin or close
 	UserInputService.InputBegan:Connect(function(input)
 		if panel.Parent == nil then
 			return

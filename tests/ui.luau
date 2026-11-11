@@ -485,14 +485,15 @@ do
 			rows += 1
 		end
 	end
-	check(rows == 22, `shop: 22 missing ({rows})`)
-	check(find(panel, "Row0") == nil and find(panel, "Row17") == nil, "shop: owned balls are absent")
-	local today = find(panel, "Row4")
+	check(rows == 21, `shop: 21 shelf balls, the deal is not a row ({rows})`)
+	check(find(panel, "Row0") == nil and find(panel, "Row17") == nil and find(panel, "Row4") == nil, "shop: owned balls are absent")
+	local today = find(panel, "Today")
 	check(today and find(today, "Deal").Text == "TODAY -30%", "shop: ball of the day marked")
 	check(find(today, "Name").Text == "WATER", "shop: day ball name")
 	check(find(find(today, "PayCoins"), "Label").Text == "700", "shop: day coin price is the discount")
 	check(find(find(today, "PayGems"), "Label").Text == "35", "shop: day crystal price is the discount")
 	check(rectOf(today)[2] < rectOf(find(panel, "Row5"))[2], "shop: the deal is first")
+	check(rectOf(today)[4] > rectOf(find(panel, "Row5"))[4], "shop: the deal is larger than a shelf row")
 	check(find(find(panel, "Row5"), "Deal") == nil, "shop: a normal ball is not marked")
 	check(
 		find(find(panel, "Row5"), "PayCoins").Text == ""
@@ -585,26 +586,23 @@ do
 	local pr = rectOf(panel)
 	check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, "spin: panel on screen")
 	check(rectOf(find(panel, "Close"))[3] >= 72, "spin: close is a large tap")
+	check(find(panel, "Reel") ~= nil and find(panel, "Strip") ~= nil, "spin: reel is on screen before the tap")
 	check(find(find(panel, "Coin_common"), "Pct").Text == "70%", "spin: coin common odds")
 	check(find(find(panel, "Coin_legendary"), "Pct").Text == "1%", "spin: coin legendary odds")
 	check(find(find(panel, "Coin_refund"), "Pct").Text == "0%", "spin: refund line is shown")
 	check(find(find(panel, "Gem_epic"), "Pct").Text == "15%", "spin: crystal epic odds")
 	check(string.find(find(panel, "PityCoins").Text, "3/10") ~= nil, "spin: coin guarantee counter")
 	check(string.find(find(panel, "PityGems").Text, "0/30") ~= nil, "spin: crystal guarantee counter")
-	local coinBtn = find(panel, "SpinCoins")
-	local gemBtn = find(panel, "SpinGems")
-	check(find(coinBtn, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.coins.price)}`, "spin: coin price from Economy")
-	check(
-		find(gemBtn, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.crystals.price)}`,
-		"spin: crystal price from Economy"
-	)
-	check(rectOf(coinBtn)[4] >= 112 and rectOf(gemBtn)[4] >= 112, "spin: buttons are a large tap")
-	coinBtn.Activated:Fire()
+	local go = find(panel, "SpinGo")
+	check(find(go, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.coins.price)}`, "spin: coin price from Economy")
+	check(rectOf(go)[4] >= 112, "spin: the spin button is a large tap")
+	check(find(panel, "ModeCoins") ~= nil and find(panel, "ModeGems") ~= nil, "spin: coin and crystal modes")
+	go.Activated:Fire()
 	check(
 		#acts == 1 and acts[1][1] == "spin" and acts[1][2] == nil and acts[1][3] == "coins",
 		"spin: Action spin coins, no result"
 	)
-	gemBtn.Activated:Fire()
+	go.Activated:Fire()
 	check(#acts == 1, "spin: a second tap before the answer does not send")
 
 	-- the server's answer: the ball is already chosen; the reel is only the show
@@ -624,19 +622,25 @@ do
 		"spin: neighbours are the fixed cycle"
 	)
 	check(find(panel, "Result").Text == "", "spin: the prize waits for the stop")
-	find(panel, "SpinCoins").Activated:Fire()
+	find(panel, "SpinGo").Activated:Fire()
 	check(#acts == 1, "spin: no tap while the reel moves")
 	step(w, 1.2)
 	check(panel:GetAttribute("SpinOn") == "rare", "spin: reel stops on the server tier")
 	check(find(panel, "Result").Text == "RARE · LAVA", "spin: the stopped prize is the server ball")
-	find(panel, "SpinGems").Activated:Fire()
+	find(panel, "ModeGems").Activated:Fire()
+	check(
+		find(find(panel, "SpinGo"), "Label").Text == `SPIN {Money.fmt(Economy.SPIN.crystals.price)}`,
+		"spin: crystal price from Economy"
+	)
+	find(panel, "SpinGo").Activated:Fire()
 	check(#acts == 2 and acts[2][1] == "spin" and acts[2][3] == "crystals", "spin: crystal tap after the reel")
 
 	local poor = view(Economy.SPIN.coins.price - 1, 0, false, 1)
 	poor.spin = spinBoard(4)
 	Wallet.setProfile(w, poor)
-	find(w.pop, "SpinCoins").Activated:Fire()
-	find(w.pop, "SpinGems").Activated:Fire()
+	find(w.pop, "SpinGo").Activated:Fire()
+	find(w.pop, "ModeGems").Activated:Fire()
+	find(w.pop, "SpinGo").Activated:Fire()
 	check(#acts == 2, "spin: a short balance does not send")
 
 	poor.spin.ok = false
