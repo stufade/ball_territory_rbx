@@ -133,6 +133,10 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	check(w.root.Visible and not w.pop.Visible, `{tag}: counters on the plaza`)
 	local coins, gems = find(w.root, "Coins"), find(w.root, "Crystals")
 	check(coins and gems and find(coins, "Value").Text == "0", `{tag}: coin and crystal pills`)
+	-- topbar.Y 86 is the phone safe area (taller than the slot above PLAY). Applying it
+	-- again would open a hole on the right; the compact y 12 / 60 stays.
+	local coinR, gemR = rectOf(coins), rectOf(gems)
+	check(coinR[2] == 12 and gemR[2] == 60, `{tag}: tall topbar does not drop the pills ({coinR[2]}, {gemR[2]})`)
 	local dailyBtn = find(w.root, "DailyBtn")
 	check(dailyBtn and find(dailyBtn, "Dot") and find(dailyBtn, "Caption").Text == "DAILY", `{tag}: DAILY with "!"`)
 	check(find(find(w.root, "QuestsBtn"), "Sub").Text == "1/3", `{tag}: QUESTS 1/3`)
@@ -255,6 +259,42 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	-- the search: counters stay, the buttons go
 	Wallet.setState(w, { ph = "queue", mode = "duel" })
 	check(w.root.Visible and find(w.root, "Coins") and find(w.root, "DailyBtn") == nil, `{tag}: search: counters only`)
+end
+
+-- Wide desktop: pills sit under the top bar (the player-list strip) and above PLAY.
+-- topbar.Y matches UI.fit: insetScreen/scale + 6. Screen y = design y * scale.
+local function wide(vpX: number, vpY: number, inset: number): (any, number, any, any)
+	local s = math.min(vpX / 960, vpY / 540)
+	local cv = V2(vpX / s, vpY / s)
+	Gui.canvas = cv
+	local canvas = Gui.new("Frame")
+	canvas.Name = "Canvas"
+	canvas.Size = { X = { Scale = 0, Offset = cv.X }, Y = { Scale = 0, Offset = cv.Y } }
+	local topbar = V2(260 / s + 8, inset / s + 6)
+	local w = Wallet.new(canvas, {
+		act = function() end,
+		canvas = cv,
+		topbar = topbar,
+		busy = function()
+			return true
+		end,
+	})
+	Wallet.setState(w, { ph = "lobby" })
+	Wallet.setProfile(w, view(10, 2, true, 0))
+	return w, s, topbar, cv
+end
+
+for _, spec in { { 1920, 1080, 58 }, { 1280, 720, 58 }, { 2560, 1440, 36 } } do
+	local vpX, vpY, inset = spec[1], spec[2], spec[3]
+	local tag = `{vpX}x{vpY}`
+	local w, s, topbar, cv = wide(vpX, vpY, inset)
+	local coinR, gemR = rectOf(find(w.root, "Coins")), rectOf(find(w.root, "Crystals"))
+	local play = { cv.X - 14 - 230, 138, 230, 104 }
+	check(coinR[2] * s >= 48, `{tag}: coins clear the top 48px ({coinR[2] * s})`)
+	check(gemR[2] * s >= 48, `{tag}: crystals clear the top 48px ({gemR[2] * s})`)
+	check(coinR[2] <= topbar.Y + 0.01, `{tag}: one topbar inset, not two ({coinR[2]} vs {topbar.Y})`)
+	check(not overlap(coinR, play) and not overlap(gemR, play), `{tag}: pills clear of PLAY`)
+	check(coinR[1] + coinR[3] <= cv.X and gemR[2] + gemR[4] < 138, `{tag}: pills on screen above PLAY`)
 end
 
 -- level 10: a toast with its coins and crystals

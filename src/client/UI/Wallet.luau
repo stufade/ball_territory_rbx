@@ -147,7 +147,12 @@ local function openPop(w: Wallet, which: string, claim: any?)
 		Wallet.render(w)
 	end
 	if which == "daily" then
-		Daily.build(w.pop, v, { canvas = w.ctx.canvas, act = w.ctx.act, close = close, fx = w.fx }, claim)
+		Daily.build(
+			w.pop,
+			v,
+			{ canvas = w.ctx.canvas, topbar = w.ctx.topbar, act = w.ctx.act, close = close, fx = w.fx },
+			claim
+		)
 	elseif which == "quests" then
 		-- under the icon row, left of PLAY
 		local L = layout(w)

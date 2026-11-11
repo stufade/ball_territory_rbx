@@ -23,6 +23,7 @@ local Daily = {}
 
 export type Ctx = {
 	canvas: Vector2,
+	topbar: Vector2?,
 	act: (verb: string, arg: number?) -> (),
 	close: () -> (),
 	fx: Cheer.Ctx,
@@ -332,7 +333,7 @@ end
 -- Claim: coins/crystals fly from the card (px, py) into a copy of the plaza counter, which rolls up as they land.
 local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: number, py: number, ctx: Ctx)
 	local cv = ctx.canvas
-	local L = Theme.plaza(cv, V2(0, 0))
+	local L = Theme.plaza(cv, ctx.topbar or V2(0, 0))
 	local k = 0
 	for _, cur in { "coins", "crystals" } do
 		local n = (gift :: any)[cur] :: number?

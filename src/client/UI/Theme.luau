@@ -417,10 +417,24 @@ export type PlazaLayout = {
 
 function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	local barW = 430
+	local playY = 138
+	local moneyH = 42
+	local moneyGap = 6
+	-- Coins and crystals stay on the right, above PLAY. On a wide screen the Roblox
+	-- player list covers that corner, so drop the stack under the top bar. topbar.Y
+	-- is already the GuiInset in design px (one pad included). Use it once. A phone
+	-- safe area is much taller than the gap above PLAY; applying it would open a hole
+	-- on the right and cover PLAY, so that case keeps the compact top.
+	local playGap = 8
+	local maxTop = playY - playGap - moneyH * 2 - moneyGap
+	local moneyTop = 12
+	if topbar.Y > moneyTop and topbar.Y <= maxTop + 16 then
+		moneyTop = math.min(topbar.Y, maxTop)
+	end
 	return {
 		right = cv.X - 14,
 		playW = 230,
-		playY = 138,
+		playY = playY,
 		playH = 104,
 		partyY = 254,
 		partyH = 66,
@@ -429,8 +443,8 @@ function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 		icon = 80,
 		gap = 10,
 		moneyW = 180,
-		moneyH = 42,
-		moneyY = { 12, 60 },
+		moneyH = moneyH,
+		moneyY = { moneyTop, moneyTop + moneyH + moneyGap },
 		barW = barW,
 		barH = 64,
 		barX = cv.X / 2,
