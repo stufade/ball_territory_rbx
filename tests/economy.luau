@@ -12,6 +12,7 @@ local Daily = require("../src/server/Logic/Daily")
 local Earn = require("../src/server/Logic/Earn")
 local Progress = require("../src/server/Logic/Progress")
 local Shop = require("../src/server/Logic/Shop")
+local Spin = require("../src/server/Logic/Spin")
 local Wallet = require("../src/server/Logic/Wallet")
 
 local fails, passed = 0, 0
@@ -550,6 +551,230 @@ do
 	table.insert(other.balls, again)
 	Shop.refresh(other, NOW, E)
 	check(other.dailyBall.e ~= again, "daily: an owned ball is not the offer")
+end
+
+-- 10. Spins: personal odds sum to 100, a closed tier's share moves only down, pity pays on the documented spin.
+do
+	local function fill(d, tier: string)
+		for _, e in E.TIERS[tier] do
+			if not table.find(d.balls, e) then
+				table.insert(d.balls, e)
+			end
+		end
+	end
+	local function sumOdds(o): number
+		return o.common + o.rare + o.epic + o.legendary + o.refund
+	end
+	local function same(o, common: number, rare: number, epic: number, legendary: number, refund: number): boolean
+		return o.common == common
+			and o.rare == rare
+			and o.epic == epic
+			and o.legendary == legendary
+			and o.refund == refund
+	end
+
+	for _, cur in { "coins", "crystals" } do
+		local spec = E.SPIN[cur]
+		local baseSum = 0
+		for _, tier in E.TIER_ORDER do
+			baseSum += spec.odds[tier]
+		end
+		check(baseSum == 100, `{cur}: config odds sum to 100`)
+		for mask = 0, 15 do
+			local d = Progress.new()
+			local closed: { [string]: boolean } = {}
+			for i, tier in E.TIER_ORDER do
+				if bit32.band(mask, bit32.lshift(1, i - 1)) ~= 0 then
+					fill(d, tier)
+					closed[tier] = true
+				end
+			end
+			local o = Spin.odds(d.balls, spec, E)
+			check(sumOdds(o) == 100, `{cur} mask {mask}: odds sum {sumOdds(o)}`)
+			for _, tier in E.TIER_ORDER do
+				local share = if tier == "common"
+					then o.common
+					elseif tier == "rare" then o.rare
+					elseif tier == "epic" then o.epic
+					else o.legendary
+				if closed[tier] then
+					check(share == 0, `{cur} mask {mask}: closed {tier} is 0`)
+				else
+					check(share >= spec.odds[tier], `{cur} mask {mask}: open {tier} did not lose share ({share})`)
+				end
+			end
+		end
+	end
+
+	local base = E.SPIN.coins.odds
+	local fresh = Spin.odds(Progress.new().balls, E.SPIN.coins, E)
+	check(same(fresh, base.common, base.rare, base.epic, base.legendary, 0), "open collection: the posted odds")
+
+	local down = Progress.new()
+	fill(down, "legendary")
+	local moved = Spin.odds(down.balls, E.SPIN.coins, E)
+	check(moved.legendary == 0 and moved.epic == base.epic + base.legendary, "legendary share moves down onto epic")
+	check(
+		moved.common == base.common and moved.rare == base.rare and moved.refund == 0,
+		"legendary share does not move up or skip"
+	)
+
+	fill(down, "rare")
+	local both = Spin.odds(down.balls, E.SPIN.coins, E)
+	check(both.epic == base.epic + base.legendary, "a closed rare does not add itself to epic")
+	check(
+		both.common == base.common + base.rare and both.rare == 0 and both.refund == 0,
+		"rare share moves down onto common"
+	)
+
+	local low = Progress.new()
+	fill(low, "common")
+	local commons = Spin.odds(low.balls, E.SPIN.coins, E)
+	check(commons.common == 0 and commons.refund == base.common, "common share goes to refund, nothing is lower")
+	check(
+		commons.rare == base.rare and commons.epic == base.epic and commons.legendary == base.legendary,
+		"common share does not move up"
+	)
+
+	local xbase = E.SPIN.crystals.odds
+	local top = Progress.new()
+	fill(top, "legendary")
+	local xleg = Spin.odds(top.balls, E.SPIN.crystals, E)
+	check(
+		xleg.legendary == 0 and xleg.epic == xbase.epic + xbase.legendary,
+		"crystal legendary share moves down onto epic"
+	)
+
+	-- nothing but legendaries left: lower shares become refund, they do not climb
+	local onlyLeg = Progress.new()
+	fill(onlyLeg, "common")
+	fill(onlyLeg, "rare")
+	fill(onlyLeg, "epic")
+	local parked = Spin.odds(onlyLeg.balls, E.SPIN.coins, E)
+	check(
+		parked.legendary == base.legendary and parked.refund == 100 - base.legendary,
+		"lower shares do not become a legendary"
+	)
+
+	local function zero(): number
+		return 0
+	end
+	local two = Progress.new()
+	two.coins = 5000
+	local first = Spin.roll(two, "coins", E, zero, {})
+	local second = Spin.roll(two, "coins", E, zero, {})
+	check(
+		first ~= nil and first.e == E.TIERS.common[1] and second ~= nil and second.e == E.TIERS.common[2],
+		"ball is the next missing of the tier"
+	)
+	check(first.e ~= second.e and two.coins == 5000 - 2 * E.SPIN.coins.price, "no repeat, price is Economy.SPIN")
+
+	local poor = Progress.new()
+	poor.coins = E.SPIN.coins.price - 1
+	poor.crystals = E.SPIN.crystals.price - 1
+	check(Spin.roll(poor, "coins", E, zero, {}) == nil, "short coins: no spin")
+	check(Spin.roll(poor, "crystals", E, zero, {}) == nil, "short crystals: no spin")
+	check(
+		poor.coins == E.SPIN.coins.price - 1 and poor.crystals == E.SPIN.crystals.price - 1,
+		"short balance: nothing spent"
+	)
+	check(
+		#poor.balls == 0 and poor.pity.coins == 0 and poor.pity.crystals == 0,
+		"short balance: no ball, pity unchanged"
+	)
+	check(Spin.roll(poor, "robux", E, zero, {}) == nil, "bad currency: no spin")
+
+	local banned = Progress.new()
+	banned.coins = 5000
+	check(Spin.roll(banned, "coins", E, zero, {}, true) == nil, "paid random restricted: coin spin refused")
+	check(Spin.roll(banned, "crystals", E, zero, {}, true) == nil, "paid random restricted: crystal spin refused")
+	check(banned.coins == 5000 and #banned.balls == 0 and banned.pity.coins == 0, "restricted: nothing spent")
+
+	-- rng() == 1 misses every tier (strict <) and refunds. Pity does not call it; the next call picks the ball.
+	local function warmup(limit: number): () -> number
+		local n = 0
+		return function(): number
+			n += 1
+			return if n <= limit then 1 else 0
+		end
+	end
+	local pity = Progress.new()
+	pity.coins = 100000
+	local rng = warmup(9)
+	local early = true
+	for i = 1, 9 do
+		local hit = Spin.roll(pity, "coins", E, rng, {})
+		if not hit or hit.tier ~= "refund" or hit.e ~= nil then
+			early = false
+		end
+		check(hit ~= nil and hit.tier == "refund", `coin pity spin {i} is a refund`)
+	end
+	check(early and pity.pity.coins == 9 and #pity.balls == 0, "coin guarantee waits until spin 10")
+	local paid = Spin.roll(pity, "coins", E, rng, {})
+	check(
+		paid ~= nil and paid.tier == "epic" and paid.e == E.TIERS.epic[1] and paid.pity == 0 and pity.pity.coins == 0,
+		"coin spin 10 is an epic and the counter resets"
+	)
+
+	local noEpic = Progress.new()
+	noEpic.coins = 100000
+	fill(noEpic, "epic")
+	fill(noEpic, "legendary")
+	local held = #noEpic.balls
+	local rngRefund = warmup(20)
+	for i = 1, 10 do
+		local hit = Spin.roll(noEpic, "coins", E, rngRefund, {})
+		check(hit ~= nil and hit.tier == "refund", `no epic left, spin {i} stays a refund`)
+	end
+	check(noEpic.pity.coins == 10 and #noEpic.balls == held, "guarantee does not fire when epic+ is owned")
+
+	local better = Progress.new()
+	better.coins = 100000
+	fill(better, "epic")
+	local rngBetter = warmup(9)
+	for _ = 1, 9 do
+		Spin.roll(better, "coins", E, rngBetter, {})
+	end
+	local up = Spin.roll(better, "coins", E, rngBetter, {})
+	check(
+		up ~= nil and up.tier == "legendary" and up.pity == 0,
+		"coin guarantee steps up to legendary when epic is owned"
+	)
+
+	local natural = Progress.new()
+	natural.coins = 5000
+	natural.pity.coins = 4
+	local calls = 0
+	local hitEpic = Spin.roll(natural, "coins", E, function(): number
+		calls += 1
+		return if calls == 1 then 0.95 else 0
+	end, {})
+	check(
+		hitEpic ~= nil and hitEpic.tier == "epic" and natural.pity.coins == 0,
+		"a natural epic resets the counter early"
+	)
+
+	local gems = Progress.new()
+	gems.crystals = E.SPIN.crystals.price * 30
+	local rngG = warmup(29)
+	for i = 1, 29 do
+		local hit = Spin.roll(gems, "crystals", E, rngG, {})
+		check(
+			hit ~= nil and hit.tier == "refund" and hit.back == E.SPIN.crystals.refund,
+			`crystal pity spin {i} refunds`
+		)
+	end
+	check(gems.pity.crystals == 29 and #gems.balls == 0, "crystal guarantee waits until spin 30")
+	local legendHit = Spin.roll(gems, "crystals", E, rngG, {})
+	check(
+		legendHit ~= nil
+			and legendHit.tier == "legendary"
+			and legendHit.e == E.TIERS.legendary[1]
+			and gems.pity.crystals == 0,
+		"crystal spin 30 is a legendary and the counter resets"
+	)
+	local spent = E.SPIN.crystals.price * 30 - E.SPIN.crystals.refund * 29
+	check(gems.crystals == E.SPIN.crystals.price * 30 - spent, "crystal price and refund come from Economy")
 end
 
 print(`{passed} passed, {fails} failed`)

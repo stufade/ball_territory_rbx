@@ -121,6 +121,11 @@ function Analytics.spin(player: Player, kind: string, tier: string, pity: number
 	event(player, "Spin", pity, kind, tier)
 end
 
+-- Once per session when PolicyService answers. hidden = both paid spins stay off (not a broken shop).
+function Analytics.paidRandom(player: Player, restricted: boolean)
+	event(player, "PaidRandom", if restricted then 1 else 0, if restricted then "hidden" else "shown", "spin")
+end
+
 function Analytics.offer(player: Player, what: string, action: string)
 	event(player, "Offer", 1, what, action)
 end

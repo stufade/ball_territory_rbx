@@ -15,6 +15,7 @@ local Daily = require("./Logic/Daily")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Progress = require("./Logic/Progress")
 local Shop = require("./Logic/Shop")
+local Spin = require("./Logic/Spin")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Rules = require(ReplicatedStorage.Shared.Rules)
 local Store = require("./Store")
@@ -46,6 +47,8 @@ export type Profile = {
 local profiles: { [Player]: Profile } = {}
 local loadedFns: { (Player) -> () } = {}
 local store: Store.Store
+-- true when PolicyService said paid random is restricted. Nil until the first answer (a failed read stays allowed).
+local paidRandomBlocked: { [Player]: boolean } = {}
 
 local shiftDays: () -> number
 
@@ -76,6 +79,26 @@ function Profiles.isDev(player: Player): boolean
 	return (game.CreatorType.Name == "User" and id == game.CreatorId) or table.find(Config.DEV_USERS, id) ~= nil
 end
 
+-- PolicyService. A failed or missing read does not hide the wheels (Studio can still spin). A true
+-- ArePaidRandomItemsRestricted hides both and Spin.roll refuses. Cached for the session.
+local function paidRandom(player: Player): boolean
+	local known = paidRandomBlocked[player]
+	if known ~= nil then
+		return known
+	end
+	local ok, info = pcall(function()
+		local PolicyService = game:GetService("PolicyService")
+		return PolicyService:GetPolicyInfoForPlayerAsync(player)
+	end)
+	local flag = false
+	if ok and type(info) == "table" then
+		flag = info.ArePaidRandomItemsRestricted == true
+		Analytics.paidRandom(player, flag)
+	end
+	paidRandomBlocked[player] = flag
+	return flag
+end
+
 -- The client's view: level bar, boost badge, collection; `news` = level ups to show now; `extra` = one-off fields
 -- of this change (gains, found, done, claim).
 function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [string]: any }?)
@@ -101,6 +124,7 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [st
 	for k, v in Award.view(d, clock(), serverNow(), Config, #NAMES) do
 		(view :: any)[k] = v
 	end
+	view.spin = Spin.board(d, Config.ECON, not paidRandom(player))
 	if extra then
 		for k, v in extra do
 			(view :: any)[k] = v
@@ -230,6 +254,13 @@ function Profiles.join(player: Player)
 				if p.temp then " (not saved)" else ""
 			)
 		)
+		local blocked = paidRandom(player)
+		if p.gone then
+			return
+		end
+		if blocked then
+			print(`[BT] paid random restricted for {player.Name}: coin and crystal spins hidden`)
+		end
 		Profiles.send(player)
 		Analytics.collection(player, #p.data.balls, Daily.day(now) - p.data.born, #p.data.book)
 		for _, fn in table.clone(loadedFns) do
@@ -245,6 +276,7 @@ function Profiles.leave(player: Player)
 	end
 	p.gone = true
 	profiles[player] = nil
+	paidRandomBlocked[player] = nil
 	if p.ready then
 		task.spawn(save, p, true)
 	end
@@ -368,6 +400,33 @@ function Profiles.buyBall(player: Player, e: any, cur: any)
 	attrs(p)
 	print(`[BT] {player.Name} bought {Rules.Config.TITLE[bought.e]} for {bought.n} {bought.cur}`)
 	Profiles.send(player, nil, { gains = gains(player, log) })
+end
+
+-- Action spin: currency only. The ball is chosen here, then the profile carries it in spinResult for the reel.
+function Profiles.spin(player: Player, cur: any)
+	local blocked = paidRandom(player)
+	local p = Profiles.get(player)
+	if not p then
+		return
+	end
+	if blocked then
+		Profiles.send(player)
+		return
+	end
+	local log = {}
+	local hit = Spin.roll(p.data, cur, Config.ECON, rand, log, false)
+	if not hit then
+		-- short balance or a bad currency: nothing was spent; refresh so the buttons match the wallet
+		Profiles.send(player)
+		return
+	end
+	Progress.plan(p.data, Config :: any, rand)
+	saveSoon(p)
+	attrs(p)
+	Analytics.spin(player, hit.cur, hit.tier, hit.pity)
+	local what = if hit.e then Rules.Config.TITLE[hit.e] else `refund +{hit.back}`
+	print(`[BT] {player.Name} spun {hit.cur}: {hit.tier} {what}`)
+	Profiles.send(player, nil, { gains = gains(player, log), spinResult = hit })
 end
 
 -- Debug: ServerScriptService attribute DebugDay = n shifts this server's profile clock by n days (login and

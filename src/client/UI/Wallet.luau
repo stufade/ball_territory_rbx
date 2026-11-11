@@ -2,7 +2,7 @@
 -- M3.1 on the plaza, compact at the right edge so the avatar can run (stick bottom left, jump bottom right stay free):
 -- coin and crystal counters above PLAY (numbers roll up when something pays, "+25" floats up), and a row of three
 -- small buttons under HOW TO PLAY: DAILY (red "!" when the login reward waits), QUESTS (done/3), BOOK (found),
--- SHOP (balls still missing). They open Daily, Quests, Book and Shop.
+-- SHOP (balls still missing) and SPIN when the server allows paid random. They open Daily, Quests, Book, Shop and Spin.
 -- Short toasts at the top middle: a new reaction, a quest done. Data: the Profile remote (Net.ProfileView).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,6 +13,7 @@ local Money = require("./Money")
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Quests = require("./Quests")
 local Shop = require("./Shop")
+local Spin = require("./Spin")
 local Theme = require("./Theme")
 
 local V2 = Vector2.new
@@ -186,6 +187,13 @@ local function openPop(w: Wallet, which: string, claim: any?)
 			close = close,
 			act = w.ctx.act,
 		})
+	elseif which == "spin" then
+		Spin.build(w.pop, v, {
+			canvas = w.ctx.canvas,
+			frames = w.fx.frames,
+			close = close,
+			act = w.ctx.act,
+		})
 	else
 		Book.build(w.pop, v, { canvas = w.ctx.canvas, frames = w.fx.frames, close = close }, w.fresh)
 		table.clear(w.fresh)
@@ -245,12 +253,19 @@ function Wallet.render(w: Wallet)
 			missing += 1
 		end
 	end
-	local shop = Theme.iconButton(layer, "🛒", "SHOP", L.icon, shopPos(L), Theme.YELLOW)
+	local shopAt = shopPos(L)
+	local shop = Theme.iconButton(layer, "🛒", "SHOP", L.icon, shopAt, Theme.YELLOW)
 	shop.Name = "ShopBtn"
 	if missing > 0 then
 		count(shop, tostring(missing))
 	end
 	local btns: { [string]: TextButton } = { daily = daily, quests = quests, book = book, shop = shop }
+	-- Same row as the other icons. Hidden when PolicyService restricted paid random (no spin field, or ok = false).
+	if v.spin and v.spin.ok then
+		local spin = Theme.iconButton(layer, "🎰", "SPIN", L.icon, Spin.iconPos(L, shopAt), Theme.ORANGE)
+		spin.Name = "SpinBtn"
+		btns.spin = spin
+	end
 	for name, b in btns do
 		Theme.select(b, w.open == name)
 		b.Activated:Connect(function()
@@ -308,6 +323,10 @@ function Wallet.setProfile(w: Wallet, v: Net.ProfileView)
 	end
 	if v.claim and w.open == "daily" then
 		openPop(w, "daily", v.claim)
+	elseif v.spinResult and v.spin and v.spin.ok and onPlaza(w) then
+		openPop(w, "spin")
+	elseif w.open == "spin" and (not v.spin or not v.spin.ok) then
+		closePop(w)
 	elseif w.open then
 		-- keep the open screen up to date (quest progress, book)
 		if w.open ~= "daily" then

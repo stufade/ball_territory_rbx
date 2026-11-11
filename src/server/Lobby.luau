@@ -198,6 +198,11 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number, cu
 		Profiles.buyBall(r.player, arg, cur)
 		return
 	end
+	-- currency only; the server rolls the ball and refuses a short balance or a paid-random ban
+	if verb == A.spin then
+		Profiles.spin(r.player, cur)
+		return
+	end
 	-- (works anywhere, the server checks who)
 	if verb == A.devballs then
 		-- TODO(REMOVE BEFORE LAUNCH): dev button

@@ -24,6 +24,7 @@ local Money = load("src/client/UI/Money.luau")
 local Plaza = load("src/client/UI/Plaza.luau")
 local Level = load("src/client/UI/Level.luau")
 local Rules = load("src/shared/Rules/init.luau")
+local Economy = load("src/shared/Economy.luau")
 local V2 = function(x: number, y: number): any
 	return { X = x, Y = y }
 end
@@ -141,6 +142,7 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	check(dailyBtn and find(dailyBtn, "Dot") and find(dailyBtn, "Caption").Text == "DAILY", `{tag}: DAILY with "!"`)
 	check(find(find(w.root, "QuestsBtn"), "Sub").Text == "1/3", `{tag}: QUESTS 1/3`)
 	check(find(find(w.root, "BookBtn"), "Sub").Text == "3", `{tag}: BOOK 3`)
+	check(find(w.root, "SpinBtn") == nil, `{tag}: spin hidden until the server allows it`)
 	-- layout (U1): inside the canvas, clear of PLAY + PARTY (right edge), the stick, the jump button and the
 	-- Roblox buttons (top left, up to x 354 / y 86)
 	local play = { cv.X - 14 - 230, 138, 230, 182 }
@@ -527,6 +529,122 @@ do
 	check(find(w.root, "Coins"):FindFirstChild("Value", true).Text == "4,300", "shop: counter shows the spend")
 	find(w.pop, "Close").Activated:Fire()
 	check(not w.pop.Visible, "shop: close")
+end
+
+-- Spin: personal odds before the tap, prices from the profile (Economy), the reel stops on the server's ball.
+local function spinBoard(pityCoins: number): any
+	local function line(cur: string, pity: number): any
+		local s = Economy.SPIN[cur]
+		return {
+			price = s.price,
+			refund = s.refund,
+			pity = pity,
+			every = s.pity.every,
+			tier = s.pity.tier,
+			odds = {
+				common = s.odds.common,
+				rare = s.odds.rare,
+				epic = s.odds.epic,
+				legendary = s.odds.legendary,
+				refund = 0,
+			},
+		}
+	end
+	return { ok = true, coins = line("coins", pityCoins), crystals = line("crystals", 0) }
+end
+
+for _, cv in { V2(1168, 540), V2(960, 540) } do
+	local tag = `{cv.X} spin`
+	local w = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(5000, 49, false, 1)
+	v.spin = spinBoard(3)
+	Wallet.setProfile(w, v)
+	local btn = find(w.root, "SpinBtn")
+	local wantX = if cv.X >= 1100 then 360 + 5 * 90 else 360
+	local wantY = if cv.X >= 1100 then 16 else 16 + 90
+	local r = rectOf(btn)
+	check(r[1] == wantX and r[2] == wantY and r[3] == 80, `{tag}: button at {r[1]},{r[2]}`)
+	check(find(btn, "Caption").Text == "SPIN", `{tag}: caption`)
+	check(not overlap(r, rectOf(find(w.root, "ShopBtn"))), `{tag}: clear of SHOP`)
+	check(not overlap(r, rectOf(find(w.root, "Coins"))), `{tag}: clear of the coins`)
+	local play = { cv.X - 14 - 230, 138, 230, 182 }
+	check(not overlap(r, play), `{tag}: clear of PLAY`)
+end
+
+do
+	local cv = V2(1168, 540)
+	local w, _, acts = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(5000, 49, false, 1)
+	v.spin = spinBoard(3)
+	Wallet.setProfile(w, v)
+	find(w.root, "SpinBtn").Activated:Fire()
+	local panel = find(w.pop, "SpinPanel")
+	check(panel ~= nil and w.open == "spin", "spin: open")
+	local pr = rectOf(panel)
+	check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, "spin: panel on screen")
+	check(rectOf(find(panel, "Close"))[3] >= 72, "spin: close is a large tap")
+	check(find(find(panel, "Coin_common"), "Pct").Text == "70%", "spin: coin common odds")
+	check(find(find(panel, "Coin_legendary"), "Pct").Text == "1%", "spin: coin legendary odds")
+	check(find(find(panel, "Coin_refund"), "Pct").Text == "0%", "spin: refund line is shown")
+	check(find(find(panel, "Gem_epic"), "Pct").Text == "15%", "spin: crystal epic odds")
+	check(string.find(find(panel, "PityCoins").Text, "3/10") ~= nil, "spin: coin guarantee counter")
+	check(string.find(find(panel, "PityGems").Text, "0/30") ~= nil, "spin: crystal guarantee counter")
+	local coinBtn = find(panel, "SpinCoins")
+	local gemBtn = find(panel, "SpinGems")
+	check(find(coinBtn, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.coins.price)}`, "spin: coin price from Economy")
+	check(
+		find(gemBtn, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.crystals.price)}`,
+		"spin: crystal price from Economy"
+	)
+	check(rectOf(coinBtn)[4] >= 112 and rectOf(gemBtn)[4] >= 112, "spin: buttons are a large tap")
+	coinBtn.Activated:Fire()
+	check(
+		#acts == 1 and acts[1][1] == "spin" and acts[1][2] == nil and acts[1][3] == "coins",
+		"spin: Action spin coins, no result"
+	)
+	gemBtn.Activated:Fire()
+	check(#acts == 1, "spin: a second tap before the answer does not send")
+
+	-- the server's answer: the ball is already chosen; the reel is only the show
+	v.coins = 4000
+	v.spin = spinBoard(4)
+	v.spinResult = { cur = "coins", tier = "rare", e = 11, back = 0, pity = 4, price = Economy.SPIN.coins.price }
+	Wallet.setProfile(w, v)
+	panel = find(w.pop, "SpinPanel")
+	check(
+		panel:GetAttribute("Decided") == "rare" and panel:GetAttribute("DecidedBall") == 11,
+		"spin: outcome is set before the reel"
+	)
+	check(
+		find(panel, "Tile16").Text == "COMMON"
+			and find(panel, "Tile17").Text == "RARE"
+			and find(panel, "Tile18").Text == "EPIC",
+		"spin: neighbours are the fixed cycle"
+	)
+	check(find(panel, "Result").Text == "", "spin: the prize waits for the stop")
+	find(panel, "SpinCoins").Activated:Fire()
+	check(#acts == 1, "spin: no tap while the reel moves")
+	step(w, 1.2)
+	check(panel:GetAttribute("SpinOn") == "rare", "spin: reel stops on the server tier")
+	check(find(panel, "Result").Text == "RARE · LAVA", "spin: the stopped prize is the server ball")
+	find(panel, "SpinGems").Activated:Fire()
+	check(#acts == 2 and acts[2][1] == "spin" and acts[2][3] == "crystals", "spin: crystal tap after the reel")
+
+	local poor = view(Economy.SPIN.coins.price - 1, 0, false, 1)
+	poor.spin = spinBoard(4)
+	Wallet.setProfile(w, poor)
+	find(w.pop, "SpinCoins").Activated:Fire()
+	find(w.pop, "SpinGems").Activated:Fire()
+	check(#acts == 2, "spin: a short balance does not send")
+
+	poor.spin.ok = false
+	Wallet.setProfile(w, poor)
+	check(
+		find(w.root, "SpinBtn") == nil and not w.pop.Visible,
+		"spin: restricted policy hides the button and the screen"
+	)
 end
 
 print(`{passed} passed, {fails} failed`)

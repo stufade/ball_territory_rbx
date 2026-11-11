@@ -15,7 +15,7 @@ Net.Remote = {
 	Match = "Match", -- RemoteEvent S->C (kind: string, data: table)
 	State = "State", -- RemoteEvent S->C (st: State)
 	Input = "Input", -- RemoteEvent C->S (kind: number, dx: number?, dy: number?)
-	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?). buy: ("buy", e, "coins"|"crystals")
+	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?). buy: ("buy", e, "coins"|"crystals"); spin: ("spin", nil, "coins"|"crystals")
 	Party = "Party", -- RemoteEvent S->C (view: PartyView), M1.6
 	Profile = "Profile", -- RemoteEvent S->C (view: ProfileView), T2.2
 }
@@ -57,6 +57,8 @@ Net.Action = {
 	daily = "daily",
 	-- M3.2: buy ball e for the currency in the third argument ("coins" | "crystals"). The server prices it.
 	buy = "buy",
+	-- M3.2: one spin. The third argument is "coins" or "crystals". The client does not send the result.
+	spin = "spin",
 }
 
 -- Action "queue" argument.
@@ -220,6 +222,33 @@ export type ProfileView = {
 		gift: DayCard,
 		mile: { day: number, coins: number, crystals: number? }?,
 	}?,
+	-- Paid spins (M3.2). Personal odds and the pity counter, before the tap. ok = false hides both wheels
+	-- (ArePaidRandomItemsRestricted). The client does not compute the chances.
+	spin: SpinView?,
+	-- Set on the snapshot that paid for a spin. The reel only displays it.
+	spinResult: SpinHit?,
+}
+
+export type SpinOdds = { common: number, rare: number, epic: number, legendary: number, refund: number }
+
+export type SpinLine = {
+	price: number,
+	refund: number,
+	pity: number,
+	every: number,
+	tier: string,
+	odds: SpinOdds,
+}
+
+export type SpinView = { ok: boolean, coins: SpinLine, crystals: SpinLine }
+
+export type SpinHit = {
+	cur: string,
+	tier: string,
+	e: number?,
+	back: number,
+	pity: number,
+	price: number,
 }
 
 export type DayCard = {
