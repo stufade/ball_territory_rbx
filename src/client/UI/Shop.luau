@@ -245,27 +245,43 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		if deal then
 			local tier = tierOf(deal.e) or "common"
 			local tint = TIER_COL[tier] or Theme.YELLOW
-			local cardH = 180
-			local card =
-				Theme.frame(body, UDim2.fromOffset(bodyW, cardH), UDim2.fromOffset(0, 0), Theme.BG:Lerp(tint, 0.42))
+			local cardH = math.clamp(math.floor(bodyH * 0.48), 188, 228)
+			local card = Theme.frame(body, UDim2.fromOffset(bodyW, cardH), UDim2.fromOffset(0, 0), tint)
 			card.Name = "Today"
 			card.ClipsDescendants = true
 			Theme.round(card, 18)
-			Theme.stroke(card, 5, tint)
+			Theme.stroke(card, 5, tint:Lerp(Color3.new(1, 1, 1), 0.35))
 			local wash = Instance.new("UIGradient")
-			wash.Rotation = 18
-			wash.Color = ColorSequence.new(tint:Lerp(Color3.new(1, 1, 1), 0.18), Theme.PANEL)
+			wash.Rotation = 16
+			wash.Color = ColorSequence.new(tint:Lerp(Color3.new(1, 1, 1), 0.28), tint:Lerp(Theme.BG, 0.18))
 			wash.Parent = card
 			endsParent = card
-			local ballD = 118
-			Theme.disc(card, ballD + 28, tint, UDim2.fromOffset(86, cardH / 2), 0.45)
-			Theme.ball(card, deal.e, ballD, UDim2.fromOffset(86, cardH / 2), MID).Name = "Icon"
+			local ballD = cardH - 28
+			local bx, byc = 18 + ballD / 2, cardH / 2
+			for i = 1, 12 do
+				local ray = Theme.frame(
+					card,
+					UDim2.fromOffset(22, math.floor(cardH * 1.85)),
+					UDim2.fromOffset(bx, byc),
+					if i % 2 == 0 then Color3.new(1, 1, 1) else tint:Lerp(Color3.new(1, 1, 1), 0.55),
+					MID
+				)
+				ray.Rotation = (i - 1) * 15
+				ray.BackgroundTransparency = 0.28
+				ray.ZIndex = 1
+			end
+			local glow =
+				Theme.disc(card, math.floor(cardH * 1.25), Color3.new(1, 1, 1), UDim2.fromOffset(bx, byc), 0.42)
+			glow.ZIndex = 2
+			local icon = Theme.ball(card, deal.e, ballD, UDim2.fromOffset(bx, byc), MID)
+			icon.Name = "Icon"
+			icon.ZIndex = 4
 			local bw, bh = 156, 68
 			local gemX = bodyW - 14 - bw
 			local coinX = gemX - 8 - bw
-			local textX = 158
+			local textX = math.floor(18 + ballD + 18)
 			local textW = math.max(80, coinX - 12 - textX)
-			Theme.label(card, "BALL OF THE DAY", 20, UDim2.fromOffset(textW, 22), UDim2.fromOffset(textX, 16), {
+			Theme.label(card, "BALL OF THE DAY", 22, UDim2.fromOffset(textW, 26), UDim2.fromOffset(textX, 18), {
 				anchor = V2(0, 0),
 				align = Enum.TextXAlignment.Left,
 				color = Theme.YELLOW,
@@ -273,9 +289,9 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			Theme.label(
 				card,
 				Rules.Config.TITLE[deal.e] or "?",
-				34,
-				UDim2.fromOffset(textW, 38),
-				UDim2.fromOffset(textX, 40),
+				40,
+				UDim2.fromOffset(textW, 46),
+				UDim2.fromOffset(textX, 46),
 				{
 					anchor = V2(0, 0),
 					align = Enum.TextXAlignment.Left,
@@ -288,7 +304,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				TIER_WORD[tier] or "COMMON",
 				20,
 				UDim2.fromOffset(textW, 22),
-				UDim2.fromOffset(textX, 82),
+				UDim2.fromOffset(textX, 96),
 				{
 					anchor = V2(0, 0),
 					align = Enum.TextXAlignment.Left,
@@ -296,7 +312,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				}
 			).Name =
 				"Tier"
-			Theme.label(card, "TODAY -30%", 20, UDim2.fromOffset(textW, 22), UDim2.fromOffset(textX, 108), {
+			Theme.label(card, "TODAY -30%", 22, UDim2.fromOffset(textW, 24), UDim2.fromOffset(textX, 122), {
 				anchor = V2(0, 0),
 				align = Enum.TextXAlignment.Left,
 				color = Theme.YELLOW_TXT,
@@ -311,7 +327,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			listTop = cardH + 8
 		end
 
-		local ends = Theme.label(endsParent, "", 20, UDim2.fromOffset(220, 22), UDim2.fromOffset(158, 134), {
+		local ends = Theme.label(endsParent, "", 22, UDim2.fromOffset(220, 24), UDim2.fromOffset(16, 16), {
 			anchor = V2(0, 0),
 			align = Enum.TextXAlignment.Left,
 			color = Theme.YELLOW_TXT,
@@ -324,7 +340,10 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		else
 			local bw = 156
 			local coinX = bodyW - 14 - bw - 8 - bw
-			ends.Size = UDim2.fromOffset(math.max(80, coinX - 12 - 158), 22)
+			local bannerH = math.clamp(math.floor(bodyH * 0.48), 188, 228)
+			local textX = math.floor(18 + (bannerH - 28) + 18)
+			ends.Position = UDim2.fromOffset(textX, bannerH - 36)
+			ends.Size = UDim2.fromOffset(math.max(80, coinX - 12 - textX), 24)
 		end
 		if deal then
 			table.insert(ctx.frames, function()
@@ -373,7 +392,17 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		local gap = 8
 		local cols = if bodyW >= 680 then 3 else 2
 		local cardW = math.floor((bodyW - 12 - gap * (cols - 1)) / cols)
-		local cardH = 174
+		local room = math.max(40, bodyH - listTop)
+		local natural = 168
+		local fit = math.max(1, math.floor((room + gap) / (natural + gap)))
+		local cardH = math.min(natural, math.floor((room - gap * (fit - 1)) / fit))
+		local shown = fit * cardH + gap * (fit - 1)
+		if shown > room then
+			fit = 1
+			cardH = math.min(natural, room)
+			shown = cardH
+		end
+		list.Size = UDim2.fromOffset(bodyW, shown)
 		for i, e in missing do
 			local tier = tierOf(e) or "common"
 			local tint = TIER_COL[tier] or Theme.SLOT

@@ -776,6 +776,14 @@ do
 			end
 		end
 		check(cardsN == #Economy.LOOKS, `{tag}: every look is on the tab ({cardsN})`)
+		local looks = find(panel, "Looks")
+		for _, id in { "R_trail_dust", "R_force_pulse" } do
+			local card = find(panel, id)
+			check(
+				card ~= nil and inside(card, looks) and inside(find(card, "PayCoins"), card),
+				`{tag}: {id} sits fully inside the panel`
+			)
+		end
 		buttonsFit(panel, cv, `{tag} skins`)
 		local pr = rectOf(panel)
 		check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, `{tag}: panel on screen`)
