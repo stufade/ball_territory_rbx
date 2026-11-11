@@ -256,22 +256,23 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			wash.Color = ColorSequence.new(tint:Lerp(Color3.new(1, 1, 1), 0.28), tint:Lerp(Theme.BG, 0.18))
 			wash.Parent = card
 			endsParent = card
-			local ballD = cardH - 28
-			local bx, byc = 18 + ballD / 2, cardH / 2
-			for i = 1, 12 do
+			local ballD = math.floor(cardH * 0.92)
+			local bx, byc = 6 + ballD / 2, cardH / 2
+			local rayLen = math.floor(math.max(bodyW, cardH) * 1.15)
+			for i = 1, 14 do
 				local ray = Theme.frame(
 					card,
-					UDim2.fromOffset(22, math.floor(cardH * 1.85)),
+					UDim2.fromOffset(26, rayLen),
 					UDim2.fromOffset(bx, byc),
-					if i % 2 == 0 then Color3.new(1, 1, 1) else tint:Lerp(Color3.new(1, 1, 1), 0.55),
+					if i % 2 == 0 then Color3.new(1, 1, 1) else tint:Lerp(Color3.new(1, 1, 1), 0.45),
 					MID
 				)
-				ray.Rotation = (i - 1) * 15
-				ray.BackgroundTransparency = 0.28
+				ray.Rotation = 12 + (i - 1) * (156 / 13)
+				ray.BackgroundTransparency = 0.38
 				ray.ZIndex = 1
 			end
 			local glow =
-				Theme.disc(card, math.floor(cardH * 1.25), Color3.new(1, 1, 1), UDim2.fromOffset(bx, byc), 0.42)
+				Theme.disc(card, math.floor(cardH * 1.55), Color3.new(1, 1, 1), UDim2.fromOffset(bx, byc), 0.35)
 			glow.ZIndex = 2
 			local icon = Theme.ball(card, deal.e, ballD, UDim2.fromOffset(bx, byc), MID)
 			icon.Name = "Icon"
@@ -279,32 +280,30 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			local bw, bh = 156, 68
 			local gemX = bodyW - 14 - bw
 			local coinX = gemX - 8 - bw
-			local textX = math.floor(18 + ballD + 18)
+			local textX = math.floor(6 + ballD + 16)
 			local textW = math.max(80, coinX - 12 - textX)
-			Theme.label(card, "BALL OF THE DAY", 22, UDim2.fromOffset(textW, 26), UDim2.fromOffset(textX, 18), {
+			local title = Rules.Config.TITLE[deal.e] or "?"
+			local metaY = cardH - 30
+			local nameH = metaY - 36
+			local namePx = Theme.fit(title, 96, textW, nameH)
+			Theme.label(card, "BALL OF THE DAY", 22, UDim2.fromOffset(textW, 24), UDim2.fromOffset(textX, 6), {
 				anchor = V2(0, 0),
 				align = Enum.TextXAlignment.Left,
 				color = Theme.YELLOW,
 			})
-			Theme.label(
-				card,
-				Rules.Config.TITLE[deal.e] or "?",
-				40,
-				UDim2.fromOffset(textW, 46),
-				UDim2.fromOffset(textX, 46),
-				{
-					anchor = V2(0, 0),
-					align = Enum.TextXAlignment.Left,
-					color = Theme.nameColor(deal.e),
-				}
-			).Name =
+			Theme.label(card, title, namePx, UDim2.fromOffset(textW, nameH), UDim2.fromOffset(textX, 30), {
+				anchor = V2(0, 0),
+				align = Enum.TextXAlignment.Left,
+				color = Theme.nameColor(deal.e),
+			}).Name =
 				"Name"
+			local tierW = math.floor(textW * 0.28)
 			Theme.label(
 				card,
 				TIER_WORD[tier] or "COMMON",
 				20,
-				UDim2.fromOffset(textW, 22),
-				UDim2.fromOffset(textX, 96),
+				UDim2.fromOffset(tierW, 22),
+				UDim2.fromOffset(textX, metaY),
 				{
 					anchor = V2(0, 0),
 					align = Enum.TextXAlignment.Left,
@@ -312,11 +311,18 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				}
 			).Name =
 				"Tier"
-			Theme.label(card, "TODAY -30%", 22, UDim2.fromOffset(textW, 24), UDim2.fromOffset(textX, 122), {
-				anchor = V2(0, 0),
-				align = Enum.TextXAlignment.Left,
-				color = Theme.YELLOW_TXT,
-			}).Name =
+			Theme.label(
+				card,
+				"TODAY -30%",
+				20,
+				UDim2.fromOffset(math.floor(textW * 0.34), 22),
+				UDim2.fromOffset(textX + tierW, metaY),
+				{
+					anchor = V2(0, 0),
+					align = Enum.TextXAlignment.Left,
+					color = Theme.YELLOW_TXT,
+				}
+			).Name =
 				"Deal"
 			local by = math.floor((cardH - bh) / 2)
 			local gems = pay(card, deal.e, "crystals", gemX, by, bw, bh)
@@ -338,12 +344,12 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			ends.Position = UDim2.fromOffset(0, 0)
 			ends.Size = UDim2.fromOffset(1, 1)
 		else
-			local bw = 156
-			local coinX = bodyW - 14 - bw - 8 - bw
 			local bannerH = math.clamp(math.floor(bodyH * 0.48), 188, 228)
-			local textX = math.floor(18 + (bannerH - 28) + 18)
-			ends.Position = UDim2.fromOffset(textX, bannerH - 36)
-			ends.Size = UDim2.fromOffset(math.max(80, coinX - 12 - textX), 24)
+			local textX = math.floor(6 + math.floor(bannerH * 0.92) + 16)
+			local coinX = bodyW - 14 - 156 - 8 - 156
+			local textW = math.max(80, coinX - 12 - textX)
+			ends.Position = UDim2.fromOffset(textX + math.floor(textW * 0.62), bannerH - 30)
+			ends.Size = UDim2.fromOffset(math.max(80, math.floor(textW * 0.38)), 22)
 		end
 		if deal then
 			table.insert(ctx.frames, function()

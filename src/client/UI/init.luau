@@ -397,11 +397,26 @@ function UI.start()
 		end
 	end)
 
-	Remotes.Profile.OnClientEvent:Connect(function(v: Net.ProfileView)
+	local heldProfile: Net.ProfileView? = nil
+	local function applyProfile(v: any)
 		if typeof(v) == "table" and type(v.level) == "number" and typeof(v.balls) == "table" then
 			Level.setProfile(level, v)
 			Wallet.setProfile(wallet, v)
 			Plaza.setDev(plaza, v.dev == true)
+		end
+	end
+	Remotes.Profile.OnClientEvent:Connect(function(v: Net.ProfileView)
+		if workspace:GetAttribute("BTHold") == true then
+			heldProfile = v
+			return
+		end
+		applyProfile(v)
+	end)
+	workspace:GetAttributeChangedSignal("BTHold"):Connect(function()
+		if workspace:GetAttribute("BTHold") ~= true and heldProfile then
+			local v = heldProfile
+			heldProfile = nil
+			applyProfile(v)
 		end
 	end)
 

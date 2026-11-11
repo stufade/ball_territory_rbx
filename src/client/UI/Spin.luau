@@ -184,17 +184,16 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	local pad = 10
 	local btnH = if h < 300 then 52 else 58
 	local pityH = 22
-	local oddsH = math.clamp(math.floor(h * 0.34), 108, 156)
+	local reelH = math.clamp(math.floor(h * 0.44), 120, 230)
+	local oddsH = h - pad - reelH - 6 - 4 - pityH - 4 - btnH - pad
+	if oddsH < 100 then
+		reelH -= 100 - oddsH
+		oddsH = 100
+	end
 	local btnY = h - pad - btnH
 	local pityY = btnY - 4 - pityH
 	local oddsY = pityY - 4 - oddsH
 	local reelY = pad
-	local reelH = oddsY - 6 - reelY
-	if reelH < 100 then
-		oddsH = math.max(96, oddsH - (100 - reelH))
-		oddsY = pityY - 4 - oddsH
-		reelH = math.max(88, oddsY - 6 - reelY)
-	end
 
 	local card = Theme.frame(host, UDim2.fromOffset(w, h), UDim2.fromOffset(0, 0), Theme.BG)
 	card.Name = "SpinCard"
@@ -217,22 +216,24 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	wash.Rotation = 18
 	wash.Color = ColorSequence.new(SPEC[featuredTier].color:Lerp(Color3.new(1, 1, 1), 0.35), SPEC[featuredTier].color)
 	wash.Parent = window
-	local heroX = math.floor(math.min(innerW * 0.3, reelH * 0.7))
-	local heroY = math.floor(reelH * 0.46)
-	for i = 1, 10 do
+	local heroD = math.floor(reelH * 0.92)
+	local heroX = math.floor(6 + heroD / 2)
+	local heroY = math.floor(reelH / 2)
+	local rayLen = math.floor(math.max(innerW, reelH) * 1.2)
+	for i = 1, 14 do
 		local ray = Theme.frame(
 			window,
-			UDim2.fromOffset(22, math.floor(reelH * 2.1)),
+			UDim2.fromOffset(24, rayLen),
 			UDim2.fromOffset(heroX, heroY),
-			if i % 2 == 0 then Color3.new(1, 1, 1) else SPEC[featuredTier].color:Lerp(Color3.new(1, 1, 1), 0.45),
+			if i % 2 == 0 then Color3.new(1, 1, 1) else SPEC[featuredTier].color:Lerp(Color3.new(1, 1, 1), 0.4),
 			MID
 		)
-		ray.Rotation = (i - 1) * 18
-		ray.BackgroundTransparency = 0.25
+		ray.Rotation = 12 + (i - 1) * (156 / 13)
+		ray.BackgroundTransparency = 0.38
 		ray.ZIndex = 1
 	end
 	local heroGlow =
-		Theme.disc(window, math.floor(reelH * 1.15), Color3.new(1, 1, 1), UDim2.fromOffset(heroX, heroY), 0.4)
+		Theme.disc(window, math.floor(reelH * 1.45), Color3.new(1, 1, 1), UDim2.fromOffset(heroX, heroY), 0.32)
 	heroGlow.ZIndex = 1
 
 	local viewW = innerW
@@ -284,30 +285,31 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	marker.BackgroundTransparency = 0.15
 
 	local kicker = if deal and featured == deal.e then "BALL OF THE DAY" else "FEATURED"
-	local titleW = math.max(120, viewW - heroX - math.floor(reelH * 0.42))
-	Theme.label(window, kicker, 20, UDim2.fromOffset(titleW, 24), UDim2.new(1, -16, 0, 18), {
-		anchor = V2(1, 0),
-		align = Enum.TextXAlignment.Right,
+	local textX = math.floor(heroX + heroD / 2 + 14)
+	local titleW = math.max(80, viewW - textX - 12)
+	local title = Rules.Config.TITLE[featured] or "?"
+	local nameH = math.floor(reelH * 0.5)
+	local namePx = Theme.fit(title, 92, titleW, nameH)
+	Theme.label(window, kicker, 22, UDim2.fromOffset(titleW, 24), UDim2.fromOffset(textX, 8), {
+		align = Enum.TextXAlignment.Left,
 		color = Theme.YELLOW,
 		z = 11,
 	})
 	local prizeName = Theme.label(
 		window,
-		Rules.Config.TITLE[featured] or "?",
-		40,
-		UDim2.fromOffset(titleW, 48),
-		UDim2.new(1, -16, 0, 42),
+		title,
+		namePx,
+		UDim2.fromOffset(titleW, nameH),
+		UDim2.fromOffset(textX, math.floor(reelH * 0.24)),
 		{
-			anchor = V2(1, 0),
-			align = Enum.TextXAlignment.Right,
+			align = Enum.TextXAlignment.Left,
 			color = Theme.nameColor(featured),
 			z = 11,
 		}
 	)
 	prizeName.Name = "Prize"
-	Theme.label(window, labelOf(featuredTier), 22, UDim2.fromOffset(titleW, 24), UDim2.new(1, -16, 0, 92), {
-		anchor = V2(1, 0),
-		align = Enum.TextXAlignment.Right,
+	Theme.label(window, labelOf(featuredTier), 22, UDim2.fromOffset(titleW, 24), UDim2.fromOffset(textX, reelH - 32), {
+		align = Enum.TextXAlignment.Left,
 		color = Color3.new(1, 1, 1),
 		z = 11,
 	})
@@ -322,7 +324,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	local function chips(c: string, line: Net.SpinLine)
 		local box = Theme.clear(card, UDim2.fromOffset(innerW, oddsH), UDim2.fromOffset(pad, oddsY))
 		box.Name = if c == "coins" then "OddsCoins" else "OddsGems"
-		local weight = { common = 1, rare = 1.05, epic = 1.12, legendary = 1.75, refund = 0.82 }
+		local weight = { common = 1, rare = 1.02, epic = 1.08, legendary = 2.15, refund = 0.78 }
 		local sum = 0
 		for _, tier in CYCLE do
 			sum += weight[tier]
@@ -334,24 +336,25 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 			local color = SPEC[tier].color
 			local chipW = if i == #CYCLE then innerW - x else math.floor(free * weight[tier] / sum)
 			local legend = tier == "legendary"
+			local chipH = if legend then oddsH else math.floor(oddsH * 0.68)
+			local chipY = oddsH - chipH
 			local row = Theme.frame(
 				box,
-				UDim2.fromOffset(chipW, oddsH),
-				UDim2.fromOffset(x, 0),
-				if legend then color:Lerp(Color3.new(1, 1, 1), 0.2) else color:Lerp(Theme.BG, 0.38)
+				UDim2.fromOffset(chipW, chipH),
+				UDim2.fromOffset(x, chipY),
+				if legend then color:Lerp(Color3.new(1, 1, 1), 0.28) else color:Lerp(Theme.BG, 0.32)
 			)
 			row.Name = `{prefix(c)}_{tier}`
 			row.ClipsDescendants = true
 			Theme.round(row, 14)
-			Theme.stroke(row, if legend then 6 else 4, color)
-			local pctSize = if legend then 32 else 24
-			local ballD = math.floor(oddsH * (if legend then 0.62 else 0.46))
-			local ballY = math.floor((oddsH - pctSize - 8) / 2)
+			Theme.stroke(row, if legend then 8 else 4, if legend then Theme.YELLOW else color)
+			local pctSize = if legend then 36 else 26
+			local ballD = math.floor(chipH * (if legend then 0.5 else 0.42))
 			if tier == "refund" then
-				Money.icon(row, c, ballD, UDim2.fromOffset(chipW / 2, ballY))
+				Money.icon(row, c, ballD, UDim2.fromScale(0.5, 0.34))
 			else
 				local poster = if legend then VOID else face[tier]
-				local icon = Theme.ball(row, poster, ballD, UDim2.fromOffset(chipW / 2, ballY), MID)
+				local icon = Theme.ball(row, poster, ballD, UDim2.fromScale(0.5, 0.34), MID)
 				icon.Name = "Icon"
 				icon.ZIndex = 4
 			end
@@ -359,12 +362,12 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 				row,
 				`{shareOf(line.odds, tier)}%`,
 				pctSize,
-				UDim2.fromOffset(chipW - 8, pctSize + 6),
-				UDim2.new(0.5, 0, 1, -4),
+				UDim2.fromScale(1, 0.5),
+				UDim2.fromScale(0.5, 0.5),
 				{
-					anchor = V2(0.5, 1),
+					anchor = MID,
 					color = Color3.new(1, 1, 1),
-					z = 5,
+					z = 6,
 				}
 			).Name =
 				"Pct"
@@ -652,10 +655,9 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		strip.Position = UDim2.fromOffset(at(4), 0)
 		strip.Visible = false
 		marker.BackgroundTransparency = 1
-		local heroD = math.floor(reelH * 0.78)
-		local heroBall = Theme.ball(window, featured, heroD, UDim2.fromOffset(heroX, heroY), MID)
-		heroBall.Name = "Hero"
-		heroBall.ZIndex = 8
+		local shown = Theme.ball(window, featured, heroD, UDim2.fromOffset(heroX, heroY), MID)
+		shown.Name = "Hero"
+		shown.ZIndex = 8
 		if not Theme.reduced() and hero then
 			local sc = Theme.scaleOf(hero)
 			local age = 0

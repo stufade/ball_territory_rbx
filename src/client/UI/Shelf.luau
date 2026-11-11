@@ -127,9 +127,9 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 	local cx, cy = w / 2, h / 2
 	box.BackgroundColor3 = paint.base
 	if kind == "SKIN" then
-		cy = math.floor(h * 0.4)
-		local d = math.floor(h * 0.62)
-		local ball = Theme.ball(box, e, d, UDim2.fromScale(0.5, 0.4), MID)
+		cy = math.floor(h * 0.42)
+		local d = math.floor(math.max(w, h) * 0.98)
+		local ball = Theme.ball(box, e, d, UDim2.fromScale(0.5, 0.42), MID)
 		ball.Name = "Ball"
 		ball.ImageColor3 = paint.base:Lerp(
 			Color3.new(1, 1, 1),
@@ -191,9 +191,9 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 			Theme.crown(box, math.floor(d * 0.42), UDim2.fromOffset(cx, cy - d * 0.28)).ZIndex = 6
 		end
 	elseif kind == "TRAIL" then
-		local bandH = math.max(22, math.floor(h * 0.28))
+		local bandH = math.max(28, math.floor(h * 0.38))
 		local bandY = math.floor(h * 0.4)
-		local band = Theme.frame(box, UDim2.fromOffset(w - 10, bandH), UDim2.fromOffset(cx, bandY), paint.accent, MID)
+		local band = Theme.frame(box, UDim2.fromOffset(w, bandH), UDim2.fromOffset(cx, bandY), paint.accent, MID)
 		band.Name = "Stripe"
 		band.ZIndex = 3
 		Theme.round(band, math.floor(bandH / 2))
@@ -227,8 +227,8 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 		head.Name = "Ball"
 		head.ZIndex = 5
 	elseif kind == "FORCE" then
-		local reach = math.floor(math.max(w, h) * 0.98)
-		local thick = math.max(12, math.floor(math.min(w, h) * 0.16))
+		local reach = math.floor(math.sqrt(w * w + h * h))
+		local thick = math.max(16, math.floor(math.min(w, h) * 0.2))
 		for i = 1, 12 do
 			local ray = Theme.frame(box, UDim2.fromOffset(thick, reach), UDim2.fromOffset(cx, cy), paint.accent, MID)
 			ray.Rotation = (i - 1) * 15
@@ -258,7 +258,7 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 		inner.ZIndex = 2
 		Theme.round(inner, 10)
 		Theme.stroke(inner, 4, paint.accent)
-		local d = math.floor(math.min(w, h) * 0.7)
+		local d = math.floor(math.max(w, h) * 0.82)
 		local ball = Theme.ball(inner, e, d, UDim2.fromScale(0.5, 0.38), MID)
 		ball.Name = "Ball"
 		ball.ZIndex = 3
