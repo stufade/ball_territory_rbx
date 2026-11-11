@@ -110,7 +110,10 @@ end
 -- and their buttons do not stick out of the panel sideways.
 local function buttonsFit(panel: any, cv: any, tag: string)
 	local pr = rectOf(panel)
-	check(pr[1] >= -1 and pr[2] >= -1 and pr[1] + pr[3] <= cv.X + 1 and pr[2] + pr[4] <= cv.Y + 1, `{tag}: panel on screen`)
+	check(
+		pr[1] >= -1 and pr[2] >= -1 and pr[1] + pr[3] <= cv.X + 1 and pr[2] + pr[4] <= cv.Y + 1,
+		`{tag}: panel on screen`
+	)
 	for _, d in panel:GetDescendants() do
 		if d._p.ClassName == "TextButton" and d.Visible ~= false then
 			check(inside(d, d.Parent), `{tag}: {d.Name} inside its parent`)
@@ -522,7 +525,10 @@ do
 		end
 	end
 	check(rows == 21, `shop: 21 shelf balls, the deal is not a row ({rows})`)
-	check(find(panel, "Row0") == nil and find(panel, "Row17") == nil and find(panel, "Row4") == nil, "shop: owned balls are absent")
+	check(
+		find(panel, "Row0") == nil and find(panel, "Row17") == nil and find(panel, "Row4") == nil,
+		"shop: owned balls are absent"
+	)
 	local today = find(panel, "Today")
 	check(today and find(today, "Deal").Text == "TODAY -30%", "shop: ball of the day marked")
 	check(find(today, "Name").Text == "WATER", "shop: day ball name")
@@ -549,8 +555,12 @@ do
 		coinBtn[1] >= rectOf(find(today, "Name"))[1] + rectOf(find(today, "Name"))[3],
 		"shop: price clear of the name"
 	)
-	check(find(find(panel, "Row5"), "Tier").Text == "COMMON", "shop: common tier is on the row")
-	check(find(find(panel, "Row11"), "Tier").Text == "RARE", "shop: rare tier is on the row")
+	check(find(find(panel, "Row5"), "Tier").Text == "COMMON", "shop: common tier is on the card")
+	check(find(find(panel, "Row11"), "Tier").Text == "RARE", "shop: rare tier is on the card")
+	check(
+		rectOf(find(panel, "Row5"))[3] < rectOf(find(panel, "List"))[3] * 0.6,
+		"shop: shelf is a card grid, not a full-width row"
+	)
 	check(find(panel, "TabBalls") and find(panel, "TabSpin") and find(panel, "TabSkins"), "shop: three tabs")
 	buttonsFit(panel, cv, "shop")
 	find(today, "PayCoins").Activated:Fire()
@@ -622,11 +632,17 @@ do
 	Wallet.setProfile(w, v)
 	find(w.root, "SpinBtn").Activated:Fire()
 	local panel = find(w.pop, "ShopPanel")
-	check(panel ~= nil and w.open == "shop" and panel:GetAttribute("Tab") == "spin", "spin: opens the shop on the spin tab")
+	check(
+		panel ~= nil and w.open == "shop" and panel:GetAttribute("Tab") == "spin",
+		"spin: opens the shop on the spin tab"
+	)
 	local pr = rectOf(panel)
 	check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, "spin: panel on screen")
 	check(rectOf(find(panel, "Close"))[3] >= 72, "spin: close is a large tap")
 	check(find(panel, "Reel") ~= nil and find(panel, "Strip") ~= nil, "spin: reel is on screen before the tap")
+	check(find(panel, "Prize") ~= nil and find(panel, "Prize").Text ~= "", "spin: featured prize banner")
+	check(rectOf(find(panel, "Reel"))[2] < rectOf(find(panel, "OddsCoins"))[2], "spin: banner sits above the odds")
+	check(inside(find(panel, "SpinGo"), find(panel, "SpinCard")), "spin: pack button inside the featured card")
 	check(find(find(panel, "Coin_common"), "Pct").Text == "70%", "spin: coin common odds")
 	check(find(find(panel, "Coin_legendary"), "Pct").Text == "1%", "spin: coin legendary odds")
 	check(find(find(panel, "Coin_refund"), "Pct").Text == "0%", "spin: refund line is shown")
@@ -738,7 +754,25 @@ do
 		for _, c in find(panel, "Looks"):GetChildren() do
 			if string.sub(c.Name, 1, 2) == "R_" then
 				cardsN += 1
-				check(find(c, "Icon") ~= nil and find(c, "Name") ~= nil and find(c, "Kind") ~= nil, `{tag}: {c.Name} has icon, name, kind`)
+				check(
+					find(c, "Icon") ~= nil and find(c, "Name") ~= nil and find(c, "Kind") ~= nil,
+					`{tag}: {c.Name} has icon, name, kind`
+				)
+				local drawn = 0
+				local function walk(o: any)
+					for _, ch in o:GetChildren() do
+						local cn = ch.ClassName
+						if cn == "ImageLabel" or cn == "Frame" or cn == "TextLabel" then
+							drawn += 1
+						end
+						walk(ch)
+					end
+				end
+				walk(find(c, "Icon"))
+				check(
+					drawn >= 2 and (find(c, "Ball") ~= nil or find(c, "Flash") ~= nil or find(c, "Stripe") ~= nil),
+					`{tag}: {c.Name} preview is a picture ({drawn})`
+				)
 			end
 		end
 		check(cardsN == #Economy.LOOKS, `{tag}: every look is on the tab ({cardsN})`)

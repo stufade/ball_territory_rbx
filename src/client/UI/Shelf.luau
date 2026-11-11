@@ -1,6 +1,7 @@
 --!strict
--- Skins tab of the shop. Every Economy.LOOKS row is on the list: icon, name, kind, price, buy.
--- Coin buy and equip send Action "look" / "wear". Robux stays grey only while the product id is 0.
+-- Skins tab of the shop. Every Economy.LOOKS row is a card: a picture in a tier frame, the name,
+-- and the price on the card. A skin is the player's ball in that colour and pattern, a trail is a
+-- stripe, a force is a flash, a frame is a portrait.
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,6 +12,8 @@ local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")
 local Theme = require("./Theme")
 
 local V2 = Vector2.new
+local MID = V2(0.5, 0.5)
+local HEX = Color3.fromHex
 
 local Shelf = {}
 
@@ -19,15 +22,6 @@ export type Ctx = {
 	frames: { (dt: number) -> () },
 	close: () -> (),
 	act: (verb: string, arg: number?, cur: string?) -> (),
-}
-
-local KIND_COL: { [string]: Color3 } = {
-	SKIN = Color3.fromHex("#ff7ad1"),
-	TRAIL = Color3.fromHex("#7ad0ff"),
-	FORCE = Color3.fromHex("#ffd63c"),
-	FRAME = Color3.fromHex("#e0a060"),
-	LOBBY = Color3.fromHex("#b04cff"),
-	CARD = Color3.fromHex("#5af096"),
 }
 
 local function title(id: string): string
@@ -49,6 +43,239 @@ local function kindOf(id: string): string
 	return "CARD"
 end
 
+local function frameOf(coins: number): Color3
+	if coins >= 12000 then
+		return HEX("#ffd63c")
+	elseif coins >= 8000 then
+		return HEX("#c044ff")
+	elseif coins >= 4000 then
+		return HEX("#14a4ff")
+	end
+	return HEX("#3d6bff")
+end
+
+type Paint = { base: Color3, accent: Color3, pat: string }
+
+local PAINT: { [string]: Paint } = {
+	skin_ink = { base = HEX("#1a1a28"), accent = HEX("#8a8ab0"), pat = "ink" },
+	skin_chalk = { base = HEX("#f4f0e4"), accent = HEX("#c8c0a8"), pat = "chalk" },
+	skin_stripe = { base = HEX("#ff4d6a"), accent = HEX("#ffe15a"), pat = "stripe" },
+	skin_speckle = { base = HEX("#3d6bff"), accent = HEX("#ffffff"), pat = "speckle" },
+	skin_marble = { base = HEX("#ece8f4"), accent = HEX("#9a94b4"), pat = "marble" },
+	skin_candy = { base = HEX("#ff78d2"), accent = HEX("#7af6ff"), pat = "stripe" },
+	skin_chrome = { base = HEX("#d5dde8"), accent = HEX("#ffffff"), pat = "shine" },
+	skin_glass = { base = HEX("#c4f0ff"), accent = HEX("#ffffff"), pat = "glass" },
+	skin_neon = { base = HEX("#10141c"), accent = HEX("#39ffb0"), pat = "neon" },
+	skin_galaxy = { base = HEX("#140e2c"), accent = HEX("#d2b0ff"), pat = "stars" },
+	skin_prism = { base = HEX("#f4f4ff"), accent = HEX("#ff6ad5"), pat = "prism" },
+	skin_crown = { base = HEX("#ffd24a"), accent = HEX("#fff6c2"), pat = "crown" },
+	trail_dust = { base = HEX("#e0c48a"), accent = HEX("#fff2cc"), pat = "dust" },
+	trail_sparks = { base = HEX("#ffb03a"), accent = HEX("#fff1a0"), pat = "sparks" },
+	trail_ribbon = { base = HEX("#ff6ad5"), accent = HEX("#ffffff"), pat = "ribbon" },
+	trail_comet = { base = HEX("#7ecbff"), accent = HEX("#ffffff"), pat = "comet" },
+	trail_rainbow = { base = HEX("#ff5a7a"), accent = HEX("#7af6ff"), pat = "rainbow" },
+	trail_void = { base = HEX("#7a3cff"), accent = HEX("#1a1028"), pat = "void" },
+	trail_eclipse = { base = HEX("#1a1028"), accent = HEX("#ffd63c"), pat = "eclipse" },
+	force_pulse = { base = HEX("#ffd63c"), accent = HEX("#fff6c0"), pat = "flash" },
+	force_ring = { base = HEX("#7ad0ff"), accent = HEX("#ffffff"), pat = "ring" },
+	force_burst = { base = HEX("#ff542c"), accent = HEX("#ffe15a"), pat = "flash" },
+	force_nova = { base = HEX("#fff1a8"), accent = HEX("#ffffff"), pat = "flash" },
+	frame_wood = { base = HEX("#c4844a"), accent = HEX("#8a5528"), pat = "portrait" },
+	frame_iron = { base = HEX("#a8b0c0"), accent = HEX("#5c6478"), pat = "portrait" },
+	frame_gold = { base = HEX("#ffd63c"), accent = HEX("#e09a14"), pat = "portrait" },
+	frame_myth = { base = HEX("#c06cff"), accent = HEX("#6a28a8"), pat = "portrait" },
+	frame_champion = { base = HEX("#ffe08a"), accent = HEX("#ffd63c"), pat = "portrait" },
+	podium_spot = { base = HEX("#b04cff"), accent = HEX("#ffd63c"), pat = "stage" },
+	ko_card = { base = HEX("#ff3c46"), accent = HEX("#ffd63c"), pat = "ko" },
+}
+
+local function paintOf(id: string): Paint
+	return PAINT[id] or { base = HEX("#b04cff"), accent = HEX("#ffffff"), pat = "flash" }
+end
+
+local function bars(parent: Instance, cx: number, cy: number, d: number, colors: { Color3 })
+	local n = #colors
+	local h = math.max(6, math.floor(d / (n + 2)))
+	for i, color in colors do
+		local y = cy - d * 0.22 + (i - 1) * (h + 3)
+		local band = Theme.frame(parent, UDim2.fromOffset(math.floor(d * 0.72), h), UDim2.fromOffset(cx, y), color, MID)
+		band.BackgroundTransparency = 0.15
+		band.ZIndex = 4
+		Theme.round(band, 4)
+	end
+end
+
+local function dots(parent: Instance, cx: number, cy: number, d: number, color: Color3, n: number)
+	for i = 1, n do
+		local ang = (i / n) * math.pi * 2
+		local r = d * (0.16 + (i % 3) * 0.08)
+		local p = Theme.disc(
+			parent,
+			math.max(6, d * 0.1),
+			color,
+			UDim2.fromOffset(cx + math.cos(ang) * r, cy + math.sin(ang) * r),
+			0.1
+		)
+		p.ZIndex = 4
+	end
+end
+
+-- Picture inside the tier frame. `e` is the player's ball, worn by a skin.
+local function picture(box: Frame, id: string, e: number, w: number, h: number)
+	local paint = paintOf(id)
+	local kind = kindOf(id)
+	local cx, cy = w / 2, h / 2
+	box.BackgroundColor3 = paint.base:Lerp(Theme.BG, 0.35)
+	if kind == "SKIN" then
+		local d = math.floor(math.min(w, h) * 0.78)
+		local ball = Theme.ball(box, e, d, UDim2.fromOffset(cx, cy), MID)
+		ball.Name = "Ball"
+		ball.ImageColor3 = paint.base:Lerp(
+			Color3.new(1, 1, 1),
+			if paint.pat == "ink" or paint.pat == "neon" or paint.pat == "stars" then 0.12 else 0.45
+		)
+		ball.ZIndex = 3
+		local ring = Theme.ring(box, d, Theme.INK, 4, UDim2.fromOffset(cx, cy))
+		ring.ZIndex = 6
+		if paint.pat == "stripe" then
+			bars(box, cx, cy, d, { paint.accent, paint.base:Lerp(Color3.new(1, 1, 1), 0.7) })
+		elseif paint.pat == "prism" then
+			bars(box, cx, cy, d, { HEX("#ff5a7a"), HEX("#ffd63c"), HEX("#5af0ff"), HEX("#b06cff") })
+		elseif paint.pat == "speckle" or paint.pat == "chalk" then
+			dots(box, cx, cy, d, paint.accent, 8)
+		elseif paint.pat == "marble" or paint.pat == "shine" then
+			local band = Theme.frame(
+				box,
+				UDim2.fromOffset(math.floor(d * 0.22), math.floor(d * 0.9)),
+				UDim2.fromOffset(cx, cy),
+				paint.accent,
+				MID
+			)
+			band.Rotation = -28
+			band.BackgroundTransparency = 0.35
+			band.ZIndex = 4
+		elseif paint.pat == "glass" then
+			Theme.disc(
+				box,
+				math.floor(d * 0.55),
+				Color3.new(1, 1, 1),
+				UDim2.fromOffset(cx - d * 0.08, cy - d * 0.08),
+				0.55
+			).ZIndex =
+				4
+		elseif paint.pat == "neon" then
+			local glow = Theme.ring(box, math.floor(d * 0.72), paint.accent, 4, UDim2.fromOffset(cx, cy))
+			glow.ZIndex = 5
+		elseif paint.pat == "stars" then
+			dots(box, cx, cy, d, paint.accent, 7)
+		elseif paint.pat == "ink" then
+			local drip = Theme.frame(
+				box,
+				UDim2.fromOffset(10, math.floor(d * 0.28)),
+				UDim2.fromOffset(cx + d * 0.12, cy + d * 0.1),
+				paint.accent,
+				MID
+			)
+			drip.ZIndex = 4
+			Theme.round(drip, 6)
+			Theme.disc(
+				box,
+				math.floor(d * 0.18),
+				Color3.new(1, 1, 1),
+				UDim2.fromOffset(cx - d * 0.16, cy - d * 0.16),
+				0.45
+			).ZIndex =
+				5
+		elseif paint.pat == "crown" then
+			Theme.crown(box, math.floor(d * 0.42), UDim2.fromOffset(cx, cy - d * 0.28)).ZIndex = 6
+		end
+	elseif kind == "TRAIL" then
+		local y = h * 0.58
+		local band =
+			Theme.frame(box, UDim2.fromOffset(math.floor(w * 0.78), 18), UDim2.fromOffset(cx - 8, y), paint.base, MID)
+		band.Name = "Stripe"
+		band.ZIndex = 3
+		Theme.round(band, 9)
+		Theme.stroke(band, 3, Theme.INK)
+		local fade = Instance.new("UIGradient")
+		fade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.9),
+			NumberSequenceKeypoint.new(0.45, 0.25),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		fade.Parent = band
+		if paint.pat == "rainbow" then
+			fade.Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, HEX("#ff5a7a")),
+				ColorSequenceKeypoint.new(0.35, HEX("#ffd63c")),
+				ColorSequenceKeypoint.new(0.7, HEX("#5af096")),
+				ColorSequenceKeypoint.new(1, HEX("#7ad0ff")),
+			})
+		end
+		for i = 1, 4 do
+			local dot =
+				Theme.disc(box, 8, paint.accent, UDim2.fromOffset(w * 0.18 + i * 14, y - 10 - (i % 2) * 8), 0.15)
+			dot.ZIndex = 4
+		end
+		local head = Theme.ball(box, e, math.floor(h * 0.46), UDim2.fromOffset(w * 0.74, y), MID)
+		head.Name = "Ball"
+		head.ZIndex = 5
+	elseif kind == "FORCE" then
+		for i = 1, 8 do
+			local ray =
+				Theme.frame(box, UDim2.fromOffset(8, math.floor(h * 0.72)), UDim2.fromOffset(cx, cy), paint.base, MID)
+			ray.Rotation = (i - 1) * 22.5
+			ray.BackgroundTransparency = 0.12
+			ray.ZIndex = 2
+			ray.Name = "Flash"
+		end
+		if paint.pat == "ring" then
+			Theme.ring(box, math.floor(math.min(w, h) * 0.62), paint.accent, 5, UDim2.fromOffset(cx, cy)).ZIndex = 4
+		end
+		Theme.disc(box, math.floor(math.min(w, h) * 0.28), paint.accent, UDim2.fromOffset(cx, cy), 0.2).ZIndex = 4
+		local core =
+			Theme.disc(box, math.floor(math.min(w, h) * 0.16), Color3.new(1, 1, 1), UDim2.fromOffset(cx, cy), 0.05)
+		core.Name = "Flash"
+		core.ZIndex = 5
+	elseif kind == "FRAME" or kind == "CARD" then
+		local mat = paint.base
+		box.BackgroundColor3 = mat
+		local inner = Theme.frame(box, UDim2.fromOffset(w - 18, h - 18), UDim2.fromOffset(cx, cy), Theme.BG, MID)
+		inner.ZIndex = 2
+		Theme.round(inner, 10)
+		Theme.stroke(inner, 3, paint.accent)
+		local d = math.floor(math.min(w, h) * 0.5)
+		local ball = Theme.ball(inner, e, d, UDim2.fromScale(0.5, 0.46), MID)
+		ball.Name = "Ball"
+		ball.ZIndex = 3
+		if id == "frame_champion" or paint.pat == "crown" then
+			Theme.crown(inner, math.floor(d * 0.4), UDim2.fromScale(0.5, 0.16)).ZIndex = 4
+		end
+		if kind == "CARD" then
+			Theme.label(inner, "KO", 22, UDim2.fromOffset(48, 24), UDim2.new(0.5, 0, 1, -4), {
+				anchor = V2(0.5, 1),
+				color = paint.accent,
+				z = 5,
+			})
+		end
+	else
+		local stage = Theme.frame(
+			box,
+			UDim2.fromOffset(math.floor(w * 0.7), 16),
+			UDim2.fromOffset(cx, h * 0.72),
+			paint.accent,
+			MID
+		)
+		stage.Name = "Stage"
+		stage.ZIndex = 3
+		Theme.round(stage, 4)
+		Theme.stroke(stage, 3, Theme.INK)
+		local ball = Theme.ball(box, e, math.floor(h * 0.42), UDim2.fromOffset(cx, h * 0.46), MID)
+		ball.Name = "Ball"
+		ball.ZIndex = 4
+	end
+end
+
 local function prompt(productId: number)
 	local player = Players.LocalPlayer
 	if player and type(MarketplaceService.PromptProductPurchase) == "function" then
@@ -58,7 +285,7 @@ local function prompt(productId: number)
 	end
 end
 
--- host is the shop body. One card per look, buttons inside the card.
+-- host is the shop body. Cards in a grid. Buttons stay inside each card.
 function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: number)
 	local shelf = v.shelf
 	local n = if shelf then shelf.n else #v.balls
@@ -82,6 +309,7 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 			or (id == "podium_spot" and on.podium)
 			or (id == "ko_card" and on.ko)
 	end
+	local worn = if on and on.ball >= 0 then on.ball else (v.balls[1] or 0)
 
 	local count = Theme.label(host, `{n}/{need}`, 28, UDim2.fromOffset(160, 32), UDim2.fromOffset(8, 2), {
 		anchor = V2(0, 0),
@@ -109,73 +337,87 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 	list.Parent = host
 
 	local looks = Economy.LOOKS
-	local rowW = w - 16
-	local rowH = 92
-	local step = 100
+	local gap = 8
+	local cols = if w >= 680 then 3 else 2
+	local cardW = math.floor((w - 12 - gap * (cols - 1)) / cols)
+	local cardH = 252
+	local bh = 72
 	for i, look in looks do
 		local id = look.id
 		local mine = have[id] == true
 		local kind = kindOf(id)
-		local row = Theme.frame(list, UDim2.fromOffset(rowW, rowH), UDim2.fromOffset(0, (i - 1) * step), Theme.SLOT)
+		local tint = frameOf(look.coins)
+		local col = (i - 1) % cols
+		local rowI = (i - 1) // cols
+		local row = Theme.frame(
+			list,
+			UDim2.fromOffset(cardW, cardH),
+			UDim2.fromOffset(col * (cardW + gap), rowI * (cardH + gap)),
+			Theme.SLOT
+		)
 		row.Name = `R_{id}`
 		row.ClipsDescendants = true
-		Theme.round(row, 14)
-		Theme.stroke(row, 2, KIND_COL[kind] or Theme.INK)
-		local icon = Theme.frame(row, UDim2.fromOffset(56, 56), UDim2.fromOffset(12, 18), KIND_COL[kind] or Theme.PURPLE)
+		Theme.round(row, 16)
+		Theme.stroke(row, if look.coins >= 12000 then 4 else 3, tint)
+
+		local previewH = 108
+		local icon = Theme.frame(row, UDim2.fromOffset(cardW - 16, previewH), UDim2.fromOffset(8, 8), Theme.BG)
 		icon.Name = "Icon"
-		Theme.round(icon, 14)
-		Theme.stroke(icon, 2, Theme.INK)
-		Theme.label(icon, string.sub(kind, 1, 1), 26, UDim2.fromScale(1, 1), UDim2.fromScale(0.5, 0.5), {
-			anchor = V2(0.5, 0.5),
-			color = Theme.INK,
-		})
-		local nameW = math.max(100, rowW - 380)
-		Theme.label(row, title(id), 22, UDim2.fromOffset(nameW, 26), UDim2.fromOffset(80, 16), {
-			anchor = V2(0, 0),
+		icon.ClipsDescendants = true
+		Theme.round(icon, 12)
+		Theme.stroke(icon, 4, tint)
+		picture(icon, id, worn, cardW - 16, previewH)
+
+		Theme.label(row, title(id), 20, UDim2.fromOffset(cardW - 16, 22), UDim2.fromOffset(8, previewH + 12), {
 			align = Enum.TextXAlignment.Left,
 			color = Theme.TEXT,
-		}).Name = "Name"
-		Theme.label(row, kind, 20, UDim2.fromOffset(nameW, 22), UDim2.fromOffset(80, 48), {
-			anchor = V2(0, 0),
+		}).Name =
+			"Name"
+		Theme.label(row, kind, 20, UDim2.fromOffset(cardW - 16, 22), UDim2.fromOffset(8, previewH + 36), {
 			align = Enum.TextXAlignment.Left,
-			color = Theme.DIM,
-		}).Name = "Kind"
+			color = tint:Lerp(Color3.new(1, 1, 1), 0.35),
+		}).Name =
+			"Kind"
 
-		local bh = 72
-		local by = math.floor((rowH - bh) / 2)
+		local by = cardH - 8 - bh
 		local function priceButton(text: string, x: number, wide: number, color: Color3, bname: string): TextButton
-			local b = Theme.button(row, text, UDim2.fromOffset(wide, bh), UDim2.fromOffset(x, by), color, nil, 22)
+			local b = Theme.button(row, text, UDim2.fromOffset(wide, bh), UDim2.fromOffset(x, by), color, nil, 20)
 			b.Name = bname
+			b.ClipsDescendants = true
 			return b
 		end
 		if mine then
-			local wearW = 116
-			local wearX = rowW - 10 - wearW
-			Theme.label(row, "YOURS", 22, UDim2.fromOffset(120, 28), UDim2.fromOffset(wearX - 128, 32), {
-				anchor = V2(0, 0),
-				align = Enum.TextXAlignment.Right,
-				color = Theme.GOOD_TXT,
-			}).Name = "Own"
+			local wearW = math.min(140, cardW - 16)
+			local wearX = cardW - 8 - wearW
+			Theme.label(
+				row,
+				"YOURS",
+				20,
+				UDim2.fromOffset(math.max(40, wearX - 12), 22),
+				UDim2.fromOffset(8, by + 24),
+				{
+					align = Enum.TextXAlignment.Left,
+					color = Theme.GOOD_TXT,
+				}
+			).Name =
+				"Own"
 			local wear = priceButton(if wearing(id) then "ON" else "WEAR", wearX, wearW, Theme.GO, "Wear")
 			if wearing(id) then
 				Theme.disable(wear, "ON")
 			else
 				wear.Active = true
 				wear.Activated:Connect(function()
-					local ball = if kind == "SKIN"
-						then (if on and on.ball >= 0 then on.ball else v.balls[1])
-						else nil
+					local ball = if kind == "SKIN" then worn else nil
 					ctx.act(Net.Action.wear, ball, id)
 				end)
 			end
 		else
-			local coinW, gemW = 148, 118
-			local gemX = rowW - 10 - gemW
-			local coinX = gemX - 8 - coinW
-			local coins = priceButton(Money.fmt(look.coins), coinX, coinW, Theme.YELLOW, "PayCoins")
+			local gemW = math.floor((cardW - 22) * 0.4)
+			local coinW = cardW - 16 - 6 - gemW
+			local coins = priceButton(Money.fmt(look.coins), 8, coinW, Theme.YELLOW, "PayCoins")
 			local pid = robux[id]
 			local live = type(pid) == "number" and pid > 0
-			local pay = priceButton(`{look.robux} R$`, gemX, gemW, Theme.SLOT, "PayRobux")
+			local pay = priceButton(`{look.robux} R$`, 8 + coinW + 6, gemW, Theme.SLOT, "PayRobux")
 			coins.Active = true
 			coins.Activated:Connect(function()
 				ctx.act(Net.Action.look, nil, id)
@@ -190,7 +432,8 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 			end
 		end
 	end
-	list.CanvasSize = UDim2.fromOffset(0, math.max(#looks * step, 1))
+	local rowsN = math.ceil(#looks / cols)
+	list.CanvasSize = UDim2.fromOffset(0, math.max(rowsN * (cardH + gap), 1))
 end
 
 return Shelf
