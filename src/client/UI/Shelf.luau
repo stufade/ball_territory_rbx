@@ -1,7 +1,8 @@
 --!strict
--- Cosmetic shelf, opened from the shop. Visible before the collection is complete, with a lock and "N/27".
--- Coin buy and equip send Action "look" / "wear". Robux prompts a developer product only when the server
--- sent a real asset id; the grant is the same Looks.grant the receipt calls. Prices are Economy.LOOKS.
+-- Cosmetic shelf, opened from the shop. Coin buy and equip are live at any ball count.
+-- Coin buy and equip send Action "look" / "wear". Robux stays grey only while the product id is 0.
+-- A real asset id prompts a developer product; the grant is the same Looks.grant the receipt calls.
+-- Prices are Economy.LOOKS. The N/27 line is the collection size, not a lock.
 local GuiService = game:GetService("GuiService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -61,7 +62,6 @@ function Shelf.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	local shelf = v.shelf
 	local n = if shelf then shelf.n else #v.balls
 	local need = if shelf then shelf.need else (v.total or 27)
-	local open = n >= need
 	local have: { [string]: boolean } = {}
 	if shelf then
 		for _, id in shelf.owned do
@@ -103,19 +103,10 @@ function Shelf.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	local count = Theme.text(panel, `{n}/{need}`, 28, UDim2.fromOffset(140, 32), UDim2.fromOffset(20, 50), {
 		anchor = V2(0, 0),
 		align = Enum.TextXAlignment.Left,
-		color = if open then Theme.GOOD_TXT else Theme.BAD_TXT,
+		color = Theme.TEXT,
 		bold = true,
 	})
 	count.Name = "Count"
-	if not open then
-		Theme.text(panel, "LOCKED", 22, UDim2.fromOffset(150, 28), UDim2.fromOffset(168, 52), {
-			anchor = V2(0, 0),
-			align = Enum.TextXAlignment.Left,
-			color = Theme.BAD_TXT,
-			bold = true,
-		}).Name =
-			"Lock"
-	end
 
 	local back = Theme.button(panel, "SHOP", UDim2.fromOffset(140, 72), UDim2.fromOffset(330, 10), Theme.SLOT, nil, 22)
 	back.Name = "Back"
@@ -172,34 +163,32 @@ function Shelf.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			}).Name =
 				"Own"
 			local wear = priceButton(if wearing(id) then "ON" else "WEAR", rowW - 128, 116, Theme.GO, "Wear")
-			if open and not wearing(id) then
+			if wearing(id) then
+				Theme.disable(wear, "ON")
+			else
+				wear.Active = true
 				wear.Activated:Connect(function()
 					local ball = if kindOf(id) == "SKIN"
 						then (if on and on.ball >= 0 then on.ball else v.balls[1])
 						else nil
 					ctx.act(Net.Action.wear, ball, id)
 				end)
-			else
-				Theme.disable(wear, if wearing(id) then "ON" else "WEAR")
 			end
 		else
 			local coins = priceButton(Money.fmt(look.coins), rowW - 300, 156, Theme.YELLOW, "PayCoins")
 			local pid = robux[id]
 			local live = type(pid) == "number" and pid > 0
 			local pay = priceButton(`{look.robux} R$`, rowW - 136, 124, Theme.SLOT, "PayRobux")
-			if open then
-				coins.Activated:Connect(function()
-					ctx.act(Net.Action.look, nil, id)
+			coins.Active = true
+			coins.Activated:Connect(function()
+				ctx.act(Net.Action.look, nil, id)
+			end)
+			if live then
+				pay.Active = true
+				pay.Activated:Connect(function()
+					prompt(pid :: number)
 				end)
-				if live then
-					pay.Activated:Connect(function()
-						prompt(pid :: number)
-					end)
-				else
-					Theme.disable(pay)
-				end
 			else
-				Theme.disable(coins)
 				Theme.disable(pay)
 			end
 		end

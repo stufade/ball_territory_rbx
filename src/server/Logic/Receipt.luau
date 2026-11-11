@@ -1,10 +1,10 @@
 --!strict
 -- Developer-product grants (docs/economy.md «Монетизация»). Pure: no MarketplaceService, so tests/receipt
 -- runs without the network. "granted" is a new PurchaseId, "already" is the same id again (nothing is added).
--- "later" is NotProcessedYet: the wrong player, an unknown product, a tier or starter purchase with no valid
--- choice, and a cosmetic while the player still owns fewer than 27 balls. "later" does not store the PurchaseId
--- and does not change the wallet, so a retry can still grant. A cosmetic with a full collection is granted by
--- Looks.grant (the same call a coin purchase uses after it has spent). Crystals go through Wallet.add, the ball
+-- "later" is NotProcessedYet: the wrong player, an unknown product, or a tier or starter purchase with no valid
+-- choice. "later" does not store the PurchaseId and does not change the wallet, so a retry can still grant.
+-- A cosmetic with a live product id is granted by Looks.grant at any ball count (the same call a coin purchase
+-- uses after it has spent). Crystals go through Wallet.add, the ball
 -- and the starter epic through Progress.give, starter coins through Wallet.gift.
 local Looks = require("./Looks")
 local Progress = require("./Progress")

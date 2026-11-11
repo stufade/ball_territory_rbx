@@ -1,5 +1,5 @@
 --!strict
--- Cosmetic shelf: locked at 26/27, a coin buy at 27/27, a second buy spends nothing.
+-- Cosmetic shelf: one ball can buy frame_wood, a second buy spends nothing, a short balance refuses.
 -- lune run tests/looks
 local process = require("@lune/process")
 local Economy = require("../src/shared/Economy")
@@ -31,17 +31,40 @@ end
 check(CHEAP.id == "frame_wood", "the cheapest look is frame_wood")
 
 do
-	local d = balls(26)
-	d.coins = 100000
-	local before = d.coins
-	check(Looks.buy(d, CHEAP.id, E, {}) == nil, "26/27 refuses the coin buy")
-	check(d.coins == before and #d.looks == 0, "26/27 spends nothing and owns nothing")
-	check(Looks.grant(d, CHEAP.id, E) == "wait", "26/27 does not grant a Robux look")
-	check(#d.looks == 0, "a refused grant is not owned")
-	-- 27 entries, but one ball twice: still 26 unique
-	table.insert(d.balls, 0)
-	check(#d.balls == 27 and Looks.count(d) == 26, "a duplicate ball does not complete the set")
-	check(Looks.buy(d, CHEAP.id, E, {}) == nil, "26 unique balls still refuse")
+	local d = balls(1)
+	check(Looks.count(d) == 1, "one ball is not a full set")
+	d.coins = CHEAP.coins
+	local log = {}
+	local hit = Looks.buy(d, CHEAP.id, E, log)
+	check(
+		hit ~= nil and hit.already == false and hit.n == CHEAP.coins and d.coins == 0 and d.looks[1] == CHEAP.id,
+		"one ball buys frame_wood"
+	)
+	check(#log == 1 and log[1].sink and log[1].cur == "coins" and log[1].n == CHEAP.coins, "the spend is one coin sink")
+	local again = Looks.buy(d, CHEAP.id, E, {})
+	check(
+		again ~= nil and again.already and again.n == 0 and d.coins == 0 and #d.looks == 1,
+		"the same id spends nothing"
+	)
+	check(Looks.grant(d, CHEAP.id, E) == "have" and #d.looks == 1, "a second grant does not add a copy")
+
+	local poor = balls(1)
+	poor.coins = CHEAP.coins - 1
+	check(
+		Looks.buy(poor, CHEAP.id, E, {}) == nil and poor.coins == CHEAP.coins - 1 and #poor.looks == 0,
+		"a short balance refuses"
+	)
+	check(Looks.grant(poor, CHEAP.id, E) == "ok" and poor.looks[1] == CHEAP.id, "a Robux grant does not need 27 balls")
+
+	local partial = balls(26)
+	partial.coins = CHEAP.coins
+	table.insert(partial.balls, 0)
+	check(#partial.balls == 27 and Looks.count(partial) == 26, "a duplicate ball does not complete the set")
+	local bought = Looks.buy(partial, CHEAP.id, E, {})
+	check(
+		bought ~= nil and bought.already == false and partial.coins == 0 and partial.looks[1] == CHEAP.id,
+		"26 unique balls still buy"
+	)
 end
 
 do

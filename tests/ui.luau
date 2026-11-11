@@ -647,7 +647,8 @@ do
 	)
 end
 
--- Shelf: locked at 5/27, open at 27/27, the cheapest row buys for coins and then reads YOURS.
+-- Shelf: live at 1/27 and at 5/27. The cheapest row buys for coins and then reads YOURS.
+-- R$ stays grey only while the product id is 0.
 do
 	local function shelfOf(n: number, owned: { string }): any
 		local balls = {}
@@ -681,7 +682,7 @@ do
 		local pr = rectOf(panel)
 		check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, `{tag}: panel on screen`)
 		check(find(panel, "Count").Text == "5/27", `{tag}: counter`)
-		check(find(panel, "Lock").Text == "LOCKED", `{tag}: lock`)
+		check(find(panel, "Lock") == nil, `{tag}: no lock`)
 		check(
 			find(panel, "Count"):FindFirstChild("UITextSizeConstraint").MinTextSize >= 20,
 			`{tag}: counter stays readable`
@@ -689,14 +690,40 @@ do
 		local row = find(panel, "R_frame_wood")
 		check(row and find(row, "Name").Text == "FRAME WOOD", `{tag}: cheapest row`)
 		local pay = find(row, "PayCoins")
-		check(pay and pay.Active == false and rectOf(pay)[4] >= 72, `{tag}: locked price is a large dead button`)
+		check(pay and pay.Active == true and rectOf(pay)[4] >= 72, `{tag}: coin price is a live button`)
+		check(find(row, "PayRobux").Active == false, `{tag}: a placeholder Robux id stays grey`)
 		local before = #acts
 		pay.Activated:Fire()
 		find(row, "PayRobux").Activated:Fire()
-		check(#acts == before, `{tag}: a locked shelf sends nothing`)
+		check(
+			#acts == before + 1 and acts[before + 1][1] == "look" and acts[before + 1][3] == "frame_wood",
+			`{tag}: five balls still send Action look`
+		)
 		check(not overlap(rectOf(find(panel, "Close")), rectOf(find(panel, "Head"))), `{tag}: close clear of the title`)
 		check(not overlap(rectOf(find(panel, "Back")), rectOf(find(panel, "Close"))), `{tag}: back clear of close`)
 	end
+
+	local earlyW, _, earlyActs = make(V2(960, 540))
+	Wallet.setState(earlyW, { ph = "lobby" })
+	local early = view(2000, 0, false, 1)
+	early.balls = { 0 }
+	early.shelf = shelfOf(1, {})
+	early.shelf.robux = { frame_wood = 9301 }
+	Wallet.setProfile(earlyW, early)
+	find(earlyW.root, "ShopBtn").Activated:Fire()
+	find(earlyW.pop, "LooksBtn").Activated:Fire()
+	local earlyRow = find(earlyW.pop, "R_frame_wood")
+	check(
+		find(earlyW.pop, "Count").Text == "1/27"
+			and find(earlyRow, "PayCoins").Active == true
+			and find(earlyRow, "PayRobux").Active == true,
+		"shelf: one ball sells coins and a live R$ id"
+	)
+	find(earlyRow, "PayCoins").Activated:Fire()
+	check(
+		#earlyActs == 1 and earlyActs[1][1] == "look" and earlyActs[1][3] == "frame_wood",
+		"shelf: one ball sends Action look"
+	)
 
 	local w, _, acts = make(V2(960, 540))
 	Wallet.setState(w, { ph = "lobby" })
@@ -710,7 +737,7 @@ do
 	find(w.root, "ShopBtn").Activated:Fire()
 	find(w.pop, "LooksBtn").Activated:Fire()
 	local row = find(w.pop, "R_frame_wood")
-	check(find(w.pop, "Count").Text == "27/27" and find(w.pop, "Lock") == nil, "shelf: open, no lock")
+	check(find(w.pop, "Count").Text == "27/27" and find(w.pop, "Lock") == nil, "shelf: full set, no lock")
 	check(find(find(row, "PayCoins"), "Label").Text == "2,000", "shelf: coin price from Economy")
 	check(find(row, "PayRobux").Active == false, "shelf: a placeholder Robux id does not sell")
 	find(row, "PayCoins").Activated:Fire()

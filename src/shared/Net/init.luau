@@ -230,7 +230,7 @@ export type ProfileView = {
 	spin: SpinView?,
 	-- Set on the snapshot that paid for a spin. The reel only displays it.
 	spinResult: SpinHit?,
-	-- Cosmetic shelf. Buy only when n >= need (27). robux lists asset ids that are actually for sale.
+	-- Cosmetic shelf. n/need is the collection size, not a lock. robux lists asset ids that are actually for sale.
 	shelf: {
 		n: number,
 		need: number,

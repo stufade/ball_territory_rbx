@@ -1,8 +1,8 @@
 --!strict
 -- E3.2 economy simulation. Reads the live game values (src/shared/Economy.luau, including MILE and LOOKS, and
 -- src/server/Config.luau XP). Plays many players of each kind day by day: matches,
--- XP and levels, coins, quests, login days, reaction book, spins, direct buys, then looks once the 27 balls
--- are owned. Prints days to 50% / 100% of the balls, the first coin purchase, coins on hand, the empty-middle
+-- XP and levels, coins, quests, login days, reaction book, spins, direct buys, then looks with whatever
+-- coins are left. Prints days to 50% / 100% of the balls, the first coin purchase, coins on hand, the empty-middle
 -- gaps, and how fast the cosmetic sink drains coins.
 -- lune run tools/econ/sim [players]      (default 400 per kind)
 --
@@ -214,12 +214,9 @@ local function markBuy(p: P, day: number)
 	end
 end
 
--- After the 27 balls, coins buy the cheapest look still missing. Robux looks are not auto-bought:
--- the coin path is what this measures.
+-- Coins left after ball buys purchase the cheapest look still missing, at any ball count.
+-- Robux looks are not auto-bought: the coin path is what this measures.
 local function spendLooks(p: P, day: number)
-	if p.n < NB then
-		return
-	end
 	while p.lookN < #LOOKS do
 		local best: any = nil
 		for _, item in LOOKS do
@@ -269,7 +266,7 @@ local function spendCoins(p: P, day: number)
 			end
 		end
 		if best == nil then
-			return
+			break
 		end
 		markBuy(p, day)
 		if best == "direct" then

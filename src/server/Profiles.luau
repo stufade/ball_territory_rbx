@@ -406,8 +406,8 @@ function Profiles.buyBall(player: Player, e: any, cur: any)
 	Profiles.send(player, nil, { gains = gains(player, log) })
 end
 
--- Action look: buy a cosmetic for coins. The price is Economy.LOOKS. Locked until all 27 balls are owned.
--- A second buy of the same id sends the shelf again and does not spend.
+-- Action look: buy a cosmetic for coins. The price is Economy.LOOKS. Any ball count is enough.
+-- A short balance sends nothing. A second buy of the same id sends the shelf again and does not spend.
 function Profiles.buyLook(player: Player, id: any)
 	local p = Profiles.get(player)
 	if not p then

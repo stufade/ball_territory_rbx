@@ -163,7 +163,7 @@ return {
 		{ day = 42, coins = 8000 },
 	} :: { Mile },
 
-	-- Cosmetic sink. Buyable only when all 27 balls are owned. No combat stats. Coin price is the free path,
+	-- Cosmetic sink. Buyable at any ball count. No combat stats. Coin price is the free path,
 	-- Robux is a one-time developer product. Order is the sim's buy order (cheapest first), not the shelf groups.
 	LOOKS = {
 		{ id = "frame_wood", coins = 2000, robux = 49 },

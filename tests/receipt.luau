@@ -140,18 +140,11 @@ end
 
 do
 	local d = fresh()
-	check(
-		Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "later",
-		"a cosmetic waits until all 27 balls are owned"
-	)
-	check(#d.receipts == 0 and #d.looks == 0, "a locked cosmetic receipt is not acknowledged")
-	for e = 0, 26 do
-		table.insert(d.balls, e)
-	end
+	table.insert(d.balls, 0)
 	local coins = d.coins
-	check(Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "granted", "a full collection grants the look")
+	check(Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "granted", "one ball grants the look")
 	check(
-		d.looks[1] == "frame_wood" and d.coins == coins and #d.receipts == 1,
+		d.looks[1] == "frame_wood" and d.coins == coins and #d.receipts == 1 and #d.balls == 1,
 		"the grant owns the look and spends no coins"
 	)
 	check(

@@ -1,6 +1,6 @@
 --!strict
 -- Cosmetic shelf (docs/economy.md «Косметика»). Pure. Prices are Economy.LOOKS.
--- A look can be bought for coins, or granted by a developer-product receipt, only when all 27 balls are owned.
+-- A look can be bought for coins, or granted by a developer-product receipt, at any ball count.
 -- Buying the same id again does not spend. The equipped row is one skin, one trail, one force effect, one frame,
 -- plus the lobby podium and the KO card. Nothing here is read by the match.
 local Wallet = require("./Wallet")
@@ -114,15 +114,12 @@ function Looks.repair(d: any, E: any)
 	w.ko = w.ko == true and owned(d, "ko_card")
 end
 
--- "ok" added it, "have" it was already owned, "wait" the collection is short, "no" unknown id.
--- A receipt uses "wait" to stay unacknowledged. Coins are not touched.
+-- "ok" added it, "have" it was already owned, "no" unknown id. Coins are not touched.
+-- A receipt stays unacknowledged only on "no", so a bad id can be retried. Ball count does not matter.
 function Looks.grant(d: any, id: unknown, E: any): string
 	local look = byId(E, id)
 	if not look or type(d.looks) ~= "table" then
 		return "no"
-	end
-	if Looks.count(d) < NEL then
-		return "wait"
 	end
 	if owned(d, look.id) then
 		return "have"
@@ -131,11 +128,11 @@ function Looks.grant(d: any, id: unknown, E: any): string
 	return "ok"
 end
 
--- Coin purchase. Nil, and nothing spent, when the shelf is locked, the id is unknown, or the balance is short.
--- The same id again returns already = true and does not spend.
+-- Coin purchase. Nil, and nothing spent, when the id is unknown or the balance is short.
+-- The same id again returns already = true and does not spend. Ball count does not matter.
 function Looks.buy(d: any, id: unknown, E: any, log: { Wallet.Flow }?): Hit?
 	local look = byId(E, id)
-	if not look or type(d.looks) ~= "table" or Looks.count(d) < NEL then
+	if not look or type(d.looks) ~= "table" then
 		return nil
 	end
 	if owned(d, look.id) then
