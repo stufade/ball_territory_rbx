@@ -48,29 +48,30 @@ function Rules.aim(S: State, e: number, dx: number, dy: number): boolean
 	if not b or S.launched or not finite(dx) or not finite(dy) then
 		return false
 	end
-	Core.steer(b, dx, dy)
+	-- false: a person's drag is the flight direction, without the 17° axis dead-zone
+	Core.steer(b, dx, dy, false)
 	return true
 end
 
--- Direction a ball really gets from an aim (dx, dy): what Core.steer and Core.turn make of it, nil if too short.
--- The client draws its own aim with it, so the line matches the flight.
+-- Direction a ball really gets from an aim (dx, dy). Nil if the drag is too short.
+-- The client draws this, and the server launches it, so the line and the shot match the finger.
 function Rules.aimDir(dx: number, dy: number): (number?, number?)
 	if not finite(dx) or not finite(dy) then
 		return nil, nil
 	end
 	local probe = { dx = 0, dy = 0 }
-	Core.steer(probe :: any, dx, dy)
+	Core.steer(probe :: any, dx, dy, false)
 	if probe.dx == 0 and probe.dy == 0 then
 		return nil, nil
 	end
 	return probe.dx, probe.dy
 end
 
--- Start of play: normalises every direction.
+-- Start of play: normalises every direction. Bots still pass through the web dead-zone.
 function Rules.launch(S: State)
 	S.launched = true
 	for _, b in S.balls do
-		Core.turn(b, 0)
+		Core.turn(b, 0, b.ctl == nil)
 	end
 	Core.ev(S, "launch")
 end
@@ -89,7 +90,7 @@ function Rules.redirect(S: State, e: number, dx: number, dy: number): boolean
 	elseif S.t > S.promptUntil then
 		return false
 	end
-	Core.steer(b, dx, dy)
+	Core.steer(b, dx, dy, false)
 	local tx, ty = Core.ahead(S, b, 5)
 	Core.ev(S, "redirect", { e = b.e, x = r2(b.x), y = r2(b.y), tx = r2(tx), ty = r2(ty) })
 	return true

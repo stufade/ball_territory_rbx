@@ -145,16 +145,24 @@ function Core.at(S: State, b: Ball, layer: { number }): boolean
 	return layer[c] > 0 and S.src[c] ~= b.e
 end
 
-function Core.turn(b: Ball, a: number)
+-- snap: web dead-zone. A component under 0.22 becomes 0.3, so after normalising the
+-- direction sits about atan(0.3) ≈ 17° off the axis. Player aim passes false so the
+-- shot stays on the finger; bots, bounces and powers keep the dead-zone.
+function Core.turn(b: Ball, a: number, snap: boolean?)
 	local c, s = cos(a), sin(a)
 	b.dx, b.dy = b.dx * c - b.dy * s, b.dx * s + b.dy * c
-	if abs(b.dx) < 0.22 then
-		b.dx = (if b.dx < 0 then -1 else 1) * 0.3
-	end
-	if abs(b.dy) < 0.22 then
-		b.dy = (if b.dy < 0 then -1 else 1) * 0.3
+	if snap ~= false then
+		if abs(b.dx) < 0.22 then
+			b.dx = (if b.dx < 0 then -1 else 1) * 0.3
+		end
+		if abs(b.dy) < 0.22 then
+			b.dy = (if b.dy < 0 then -1 else 1) * 0.3
+		end
 	end
 	local n = Grid.hypot(b.dx, b.dy)
+	if n == 0 then
+		n = 1
+	end
 	b.dx /= n
 	b.dy /= n
 end
@@ -178,12 +186,12 @@ function Core.shove(S: State, t: Ball, ux: number, uy: number, d: number)
 	t.y = Core.clampY(S, t.y + uy * d)
 end
 
-function Core.steer(b: Ball, dx: number, dy: number)
+function Core.steer(b: Ball, dx: number, dy: number, snap: boolean?)
 	local n = Grid.hypot(dx, dy)
 	if n > 0.3 then
 		b.dx = dx / n
 		b.dy = dy / n
-		Core.turn(b, 0)
+		Core.turn(b, 0, snap)
 	end
 end
 
