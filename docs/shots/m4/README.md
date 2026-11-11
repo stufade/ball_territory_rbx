@@ -1,6 +1,8 @@
 # M4 — магазин и лента
 
-**Снимки: NOT VERIFIED.** Окно Studio было вне экрана (`isOnscreen = false`). `tools/shot.sh` записал чужое содержимое экрана по прямоугольнику окна, файл удалён. `screencapture -l` ответил `could not create image from window`. Повторно не снимал.
+Площадка лобби: `plaza.png` (стойка SHOP слева, арка PLAY справа, маяк по центру). Кадр снят `tools/shot.sh` и вместе с вьюпортом захватил панель Toolbox.
+
+**Снимки экранов магазина и ленты: NOT VERIFIED.** Окно Studio было вне экрана (`isOnscreen = false`). `tools/shot.sh` записал чужое содержимое экрана по прямоугольнику окна, файл удалён. `screencapture -l` ответил `could not create image from window`. Повторно не снимал.
 
 В Play через Studio раскладка снята числами (`AbsolutePosition` / `AbsoluteSize`, холст около 1090×724):
 

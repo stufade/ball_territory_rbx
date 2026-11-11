@@ -53,6 +53,10 @@ local function neon(name: string, size: { number }, pos: { number }, color: stri
 	return part(name, size, pos, color or NEON, "Neon", NOHIT)
 end
 
+local function udim2(xs: number, xo: number, ys: number, yo: number): { any }
+	return { UDim2 = { { xs, xo }, { ys, yo } } }
+end
+
 -- Stand pillar: top face at `top`, standing on the floor (y = 200). Glow ring just under the top face.
 local function stand(out: { Node }, i: number, x: number, z: number, top: number)
 	local h = top - 200
@@ -206,6 +210,175 @@ local lobbyKids: { Node } = {
 	part("PylonE", { 3, 10, 3 }, { PX1 - 4, 205, PZ1 - 4 }, PILLAR),
 	neon("PylonETop", { 3.4, 0.5, 3.4 }, { PX1 - 4, 210.2, PZ1 - 4 }),
 }
+
+-- Kiosks you walk to. Prompt range is 10 studs: from the spawn (0, 56) both are ~60 studs away.
+-- Tag PlazaSpot, attribute Kind "shop"|"play". Client: src/client/UI/init.luau.
+local REACH = 10
+local YELLOW = "#ffd24a"
+local GREEN = "#3ee07a"
+local SHOP_AT = { -58, 66 }
+local PLAY_AT = { 66, 66 }
+
+local function light(color: string, range: number): Node
+	return {
+		name = "Light",
+		className = "PointLight",
+		properties = { Brightness = 2, Range = range, Shadows = false, Color = hex(color) },
+	}
+end
+
+local function prompt(text: string): Node
+	return {
+		name = "Prompt",
+		className = "ProximityPrompt",
+		properties = {
+			ActionText = text,
+			ObjectText = text,
+			MaxActivationDistance = REACH,
+			RequiresLineOfSight = false,
+			HoldDuration = 0,
+			Exclusivity = "OnePerButton",
+			KeyboardKeyCode = "E",
+			GamepadKeyCode = "ButtonX",
+			ClickablePrompt = true,
+			Style = "Default",
+		},
+	}
+end
+
+-- Word on the face that looks back at the plaza (local -Z). Readable on a phone while you walk up.
+local function word(text: string, color: string): { Node }
+	return {
+		{
+			name = "Sign",
+			className = "SurfaceGui",
+			properties = {
+				Face = "Front",
+				LightInfluence = 0,
+				Brightness = 2,
+				PixelsPerStud = 40,
+				SizingMode = "PixelsPerStud",
+				ZOffset = 0.04,
+			},
+			children = {
+				{
+					name = "Label",
+					className = "TextLabel",
+					properties = {
+						BackgroundTransparency = 1,
+						BorderSizePixel = 0,
+						Size = udim2(1, 0, 1, 0),
+						Text = text,
+						TextColor3 = hex("#1a1204"),
+						TextScaled = true,
+						Font = "GothamBold",
+					},
+				},
+			},
+		},
+		{
+			name = "Billboard",
+			className = "BillboardGui",
+			properties = {
+				Size = udim2(8, 0, 2, 0),
+				StudsOffset = { 0, 2.2, 0 },
+				MaxDistance = 80,
+				LightInfluence = 0,
+				AlwaysOnTop = false,
+				ResetOnSpawn = false,
+			},
+			children = {
+				{
+					name = "Label",
+					className = "TextLabel",
+					properties = {
+						BackgroundColor3 = hex(color),
+						BackgroundTransparency = 0.15,
+						BorderSizePixel = 0,
+						Size = udim2(1, 0, 1, 0),
+						Text = text,
+						TextColor3 = hex("#1a1204"),
+						TextScaled = true,
+						Font = "GothamBold",
+					},
+				},
+			},
+		},
+	}
+end
+
+local function kiosk(name: string, kind: string, text: string, at: { number }, color: string): Node
+	local x, z = at[1], at[2]
+	local board = part("Board", { 10, 2.6, 0.45 }, { x, 205.2, z - 2.4 }, color, "Neon")
+	board.children = word(text, color)
+	table.insert(board.children, light(color, 22))
+	local trigger = part("Trigger", { 8, 4, 6 }, { x, 202.5, z - 1 }, color, nil, {
+		Transparency = 1,
+		CanCollide = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
+	trigger.children = { prompt(text) }
+	return {
+		name = name,
+		className = "Model",
+		properties = { Tags = { "PlazaSpot" } },
+		attributes = { Kind = kind },
+		children = {
+			part("Base", { 12, 1, 8 }, { x, 200.4, z }, color),
+			part("Counter", { 10, 3.2, 3.2 }, { x, 202.1, z }, "#2a2418", "Wood"),
+			board,
+			trigger,
+		},
+	}
+end
+
+-- PLAY is an arch you can walk under. The board faces the plaza (-Z).
+local function arch(): Node
+	local x, z = PLAY_AT[1], PLAY_AT[2]
+	local board = part("Board", { 8, 2.2, 0.45 }, { x, 206.2, z - 1.4 }, GREEN, "Neon")
+	board.children = word("PLAY", GREEN)
+	table.insert(board.children, light(GREEN, 22))
+	local trigger = part("Trigger", { 6, 5, 4 }, { x, 202.8, z }, GREEN, nil, {
+		Transparency = 1,
+		CanCollide = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
+	trigger.children = { prompt("PLAY") }
+	return {
+		name = "Play",
+		className = "Model",
+		properties = { Tags = { "PlazaSpot" } },
+		attributes = { Kind = "play" },
+		children = {
+			part("PillarL", { 2, 8, 2 }, { x - 5, 204, z }, PILLAR),
+			part("PillarR", { 2, 8, 2 }, { x + 5, 204, z }, PILLAR),
+			neon("Beam", { 12, 1.2, 2 }, { x, 208.4, z }, GREEN),
+			board,
+			trigger,
+			neon("Mat", { 10, 0.15, 8 }, { x, 200.12, z }, GREEN),
+		},
+	}
+end
+
+table.insert(lobbyKids, kiosk("Shop", "shop", "SHOP", SHOP_AT, YELLOW))
+table.insert(lobbyKids, arch())
+
+-- One landmark behind the spawn, plus a colored path so the pad is not one flat blue rectangle.
+local bx, bz = 0, 70
+local beacon = part("Beacon", { 3.2, 16, 3.2 }, { bx, 208, bz }, "#f4f1ff")
+local beaconLight = light("#fff1a8", 36)
+beaconLight.name = "BeaconLight"
+beacon.children = { beaconLight }
+table.insert(lobbyKids, beacon)
+table.insert(lobbyKids, neon("BeaconCap", { 5, 1.2, 5 }, { bx, 216.4, bz }, YELLOW))
+table.insert(lobbyKids, neon("BeaconRing", { 8, 0.2, 8 }, { bx, 200.12, bz }, NEON_PINK))
+table.insert(lobbyKids, neon("PathShop", { 44, 0.12, 2.2 }, { -32, 200.08, 60 }, YELLOW))
+table.insert(lobbyKids, neon("PathPlay", { 48, 0.12, 2.2 }, { 36, 200.08, 60 }, GREEN))
+table.insert(lobbyKids, neon("TileW", { 7, 0.12, 7 }, { -16, 200.08, 46 }, NEON))
+table.insert(lobbyKids, neon("TileE", { 7, 0.12, 7 }, { 22, 200.08, 46 }, NEON_PINK))
+table.insert(lobbyKids, neon("TileC", { 7, 0.12, 7 }, { 4, 200.08, 42 }, YELLOW))
 -- Spawn: faces the arenas (-Z). Server sets Player.RespawnLocation to it (src/server/Avatars.luau).
 local spawn = part("Spawn", { 12, 1, 12 }, { 0, 199.6, 56 }, "#2a4fa8")
 spawn.className = "SpawnLocation"

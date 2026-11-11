@@ -215,6 +215,19 @@ local function openPop(w: Wallet, which: string, claim: any?)
 	Wallet.render(w)
 end
 
+-- The plaza shop kiosk uses the same screen as the SHOP button. No-op off the lobby.
+function Wallet.show(w: Wallet, which: string)
+	if not onPlaza(w) or w.st == nil or w.st.ph ~= "lobby" or w.view == nil then
+		return
+	end
+	if w.open == which then
+		closePop(w)
+		Wallet.render(w)
+	else
+		openPop(w, which)
+	end
+end
+
 function Wallet.render(w: Wallet)
 	w.root:ClearAllChildren()
 	local v = w.view

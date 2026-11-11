@@ -389,6 +389,26 @@ function Plaza.setParty(p: Plaza, v: Net.PartyView)
 	end
 end
 
+-- Duel search from the plaza arch. Same action as the DUEL choice under PLAY (party host uses pplay).
+function Plaza.searchDuel(p: Plaza)
+	local st = p.st
+	if not st or st.ph ~= "lobby" then
+		return
+	end
+	local party = inParty(p)
+	if party and not isHost(p) then
+		return
+	end
+	local members = if p.party and p.party.id then #p.party.members else 1
+	if party and members ~= 2 then
+		return
+	end
+	p.pressed = true
+	p.playOpen = false
+	p.ctx.act(if party then Net.Action.pplay else Net.Action.queue, Net.Mode.duel)
+	Plaza.render(p)
+end
+
 -- 10 times a second (search countdown).
 function Plaza.step(p: Plaza)
 	if p.tick then

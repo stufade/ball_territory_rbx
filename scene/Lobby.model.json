@@ -779,6 +779,982 @@
       }
     },
     {
+      "attributes": {
+        "Kind": "shop"
+      },
+      "children": [
+        {
+          "className": "Part",
+          "name": "Base",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              -58,
+              200.4,
+              66,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "Color": [
+              1,
+              0.823529,
+              0.290196
+            ],
+            "Material": "SmoothPlastic",
+            "Size": [
+              12,
+              1,
+              8
+            ],
+            "TopSurface": "Smooth"
+          }
+        },
+        {
+          "className": "Part",
+          "name": "Counter",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              -58,
+              202.1,
+              66,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "Color": [
+              0.164705,
+              0.141176,
+              0.094117
+            ],
+            "Material": "Wood",
+            "Size": [
+              10,
+              3.2,
+              3.2
+            ],
+            "TopSurface": "Smooth"
+          }
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "className": "TextLabel",
+                  "name": "Label",
+                  "properties": {
+                    "BackgroundTransparency": 1,
+                    "BorderSizePixel": 0,
+                    "Font": "GothamBold",
+                    "Size": {
+                      "UDim2": [
+                        [
+                          1,
+                          0
+                        ],
+                        [
+                          1,
+                          0
+                        ]
+                      ]
+                    },
+                    "Text": "SHOP",
+                    "TextColor3": [
+                      0.10196,
+                      0.070588,
+                      0.015686
+                    ],
+                    "TextScaled": true
+                  }
+                }
+              ],
+              "className": "SurfaceGui",
+              "name": "Sign",
+              "properties": {
+                "Brightness": 2,
+                "Face": "Front",
+                "LightInfluence": 0,
+                "PixelsPerStud": 40,
+                "SizingMode": "PixelsPerStud",
+                "ZOffset": 0.04
+              }
+            },
+            {
+              "children": [
+                {
+                  "className": "TextLabel",
+                  "name": "Label",
+                  "properties": {
+                    "BackgroundColor3": [
+                      1,
+                      0.823529,
+                      0.290196
+                    ],
+                    "BackgroundTransparency": 0.15,
+                    "BorderSizePixel": 0,
+                    "Font": "GothamBold",
+                    "Size": {
+                      "UDim2": [
+                        [
+                          1,
+                          0
+                        ],
+                        [
+                          1,
+                          0
+                        ]
+                      ]
+                    },
+                    "Text": "SHOP",
+                    "TextColor3": [
+                      0.10196,
+                      0.070588,
+                      0.015686
+                    ],
+                    "TextScaled": true
+                  }
+                }
+              ],
+              "className": "BillboardGui",
+              "name": "Billboard",
+              "properties": {
+                "AlwaysOnTop": false,
+                "LightInfluence": 0,
+                "MaxDistance": 80,
+                "ResetOnSpawn": false,
+                "Size": {
+                  "UDim2": [
+                    [
+                      8,
+                      0
+                    ],
+                    [
+                      2,
+                      0
+                    ]
+                  ]
+                },
+                "StudsOffset": [
+                  0,
+                  2.2,
+                  0
+                ]
+              }
+            },
+            {
+              "className": "PointLight",
+              "name": "Light",
+              "properties": {
+                "Brightness": 2,
+                "Color": [
+                  1,
+                  0.823529,
+                  0.290196
+                ],
+                "Range": 22,
+                "Shadows": false
+              }
+            }
+          ],
+          "className": "Part",
+          "name": "Board",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              -58,
+              205.2,
+              63.6,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "Color": [
+              1,
+              0.823529,
+              0.290196
+            ],
+            "Material": "Neon",
+            "Size": [
+              10,
+              2.6,
+              0.45
+            ],
+            "TopSurface": "Smooth"
+          }
+        },
+        {
+          "children": [
+            {
+              "className": "ProximityPrompt",
+              "name": "Prompt",
+              "properties": {
+                "ActionText": "SHOP",
+                "ClickablePrompt": true,
+                "Exclusivity": "OnePerButton",
+                "GamepadKeyCode": "ButtonX",
+                "HoldDuration": 0,
+                "KeyboardKeyCode": "E",
+                "MaxActivationDistance": 10,
+                "ObjectText": "SHOP",
+                "RequiresLineOfSight": false,
+                "Style": "Default"
+              }
+            }
+          ],
+          "className": "Part",
+          "name": "Trigger",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              -58,
+              202.5,
+              65,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "CanCollide": false,
+            "CanTouch": false,
+            "CastShadow": false,
+            "Color": [
+              1,
+              0.823529,
+              0.290196
+            ],
+            "Material": "SmoothPlastic",
+            "Size": [
+              8,
+              4,
+              6
+            ],
+            "TopSurface": "Smooth",
+            "Transparency": 1
+          }
+        }
+      ],
+      "className": "Model",
+      "name": "Shop",
+      "properties": {
+        "Tags": [
+          "PlazaSpot"
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "Kind": "play"
+      },
+      "children": [
+        {
+          "className": "Part",
+          "name": "PillarL",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              61,
+              204,
+              66,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "Color": [
+              0.141176,
+              0.207843,
+              0.478431
+            ],
+            "Material": "SmoothPlastic",
+            "Size": [
+              2,
+              8,
+              2
+            ],
+            "TopSurface": "Smooth"
+          }
+        },
+        {
+          "className": "Part",
+          "name": "PillarR",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              71,
+              204,
+              66,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "Color": [
+              0.141176,
+              0.207843,
+              0.478431
+            ],
+            "Material": "SmoothPlastic",
+            "Size": [
+              2,
+              8,
+              2
+            ],
+            "TopSurface": "Smooth"
+          }
+        },
+        {
+          "className": "Part",
+          "name": "Beam",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              66,
+              208.4,
+              66,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "CanCollide": false,
+            "CanQuery": false,
+            "CanTouch": false,
+            "CastShadow": false,
+            "Color": [
+              0.243137,
+              0.878431,
+              0.478431
+            ],
+            "Material": "Neon",
+            "Size": [
+              12,
+              1.2,
+              2
+            ],
+            "TopSurface": "Smooth"
+          }
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "className": "TextLabel",
+                  "name": "Label",
+                  "properties": {
+                    "BackgroundTransparency": 1,
+                    "BorderSizePixel": 0,
+                    "Font": "GothamBold",
+                    "Size": {
+                      "UDim2": [
+                        [
+                          1,
+                          0
+                        ],
+                        [
+                          1,
+                          0
+                        ]
+                      ]
+                    },
+                    "Text": "PLAY",
+                    "TextColor3": [
+                      0.10196,
+                      0.070588,
+                      0.015686
+                    ],
+                    "TextScaled": true
+                  }
+                }
+              ],
+              "className": "SurfaceGui",
+              "name": "Sign",
+              "properties": {
+                "Brightness": 2,
+                "Face": "Front",
+                "LightInfluence": 0,
+                "PixelsPerStud": 40,
+                "SizingMode": "PixelsPerStud",
+                "ZOffset": 0.04
+              }
+            },
+            {
+              "children": [
+                {
+                  "className": "TextLabel",
+                  "name": "Label",
+                  "properties": {
+                    "BackgroundColor3": [
+                      0.243137,
+                      0.878431,
+                      0.478431
+                    ],
+                    "BackgroundTransparency": 0.15,
+                    "BorderSizePixel": 0,
+                    "Font": "GothamBold",
+                    "Size": {
+                      "UDim2": [
+                        [
+                          1,
+                          0
+                        ],
+                        [
+                          1,
+                          0
+                        ]
+                      ]
+                    },
+                    "Text": "PLAY",
+                    "TextColor3": [
+                      0.10196,
+                      0.070588,
+                      0.015686
+                    ],
+                    "TextScaled": true
+                  }
+                }
+              ],
+              "className": "BillboardGui",
+              "name": "Billboard",
+              "properties": {
+                "AlwaysOnTop": false,
+                "LightInfluence": 0,
+                "MaxDistance": 80,
+                "ResetOnSpawn": false,
+                "Size": {
+                  "UDim2": [
+                    [
+                      8,
+                      0
+                    ],
+                    [
+                      2,
+                      0
+                    ]
+                  ]
+                },
+                "StudsOffset": [
+                  0,
+                  2.2,
+                  0
+                ]
+              }
+            },
+            {
+              "className": "PointLight",
+              "name": "Light",
+              "properties": {
+                "Brightness": 2,
+                "Color": [
+                  0.243137,
+                  0.878431,
+                  0.478431
+                ],
+                "Range": 22,
+                "Shadows": false
+              }
+            }
+          ],
+          "className": "Part",
+          "name": "Board",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              66,
+              206.2,
+              64.6,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "Color": [
+              0.243137,
+              0.878431,
+              0.478431
+            ],
+            "Material": "Neon",
+            "Size": [
+              8,
+              2.2,
+              0.45
+            ],
+            "TopSurface": "Smooth"
+          }
+        },
+        {
+          "children": [
+            {
+              "className": "ProximityPrompt",
+              "name": "Prompt",
+              "properties": {
+                "ActionText": "PLAY",
+                "ClickablePrompt": true,
+                "Exclusivity": "OnePerButton",
+                "GamepadKeyCode": "ButtonX",
+                "HoldDuration": 0,
+                "KeyboardKeyCode": "E",
+                "MaxActivationDistance": 10,
+                "ObjectText": "PLAY",
+                "RequiresLineOfSight": false,
+                "Style": "Default"
+              }
+            }
+          ],
+          "className": "Part",
+          "name": "Trigger",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              66,
+              202.8,
+              66,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "CanCollide": false,
+            "CanTouch": false,
+            "CastShadow": false,
+            "Color": [
+              0.243137,
+              0.878431,
+              0.478431
+            ],
+            "Material": "SmoothPlastic",
+            "Size": [
+              6,
+              5,
+              4
+            ],
+            "TopSurface": "Smooth",
+            "Transparency": 1
+          }
+        },
+        {
+          "className": "Part",
+          "name": "Mat",
+          "properties": {
+            "Anchored": true,
+            "BottomSurface": "Smooth",
+            "CFrame": [
+              66,
+              200.12,
+              66,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "CanCollide": false,
+            "CanQuery": false,
+            "CanTouch": false,
+            "CastShadow": false,
+            "Color": [
+              0.243137,
+              0.878431,
+              0.478431
+            ],
+            "Material": "Neon",
+            "Size": [
+              10,
+              0.15,
+              8
+            ],
+            "TopSurface": "Smooth"
+          }
+        }
+      ],
+      "className": "Model",
+      "name": "Play",
+      "properties": {
+        "Tags": [
+          "PlazaSpot"
+        ]
+      }
+    },
+    {
+      "children": [
+        {
+          "className": "PointLight",
+          "name": "BeaconLight",
+          "properties": {
+            "Brightness": 2,
+            "Color": [
+              1,
+              0.945098,
+              0.658823
+            ],
+            "Range": 36,
+            "Shadows": false
+          }
+        }
+      ],
+      "className": "Part",
+      "name": "Beacon",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          208,
+          70,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "Color": [
+          0.956862,
+          0.945098,
+          1
+        ],
+        "Material": "SmoothPlastic",
+        "Size": [
+          3.2,
+          16,
+          3.2
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "BeaconCap",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          216.4,
+          70,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.823529,
+          0.290196
+        ],
+        "Material": "Neon",
+        "Size": [
+          5,
+          1.2,
+          5
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "BeaconRing",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          200.12,
+          70,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.309803,
+          0.847058
+        ],
+        "Material": "Neon",
+        "Size": [
+          8,
+          0.2,
+          8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PathShop",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -32,
+          200.08,
+          60,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.823529,
+          0.290196
+        ],
+        "Material": "Neon",
+        "Size": [
+          44,
+          0.12,
+          2.2
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PathPlay",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          36,
+          200.08,
+          60,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.243137,
+          0.878431,
+          0.478431
+        ],
+        "Material": "Neon",
+        "Size": [
+          48,
+          0.12,
+          2.2
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "TileW",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -16,
+          200.08,
+          46,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          0.211764,
+          0.839215,
+          1
+        ],
+        "Material": "Neon",
+        "Size": [
+          7,
+          0.12,
+          7
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "TileE",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          22,
+          200.08,
+          46,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.309803,
+          0.847058
+        ],
+        "Material": "Neon",
+        "Size": [
+          7,
+          0.12,
+          7
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "TileC",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          4,
+          200.08,
+          42,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "CastShadow": false,
+        "Color": [
+          1,
+          0.823529,
+          0.290196
+        ],
+        "Material": "Neon",
+        "Size": [
+          7,
+          0.12,
+          7
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
       "className": "SpawnLocation",
       "name": "Spawn",
       "properties": {

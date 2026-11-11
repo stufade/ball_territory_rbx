@@ -1,7 +1,9 @@
 --!strict
 -- Client UI entry: ScreenGui with menus (by State.ph) and the match HUD. Call UI.start() once from the client bootstrap.
 -- Layout is designed on a 960x540 canvas that is scaled to the screen (phone landscape first). Spec: docs/ui.md.
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -150,6 +152,20 @@ function UI.start()
 		return level.showing
 	end
 	local wallet = Wallet.new(canvas, wctx)
+	-- Plaza kiosks (docs/scene.md): tag PlazaSpot. Kept here so it does not need a new module file.
+	ProximityPromptService.PromptTriggered:Connect(function(prompt)
+		local host = prompt.Parent
+		local model = if host then host:FindFirstAncestorOfClass("Model") else nil
+		if not model or not CollectionService:HasTag(model, "PlazaSpot") then
+			return
+		end
+		local kind = model:GetAttribute("Kind")
+		if kind == "shop" then
+			Wallet.show(wallet, "shop")
+		elseif kind == "play" then
+			Plaza.searchDuel(plaza)
+		end
+	end)
 
 	local function rebuild()
 		table.clear(ctx.tickers)
