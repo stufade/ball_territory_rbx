@@ -59,6 +59,9 @@ Net.Action = {
 	buy = "buy",
 	-- M3.2: one spin. The third argument is "coins" or "crystals". The client does not send the result.
 	spin = "spin",
+	-- Cosmetics: "look" buys the id in the third argument for coins. "wear" equips it (arg = ball for a skin).
+	look = "look",
+	wear = "wear",
 }
 
 -- Action "queue" argument.
@@ -227,6 +230,22 @@ export type ProfileView = {
 	spin: SpinView?,
 	-- Set on the snapshot that paid for a spin. The reel only displays it.
 	spinResult: SpinHit?,
+	-- Cosmetic shelf. Buy only when n >= need (27). robux lists asset ids that are actually for sale.
+	shelf: {
+		n: number,
+		need: number,
+		owned: { string },
+		on: {
+			skin: string,
+			trail: string,
+			force: string,
+			frame: string,
+			podium: boolean,
+			ko: boolean,
+			ball: number,
+		},
+		robux: { [string]: number },
+	}?,
 }
 
 export type SpinOdds = { common: number, rare: number, epic: number, legendary: number, refund: number }

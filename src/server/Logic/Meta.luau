@@ -50,6 +50,17 @@ function Meta.fresh(): { [string]: any }
 		dailyBall = { day = -1, e = -1, recent = {} } :: DailyBall,
 		-- friend bonus matches today (anti-farm limit)
 		friend = { day = -1, n = 0 } :: DayCount,
+		-- cosmetics (Logic/Looks): owned ids, and the one equipped item of each slot ("" = none)
+		looks = {} :: { string },
+		worn = {
+			skin = "",
+			trail = "",
+			force = "",
+			frame = "",
+			podium = false,
+			ko = false,
+			ball = -1,
+		},
 		-- developer products (Logic/Receipt): handled PurchaseIds, starter pack already granted,
 		-- ball chosen before the tier prompt, epic chosen before the starter prompt (-1 = none)
 		receipts = {} :: { string },
@@ -116,6 +127,31 @@ function Meta.read(d: any, raw: { [string]: any })
 		d.dailyBall = { day = int(b.day, -1, 1e7, -1), e = int(b.e, -1, 26, -1), recent = recent }
 	end
 	d.friend = dayCount(raw.friend)
+	d.looks = {}
+	if type(raw.looks) == "table" then
+		local seen = {}
+		for _, k in raw.looks do
+			local s = str(k, 32)
+			if s and string.match(s, "^[%l%d_]+$") and not seen[s] and #d.looks < 40 then
+				seen[s] = true
+				table.insert(d.looks, s)
+			end
+		end
+	end
+	local worn = if type(raw.worn) == "table" then raw.worn else {}
+	local function wornId(key: string): string
+		local s = str(worn[key], 32)
+		return if s and string.match(s, "^[%l%d_]+$") then s else ""
+	end
+	d.worn = {
+		skin = wornId("skin"),
+		trail = wornId("trail"),
+		force = wornId("force"),
+		frame = wornId("frame"),
+		podium = worn.podium == true,
+		ko = worn.ko == true,
+		ball = int(worn.ball, -1, 26, -1),
+	}
 	d.starterBought = raw.starterBought == true
 	d.robuxBall = int(raw.robuxBall, -1, 26, -1)
 	d.robuxEpic = int(raw.robuxEpic, -1, 26, -1)

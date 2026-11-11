@@ -198,6 +198,15 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number, cu
 		Profiles.buyBall(r.player, arg, cur)
 		return
 	end
+	-- look id in the third argument; the server prices it and refuses a short collection or a short balance
+	if verb == A.look then
+		Profiles.buyLook(r.player, cur)
+		return
+	end
+	if verb == A.wear then
+		Profiles.wearLook(r.player, cur, arg)
+		return
+	end
 	-- currency only; the server rolls the ball and refuses a short balance or a paid-random ban
 	if verb == A.spin then
 		Profiles.spin(r.player, cur)

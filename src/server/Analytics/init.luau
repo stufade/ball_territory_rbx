@@ -130,6 +130,11 @@ function Analytics.offer(player: Player, what: string, action: string)
 	event(player, "Offer", 1, what, action)
 end
 
+-- A cosmetic (docs/economy.md «Косметика»): the look id, paid with coins or Robux.
+function Analytics.look(player: Player, id: string, pay: string)
+	event(player, "Look", 1, id, pay)
+end
+
 function Analytics.forget(player: Player)
 	done[player] = nil
 end

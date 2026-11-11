@@ -2,9 +2,11 @@
 -- Developer-product grants (docs/economy.md «Монетизация»). Pure: no MarketplaceService, so tests/receipt
 -- runs without the network. "granted" is a new PurchaseId, "already" is the same id again (nothing is added).
 -- "later" is NotProcessedYet: the wrong player, an unknown product, a tier or starter purchase with no valid
--- choice, and cosmetics. The skin grant is a later task; the product id is only recorded in Products.luau.
--- "later" does not store the PurchaseId and does not change the wallet, so a retry can still grant.
--- Crystals go through Wallet.add, the ball and the starter epic through Progress.give, starter coins through Wallet.gift.
+-- choice, and a cosmetic while the player still owns fewer than 27 balls. "later" does not store the PurchaseId
+-- and does not change the wallet, so a retry can still grant. A cosmetic with a full collection is granted by
+-- Looks.grant (the same call a coin purchase uses after it has spent). Crystals go through Wallet.add, the ball
+-- and the starter epic through Progress.give, starter coins through Wallet.gift.
+local Looks = require("./Looks")
 local Progress = require("./Progress")
 local Wallet = require("./Wallet")
 
@@ -132,10 +134,15 @@ function Receipt.apply(
 		return "already"
 	end
 	local spec = catalog[receipt.ProductId]
-	if not spec or spec.kind == "look" then
+	if not spec then
 		return "later"
 	end
-	if spec.kind == "crystals" then
+	if spec.kind == "look" then
+		local how = Looks.grant(d, spec.id, E)
+		if how ~= "ok" and how ~= "have" then
+			return "later"
+		end
+	elseif spec.kind == "crystals" then
 		local n = Wallet.add(d, "crystals", spec.n or 0, spec.why, "IAP", log)
 		if n <= 0 then
 			return "later"

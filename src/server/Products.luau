@@ -4,7 +4,7 @@
 -- Every 0 is a placeholder, not a live asset id. Logic/Receipt ignores 0, so a receipt cannot grant
 -- until that id is filled in. Do not invent ids.
 -- `crystals` is parallel to Economy.CRYSTAL_PACKS. `ball` keys are Economy.PRICE.robux.
--- `looks` keys are Economy.LOOKS ids. The skin itself is granted by a later task; this file only records the product.
+-- `looks` keys are Economy.LOOKS ids. A non-zero id is granted by Logic/Looks when the receipt is processed.
 return {
 	crystals = { 0, 0, 0, 0, 0, 0 },
 	ball = { common = 0, rare = 0, epic = 0, legendary = 0 },

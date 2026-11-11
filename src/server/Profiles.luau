@@ -12,7 +12,9 @@ local Analytics = require("./Analytics")
 local Award = require("./Logic/Award")
 local Config = require("./Config")
 local Daily = require("./Logic/Daily")
+local Looks = require("./Logic/Looks")
 local Net = require(ReplicatedStorage.Shared.Net)
+local Products = require("./Products")
 local Progress = require("./Logic/Progress")
 local Receipt = require("./Logic/Receipt")
 local Shop = require("./Logic/Shop")
@@ -126,6 +128,7 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [st
 		(view :: any)[k] = v
 	end
 	view.spin = Spin.board(d, Config.ECON, not paidRandom(player))
+	view.shelf = Looks.snapshot(d, Config.ECON, Products)
 	if extra then
 		for k, v in extra do
 			(view :: any)[k] = v
@@ -401,6 +404,40 @@ function Profiles.buyBall(player: Player, e: any, cur: any)
 	attrs(p)
 	print(`[BT] {player.Name} bought {Rules.Config.TITLE[bought.e]} for {bought.n} {bought.cur}`)
 	Profiles.send(player, nil, { gains = gains(player, log) })
+end
+
+-- Action look: buy a cosmetic for coins. The price is Economy.LOOKS. Locked until all 27 balls are owned.
+-- A second buy of the same id sends the shelf again and does not spend.
+function Profiles.buyLook(player: Player, id: any)
+	local p = Profiles.get(player)
+	if not p then
+		return
+	end
+	local log = {}
+	local bought = Looks.buy(p.data, id, Config.ECON, log)
+	if not bought then
+		return
+	end
+	if not bought.already then
+		saveSoon(p)
+		attrs(p)
+		Analytics.look(player, bought.id, "coins")
+		print(`[BT] {player.Name} bought {bought.id} for {bought.n} coins`)
+	end
+	Profiles.send(player, nil, { gains = gains(player, log) })
+end
+
+-- Action wear: equip an owned look. One of each slot. The match does not read this.
+function Profiles.wearLook(player: Player, id: any, ball: any)
+	local p = Profiles.get(player)
+	if not p then
+		return
+	end
+	if not Looks.wear(p.data, id, ball, Config.ECON) then
+		return
+	end
+	saveSoon(p)
+	Profiles.send(player)
 end
 
 -- Action spin: currency only. The ball is chosen here, then the profile carries it in spinResult for the reel.

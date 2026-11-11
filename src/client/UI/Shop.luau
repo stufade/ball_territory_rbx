@@ -24,10 +24,11 @@ export type Ctx = {
 	frames: { (dt: number) -> () },
 	close: () -> (),
 	act: (verb: string, arg: number?, cur: string?) -> (),
+	shelf: () -> (),
 }
 
 local function tierOf(e: number): string?
-	for tier, list in Economy.TIERS do
+	for tier, list in Economy.TIERS :: { [string]: { number } } do
 		if table.find(list, e) then
 			return tier
 		end
@@ -111,6 +112,11 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		bold = true,
 	}).Name =
 		"Left"
+
+	local looks =
+		Theme.button(panel, "LOOKS", UDim2.fromOffset(150, 64), UDim2.fromOffset(210, 12), Theme.PURPLE, nil, 22)
+	looks.Name = "LooksBtn"
+	looks.Activated:Connect(ctx.shelf)
 
 	local close =
 		Theme.button(panel, "X", UDim2.fromOffset(76, 76), UDim2.new(1, -12, 0, 10), Theme.BAD, nil, 36, V2(1, 0))

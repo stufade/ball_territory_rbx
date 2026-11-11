@@ -13,6 +13,7 @@ local Money = require("./Money")
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Quests = require("./Quests")
 local Shop = require("./Shop")
+local Shelf = require("./Shelf")
 local Spin = require("./Spin")
 local Theme = require("./Theme")
 
@@ -186,6 +187,19 @@ local function openPop(w: Wallet, which: string, claim: any?)
 			frames = w.fx.frames,
 			close = close,
 			act = w.ctx.act,
+			shelf = function()
+				openPop(w, "shelf")
+			end,
+		})
+	elseif which == "shelf" then
+		Shelf.build(w.pop, v, {
+			canvas = w.ctx.canvas,
+			frames = w.fx.frames,
+			close = close,
+			act = w.ctx.act,
+			shop = function()
+				openPop(w, "shop")
+			end,
 		})
 	elseif which == "spin" then
 		Spin.build(w.pop, v, {
@@ -267,7 +281,7 @@ function Wallet.render(w: Wallet)
 		btns.spin = spin
 	end
 	for name, b in btns do
-		Theme.select(b, w.open == name)
+		Theme.select(b, w.open == name or (name == "shop" and w.open == "shelf"))
 		b.Activated:Connect(function()
 			if w.open == name then
 				closePop(w)

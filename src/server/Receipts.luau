@@ -4,6 +4,7 @@
 -- acknowledges. PurchaseGranted is returned only after the PurchaseId is in the saved profile.
 local Players = game:GetService("Players")
 
+local Analytics = require("./Analytics")
 local Config = require("./Config")
 local Products = require("./Products")
 local Profiles = require("./Profiles")
@@ -38,6 +39,10 @@ local function handle(receipt: any): string
 	end
 	if result == "granted" then
 		Profiles.showGain(player, log)
+		local spec = catalog[receipt.ProductId]
+		if spec and spec.kind == "look" and spec.id then
+			Analytics.look(player, spec.id, "robux")
+		end
 		print(`[BT] {player.Name} developer product {receipt.ProductId} ({receipt.PurchaseId})`)
 	end
 	if not Profiles.commit(player) then

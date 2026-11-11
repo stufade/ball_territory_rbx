@@ -647,6 +647,86 @@ do
 	)
 end
 
+-- Shelf: locked at 5/27, open at 27/27, the cheapest row buys for coins and then reads YOURS.
+do
+	local function shelfOf(n: number, owned: { string }): any
+		local balls = {}
+		for e = 0, n - 1 do
+			balls[e + 1] = e
+		end
+		return {
+			n = n,
+			need = 27,
+			owned = owned,
+			on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
+			robux = {},
+		}
+	end
+	for _, cv in { V2(960, 540), V2(1168, 540) } do
+		local tag = `{cv.X} shelf`
+		local w, _, acts = make(cv)
+		Wallet.setState(w, { ph = "lobby" })
+		local v = view(5000, 10, false, 1)
+		v.shelf = shelfOf(5, {})
+		Wallet.setProfile(w, v)
+		find(w.root, "ShopBtn").Activated:Fire()
+		local shop = find(w.pop, "ShopPanel")
+		local looksBtn = find(shop, "LooksBtn")
+		check(looksBtn ~= nil and find(looksBtn, "Label").Text == "LOOKS", `{tag}: shop opens the shelf`)
+		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Close"))), `{tag}: LOOKS clear of close`)
+		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Head"))), `{tag}: LOOKS clear of the title`)
+		looksBtn.Activated:Fire()
+		local panel = find(w.pop, "ShelfPanel")
+		check(panel ~= nil and w.open == "shelf", `{tag}: shelf open`)
+		local pr = rectOf(panel)
+		check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, `{tag}: panel on screen`)
+		check(find(panel, "Count").Text == "5/27", `{tag}: counter`)
+		check(find(panel, "Lock").Text == "LOCKED", `{tag}: lock`)
+		check(
+			find(panel, "Count"):FindFirstChild("UITextSizeConstraint").MinTextSize >= 20,
+			`{tag}: counter stays readable`
+		)
+		local row = find(panel, "R_frame_wood")
+		check(row and find(row, "Name").Text == "FRAME WOOD", `{tag}: cheapest row`)
+		local pay = find(row, "PayCoins")
+		check(pay and pay.Active == false and rectOf(pay)[4] >= 72, `{tag}: locked price is a large dead button`)
+		local before = #acts
+		pay.Activated:Fire()
+		find(row, "PayRobux").Activated:Fire()
+		check(#acts == before, `{tag}: a locked shelf sends nothing`)
+		check(not overlap(rectOf(find(panel, "Close")), rectOf(find(panel, "Head"))), `{tag}: close clear of the title`)
+		check(not overlap(rectOf(find(panel, "Back")), rectOf(find(panel, "Close"))), `{tag}: back clear of close`)
+	end
+
+	local w, _, acts = make(V2(960, 540))
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(2000, 0, false, 1)
+	v.balls = {}
+	for e = 0, 26 do
+		v.balls[e + 1] = e
+	end
+	v.shelf = shelfOf(27, {})
+	Wallet.setProfile(w, v)
+	find(w.root, "ShopBtn").Activated:Fire()
+	find(w.pop, "LooksBtn").Activated:Fire()
+	local row = find(w.pop, "R_frame_wood")
+	check(find(w.pop, "Count").Text == "27/27" and find(w.pop, "Lock") == nil, "shelf: open, no lock")
+	check(find(find(row, "PayCoins"), "Label").Text == "2,000", "shelf: coin price from Economy")
+	check(find(row, "PayRobux").Active == false, "shelf: a placeholder Robux id does not sell")
+	find(row, "PayCoins").Activated:Fire()
+	check(#acts == 1 and acts[1][1] == "look" and acts[1][3] == "frame_wood", "shelf: Action look for coins")
+	v.coins = 0
+	v.shelf = shelfOf(27, { "frame_wood" })
+	Wallet.setProfile(w, v)
+	local owned = find(w.pop, "R_frame_wood")
+	check(w.open == "shelf" and find(owned, "Own").Text == "YOURS", "shelf: the bought look reads YOURS")
+	check(find(owned, "PayCoins") == nil, "shelf: an owned look has no coin button")
+	find(owned, "Wear").Activated:Fire()
+	check(acts[2][1] == "wear" and acts[2][3] == "frame_wood", "shelf: wear sends the id")
+	find(w.pop, "Back").Activated:Fire()
+	check(find(w.pop, "ShopPanel") ~= nil, "shelf: back returns to the shop")
+end
+
 print(`{passed} passed, {fails} failed`)
 if fails > 0 then
 	process.exit(1)

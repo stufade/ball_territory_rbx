@@ -46,6 +46,17 @@ export type Data = {
 	trialBonus: number,
 	dailyBall: Meta.DailyBall,
 	friend: Meta.DayCount,
+	-- cosmetics (Logic/Looks). worn is lobby-only: the match never reads it.
+	looks: { string },
+	worn: {
+		skin: string,
+		trail: string,
+		force: string,
+		frame: string,
+		podium: boolean,
+		ko: boolean,
+		ball: number,
+	},
 	-- developer products (Logic/Receipt)
 	receipts: { string },
 	starterBought: boolean,
@@ -161,6 +172,8 @@ function Progress.repair(d: Data, cfg: Cfg, reactions: { string }?)
 	if reactions then
 		Meta.repair(d, reactions, cfg.ECON.QUESTS.pool)
 	end
+	local Looks = require("./Looks")
+	Looks.repair(d, cfg.ECON)
 end
 
 function Progress.owns(d: Data, e: number): boolean

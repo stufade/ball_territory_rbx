@@ -142,9 +142,26 @@ do
 	local d = fresh()
 	check(
 		Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "later",
-		"a cosmetic product is not granted yet"
+		"a cosmetic waits until all 27 balls are owned"
 	)
-	check(#d.receipts == 0 and d.crystals == 0, "a cosmetic receipt is not acknowledged")
+	check(#d.receipts == 0 and #d.looks == 0, "a locked cosmetic receipt is not acknowledged")
+	for e = 0, 26 do
+		table.insert(d.balls, e)
+	end
+	local coins = d.coins
+	check(Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "granted", "a full collection grants the look")
+	check(
+		d.looks[1] == "frame_wood" and d.coins == coins and #d.receipts == 1,
+		"the grant owns the look and spends no coins"
+	)
+	check(
+		Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "already",
+		"the same cosmetic receipt adds nothing"
+	)
+	check(
+		Receipt.apply(d, receipt(9301, "look-2"), USER, cat, E, {}) == "granted" and #d.looks == 1,
+		"a second purchase of an owned look is acknowledged once"
+	)
 end
 
 do
