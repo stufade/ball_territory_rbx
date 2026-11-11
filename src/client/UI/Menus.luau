@@ -16,7 +16,7 @@ local Theme = require("./Theme")
 local Menus = {}
 
 export type Ctx = {
-	act: (verb: string, arg: number?) -> (),
+	act: (verb: string, arg: number?, cur: string?) -> (),
 	timeLeft: (endsAt: number?) -> number,
 	tickers: { () -> () }, -- 10 times a second
 	frames: { (dt: number) -> () }, -- every frame

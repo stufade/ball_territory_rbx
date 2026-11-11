@@ -17,7 +17,7 @@ local MID = V2(0.5, 0.5)
 local NUDGE = 6
 
 export type Ctx = {
-	act: (verb: string, arg: number?) -> (),
+	act: (verb: string, arg: number?, cur: string?) -> (),
 	canvas: Vector2,
 }
 

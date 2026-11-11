@@ -106,8 +106,8 @@ function UI.start()
 	scale.Parent = canvas
 
 	local ctx: Menus.Ctx = {
-		act = function(verb, arg)
-			Remotes.Action:FireServer(verb, arg)
+		act = function(verb, arg, cur)
+			Remotes.Action:FireServer(verb, arg, cur)
 		end,
 		timeLeft = function(endsAt)
 			return if endsAt then math.max(0, endsAt - workspace:GetServerTimeNow()) else 0

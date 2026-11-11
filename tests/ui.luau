@@ -104,8 +104,8 @@ local function make(cv: any): (any, any, { any }, { busy: boolean })
 	local acts = {}
 	local flags = { busy = false }
 	local ctx = {
-		act = function(verb: string, arg: number?)
-			table.insert(acts, { verb, arg })
+		act = function(verb: string, arg: number?, cur: string?)
+			table.insert(acts, { verb, arg, cur })
 		end,
 		canvas = cv,
 		topbar = V2(354, 86),
@@ -147,13 +147,21 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	local roblox = { 0, 0, 354, 86 }
 	local stick = { 83, 298, 166, 166 }
 	local jump = { cv.X - 131, 415, 97, 97 }
-	for _, name in { "Coins", "Crystals", "DailyBtn", "QuestsBtn", "BookBtn" } do
+	for _, name in { "Coins", "Crystals", "DailyBtn", "QuestsBtn", "BookBtn", "ShopBtn" } do
 		local r = rectOf(find(w.root, name))
 		check(r[1] >= 0 and r[2] >= 0 and r[1] + r[3] <= cv.X and r[2] + r[4] <= cv.Y, `{tag}: {name} on screen`)
 		check(not overlap(r, play), `{tag}: {name} clear of PLAY/PARTY/HOW TO PLAY`)
 		check(not overlap(r, stick) and not overlap(r, jump), `{tag}: {name} clear of the stick and jump`)
 		check(not overlap(r, roblox), `{tag}: {name} clear of the Roblox buttons`)
 	end
+	local shopR = rectOf(find(w.root, "ShopBtn"))
+	-- fifth icon when it clears the coin pills; otherwise the rightmost wrap that stays clear of PLAY
+	local wantX = if cv.X >= 1100 then 360 + 4 * 90 else 360 + 2 * 90
+	local wantY = if cv.X >= 1100 then 16 else 16 + 80 + 10
+	check(shopR[1] == wantX and shopR[2] == wantY and shopR[3] == 80, `{tag}: SHOP at {shopR[1]},{shopR[2]}`)
+	check(find(find(w.root, "ShopBtn"), "Caption").Text == "SHOP", `{tag}: SHOP caption`)
+	check(find(find(w.root, "ShopBtn"), "Sub").Text == "22", `{tag}: SHOP missing count`)
+	check(not overlap(shopR, coinR) and not overlap(shopR, gemR), `{tag}: SHOP clear of the counters`)
 	-- NEW BALL! on screen: the login screen waits
 	Wallet.setState(w, { ph = "result", win = true })
 	Wallet.setState(w, { ph = "lobby", glow = "play" })
@@ -450,6 +458,75 @@ do
 	end
 	Level.setProfile(l, { level = 9, xp = 10, need = 350, balls = { 0 }, total = 27, boostMult = 2, levelBalls = 9 })
 	check(find(l.root, "NextBall") == nil and find(l.root, "NextWord") == nil, "no next ball: hidden")
+end
+
+-- Shop: missing balls only, ball of the day marked at the server price, buy sends Action buy.
+do
+	local cv = V2(1168, 540)
+	local w, _, acts = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(5000, 80, false, 1)
+	v.dailyBall = { e = 4, coins = 700, crystals = 35, endsAt = 1e8 }
+	Wallet.setProfile(w, v)
+	find(w.root, "ShopBtn").Activated:Fire()
+	local panel = find(w.pop, "ShopPanel")
+	check(panel ~= nil and w.open == "shop", "shop: open")
+	local pr = rectOf(panel)
+	check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, "shop: panel on screen")
+	local close = find(panel, "Close")
+	local cr = rectOf(close)
+	check(cr[3] >= 72 and cr[4] >= 72, `shop: close is large ({cr[3]}x{cr[4]})`)
+	check(not overlap(cr, rectOf(find(panel, "Head"))), "shop: close clear of the title")
+	local rows = 0
+	for _, c in find(panel, "List"):GetChildren() do
+		if string.sub(c.Name, 1, 3) == "Row" then
+			rows += 1
+		end
+	end
+	check(rows == 22, `shop: 22 missing ({rows})`)
+	check(find(panel, "Row0") == nil and find(panel, "Row17") == nil, "shop: owned balls are absent")
+	local today = find(panel, "Row4")
+	check(today and find(today, "Deal").Text == "TODAY -30%", "shop: ball of the day marked")
+	check(find(today, "Name").Text == "WATER", "shop: day ball name")
+	check(find(find(today, "PayCoins"), "Label").Text == "700", "shop: day coin price is the discount")
+	check(find(find(today, "PayGems"), "Label").Text == "35", "shop: day crystal price is the discount")
+	check(rectOf(today)[2] < rectOf(find(panel, "Row5"))[2], "shop: the deal is first")
+	check(find(find(panel, "Row5"), "Deal") == nil, "shop: a normal ball is not marked")
+	check(
+		find(find(panel, "Row5"), "PayCoins").Text == ""
+			or find(find(find(panel, "Row5"), "PayCoins"), "Label").Text == "1,000",
+		"shop: full coin price"
+	)
+	check(find(find(find(panel, "Row11"), "PayCoins"), "Label").Text == "3,000", "shop: rare price")
+	local ends = find(panel, "Ends").Text
+	check(string.find(ends, "^ENDS %d+h %d%d") ~= nil, `shop: real timer ({ends})`)
+	local coinBtn, gemBtn = rectOf(find(today, "PayCoins")), rectOf(find(today, "PayGems"))
+	check(coinBtn[4] >= 64 and gemBtn[4] >= 64, "shop: price buttons are a large tap")
+	check(
+		coinBtn[1] + coinBtn[3] <= gemBtn[1] and gemBtn[1] + gemBtn[3] <= pr[1] + pr[3] - 4,
+		"shop: prices inside the panel"
+	)
+	check(
+		coinBtn[1] >= rectOf(find(today, "Name"))[1] + rectOf(find(today, "Name"))[3],
+		"shop: price clear of the name"
+	)
+	find(today, "PayCoins").Activated:Fire()
+	check(#acts == 1 and acts[1][1] == "buy" and acts[1][2] == 4 and acts[1][3] == "coins", "shop: Action buy coins")
+	find(find(panel, "Row11"), "PayGems").Activated:Fire()
+	check(acts[2][1] == "buy" and acts[2][2] == 11 and acts[2][3] == "crystals", "shop: Action buy crystals")
+	-- server answer: coins down, the ball joins the collection, the deal leaves the list
+	local paid = view(4300, 80, false, 1)
+	paid.balls = { 0, 1, 2, 3, 4, 17 }
+	Wallet.setProfile(w, paid)
+	check(
+		w.open == "shop" and find(w.pop, "Row4") == nil and find(w.pop, "Row5") ~= nil,
+		"shop: bought ball leaves the list"
+	)
+	check(find(w.pop, "Ends").Text == "", "shop: no deal after it is owned")
+	step(w, 1)
+	check(find(w.root, "Coins"):FindFirstChild("Value", true).Text == "4,300", "shop: counter shows the spend")
+	find(w.pop, "Close").Activated:Fire()
+	check(not w.pop.Visible, "shop: close")
 end
 
 print(`{passed} passed, {fails} failed`)

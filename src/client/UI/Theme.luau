@@ -391,7 +391,7 @@ function Theme.badge(parent: GuiObject, text: string, color: Color3?, name: stri
 end
 
 -- Plaza layout (docs/ui.md «Площадка»), design px of the canvas; shared by Plaza, Wallet and Level.
---   top left, right of the Roblox buttons: icon row DAILY / QUESTS / BOOK / HELP (secondary, opened now and then)
+--   top left, right of the Roblox buttons: icon row DAILY / QUESTS / BOOK / HELP / SHOP (secondary, opened now and then)
 --   top right: coins and crystals
 --   right edge, above the jump button: PLAY (biggest) and PARTY under it - the only main actions
 --   bottom middle, between the stick and the jump button: level, XP bar, next ball; the 2x XP icon right of it

@@ -24,7 +24,7 @@ local Daily = {}
 export type Ctx = {
 	canvas: Vector2,
 	topbar: Vector2?,
-	act: (verb: string, arg: number?) -> (),
+	act: (verb: string, arg: number?, cur: string?) -> (),
 	close: () -> (),
 	fx: Cheer.Ctx,
 }

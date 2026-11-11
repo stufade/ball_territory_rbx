@@ -13,7 +13,7 @@ local Theme = require("./Theme")
 local V2 = Vector2.new
 local SLOT = 62
 
-export type Ctx = { act: (verb: string, arg: number?) -> (), canvas: Vector2, topbar: Vector2 }
+export type Ctx = { act: (verb: string, arg: number?, cur: string?) -> (), canvas: Vector2, topbar: Vector2 }
 
 export type Panel = {
 	root: Frame,

@@ -21,7 +21,7 @@ local MID = V2(0.5, 0.5)
 local TOP_MID = V2(0.5, 0)
 
 export type Ctx = Cheer.Ctx & {
-	act: (verb: string, arg: number?) -> (),
+	act: (verb: string, arg: number?, cur: string?) -> (),
 	topbar: Vector2,
 }
 

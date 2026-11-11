@@ -1,8 +1,8 @@
 --!strict
 -- M3.1 on the plaza, compact at the right edge so the avatar can run (stick bottom left, jump bottom right stay free):
 -- coin and crystal counters above PLAY (numbers roll up when something pays, "+25" floats up), and a row of three
--- small buttons under HOW TO PLAY: DAILY (red "!" when the login reward waits), QUESTS (done/3), BOOK (found).
--- They open Daily (opens by itself once a day on the plaza), Quests (a card, the plaza stays usable) and Book.
+-- small buttons under HOW TO PLAY: DAILY (red "!" when the login reward waits), QUESTS (done/3), BOOK (found),
+-- SHOP (balls still missing). They open Daily, Quests, Book and Shop.
 -- Short toasts at the top middle: a new reaction, a quest done. Data: the Profile remote (Net.ProfileView).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -12,6 +12,7 @@ local Daily = require("./Daily")
 local Money = require("./Money")
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Quests = require("./Quests")
+local Shop = require("./Shop")
 local Theme = require("./Theme")
 
 local V2 = Vector2.new
@@ -19,7 +20,7 @@ local RIGHT = V2(1, 0)
 local TOP_MID = V2(0.5, 0)
 
 export type Ctx = {
-	act: (verb: string, arg: number?) -> (),
+	act: (verb: string, arg: number?, cur: string?) -> (),
 	canvas: Vector2,
 	topbar: Vector2,
 	-- another popup (NEW BALL!) is on screen: the login screen waits
@@ -110,6 +111,26 @@ local function small(
 	return b
 end
 
+-- SHOP uses the same icon button. The fifth slot stays on the row when it clears the coin pills;
+-- otherwise it wraps under the row, in the rightmost column that stays clear of PLAY.
+local function shopPos(L: Theme.PlazaLayout): UDim2
+	local step = L.icon + L.gap
+	local x = L.rowX + 4 * step
+	if x + L.icon <= L.right - L.moneyW - L.gap then
+		return UDim2.fromOffset(x, L.rowY)
+	end
+	local y = L.rowY + L.icon + L.gap
+	local playLeft = L.right - L.playW
+	for slot = 3, 0, -1 do
+		local sx = L.rowX + slot * step
+		local overPlay = sx + L.icon > playLeft - 8 and y + L.icon > L.playY
+		if not overPlay then
+			return UDim2.fromOffset(sx, y)
+		end
+	end
+	return UDim2.fromOffset(L.rowX, y)
+end
+
 local function count(b: GuiObject, text: string)
 	if text ~= "" then
 		local d = Theme.badge(b, text, Theme.SLOT, "Count")
@@ -158,6 +179,13 @@ local function openPop(w: Wallet, which: string, claim: any?)
 		local L = layout(w)
 		local right = math.min(L.rowX + 430, L.right - L.playW - 12)
 		Quests.build(w.pop, v, { frames = w.fx.frames, close = close }, right, L.rowY + L.icon + 12)
+	elseif which == "shop" then
+		Shop.build(w.pop, v, {
+			canvas = w.ctx.canvas,
+			frames = w.fx.frames,
+			close = close,
+			act = w.ctx.act,
+		})
 	else
 		Book.build(w.pop, v, { canvas = w.ctx.canvas, frames = w.fx.frames, close = close }, w.fresh)
 		table.clear(w.fresh)
@@ -207,7 +235,22 @@ function Wallet.render(w: Wallet)
 	if next(w.fresh) then
 		dot(book)
 	end
-	local btns: { [string]: TextButton } = { daily = daily, quests = quests, book = book }
+	local have: { [number]: boolean } = {}
+	for _, e in v.balls do
+		have[e] = true
+	end
+	local missing = 0
+	for e = 0, 26 do
+		if not have[e] then
+			missing += 1
+		end
+	end
+	local shop = Theme.iconButton(layer, "🛒", "SHOP", L.icon, shopPos(L), Theme.YELLOW)
+	shop.Name = "ShopBtn"
+	if missing > 0 then
+		count(shop, tostring(missing))
+	end
+	local btns: { [string]: TextButton } = { daily = daily, quests = quests, book = book, shop = shop }
 	for name, b in btns do
 		Theme.select(b, w.open == name)
 		b.Activated:Connect(function()

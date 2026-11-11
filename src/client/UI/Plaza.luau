@@ -15,7 +15,7 @@ local TOP_MID = V2(0.5, 0)
 local MID = V2(0.5, 0.5)
 
 export type Ctx = {
-	act: (verb: string, arg: number?) -> (),
+	act: (verb: string, arg: number?, cur: string?) -> (),
 	canvas: Vector2,
 	topbar: Vector2,
 }
