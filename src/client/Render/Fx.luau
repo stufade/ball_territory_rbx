@@ -463,7 +463,9 @@ function Fx.event(self: Fx, kind: string, d: { [string]: any })
 	local x, y = d.x, d.y
 	if kind == "bump" then
 		Fx.burst(self, x, y, C("#dce1ff"), 4, 120, 0.25, 2, 3)
+		self.sound("hit")
 	elseif kind == "hit" then
+		-- weapon damage stays visual; the hit cue is bumps and KOs, and painting a cell stays silent
 		Fx.burst(self, x, y, WHITE, 8, 240, 0.3, 2, 4)
 		shake(self, 3.5)
 		self.pause = math.max(self.pause, 0.05)
@@ -475,8 +477,7 @@ function Fx.event(self: Fx, kind: string, d: { [string]: any })
 		Fx.callout(self, "KO!", x, y - 1.5, WHITE, 46, 0.8)
 		shake(self, 9)
 		self.pause = math.max(self.pause, 0.1)
-		-- one quiet pop per knockout; painting cells stays silent
-		self.sound("capture")
+		self.sound("hit")
 	elseif kind == "power" then
 		Fx.ring(self, x, y, 30, CELL * 4, 0.45, Look.bright(d.e), 12)
 		Fx.burst(self, x, y, Look.light(d.e), 18, 340, 0.55, 3, 6)

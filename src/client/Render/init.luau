@@ -76,6 +76,10 @@ local function destroy(s: Session)
 	if session == s then
 		session = nil
 	end
+	-- own match is over: the plaza bed comes back up. A watched board never ducked it.
+	if not s.view then
+		Sfx.plaza(false)
+	end
 end
 
 local function applyChanges(s: Session, animate: boolean)
@@ -250,6 +254,8 @@ local function startSession(data: Net.MatchStart)
 	RunService:BindToRenderStep("BTRender", Enum.RenderPriority.Camera.Value + 2, function(dt)
 		render(s, dt)
 	end)
+	-- spectator keeps the plaza bed; the seated player hears it ducked under the fight
+	Sfx.plaza(not view)
 	if data.you and not view then
 		s.stopInput = Input.start({
 			board = board,
@@ -414,6 +420,7 @@ end
 
 function Render.start()
 	Sfx.start()
+	Sfx.plaza(false)
 	Signs.start()
 	Remotes.Match.OnClientEvent:Connect(onMatch)
 	Remotes.State.OnClientEvent:Connect(onState)
