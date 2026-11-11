@@ -475,6 +475,8 @@ function Fx.event(self: Fx, kind: string, d: { [string]: any })
 		Fx.callout(self, "KO!", x, y - 1.5, WHITE, 46, 0.8)
 		shake(self, 9)
 		self.pause = math.max(self.pause, 0.1)
+		-- one quiet pop per knockout; painting cells stays silent
+		self.sound("capture")
 	elseif kind == "power" then
 		Fx.ring(self, x, y, 30, CELL * 4, 0.45, Look.bright(d.e), 12)
 		Fx.burst(self, x, y, Look.light(d.e), 18, 340, 0.55, 3, 6)

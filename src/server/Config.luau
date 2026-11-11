@@ -66,8 +66,9 @@ return {
 		watchMax = 7,
 		-- B: the land fills this long after the power
 		grab = 2.6,
-		-- C: a tap within `cone` rad of the enemy counts (and flies straight at it); after `misses` misses any tap
-		-- counts; a miss flies this long before the scene repeats; the KO shows this long; no KO by hitWait -> repeat
+		-- C: a tap within `cone` rad of the enemy counts and flies along the finger; after `misses` misses any
+		-- tap counts the same way. A miss does not fly; the banner stays `missShow`, then the scene repeats.
+		-- The KO banner stays `koShow`. No KO within `hitWait` repeats the scene.
 		cone = 0.6,
 		misses = 2,
 		missShow = 1.3,

@@ -3,8 +3,8 @@
 -- by Logic/Stage, then run by the unchanged rules:
 --   A elements react: fire flies through a gas cloud (BOOM) into grass (WILDFIRE); tap to go on;
 --   B power grabs land: time stands still until the player taps POWER (IGNITE);
---   C choose a direction: the CHOOSE DIRECTION window stands still until a tap at the stunned enemy, KO, land stolen;
---     a miss repeats the scene;
+--   C choose a direction: the CHOOSE DIRECTION window stands still until a tap; the tap flies along the finger
+--     (a hit on the enemy is a KO, land stolen); a miss repeats the scene; after two misses any tap counts;
 --   D the final, played alone: 15 s of FINAL vs a rookie bot (Logic/TutorBot), the player starts with more land.
 -- Overlay cues go as Match "tut" (docs/net.md); the end is the usual result screen and Tutorial.complete (T2.2 hook).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -248,18 +248,18 @@ function filter(
 			return true
 		end
 	elseif d.scene == "C" and kind == IN.dir and d.step == "wait" and dx and dy then
-		local tx, ty, off = Stage.offAngle(run(s).S, FIRE, BOT, dx, dy)
+		local _, _, off = Stage.offAngle(run(s).S, FIRE, BOT, dx, dy)
 		if off <= T.cone or d.misses >= T.misses then
+			-- the finger is the flight: do not replace it with the vector onto the enemy
 			fly(s, now)
-			return true, tx, ty
+			return true
 		end
 		d.misses += 1
 		d.step = "miss"
 		d.at = now
-		run(s).scale = 1
 		closeWindow(s)
 		cue(s, "miss")
-		return true
+		return false
 	end
 	return false
 end

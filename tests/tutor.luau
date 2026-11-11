@@ -28,6 +28,7 @@ local Remotes = load("src/shared/Net/Remotes.luau")
 local Tutor = load("src/server/Modes/Tutor.luau")
 local TutorBot = load("src/server/Logic/TutorBot.luau")
 local Tutorial = load("src/server/Tutorial.luau")
+local Session = load("src/server/Session.luau")
 local Config = load("src/server/Config.luau")
 local Snap = Net.Snap
 local S_ = world.services
@@ -219,6 +220,12 @@ type Client = {
 	react: number,
 	misses: number,
 	afk: boolean,
+	-- scene C probe: the flight must stay on the finger, and the clock must stand until that tap
+	probe: boolean?,
+	probes: number?,
+	stood: boolean?,
+	finger: number?,
+	enemy: number?,
 	ends: number,
 	finish: any,
 	results: number,
@@ -276,6 +283,21 @@ local function later(c: Client, dt: number, f: () -> ())
 	table.insert(c.pending :: any, { at = Mock.now() + dt, f = f })
 end
 
+local function gapDeg(ax: number, ay: number, bx: number, by: number): number
+	local d = math.deg(math.atan2(by, bx) - math.atan2(ay, ax))
+	return math.abs((d + 180) % 360 - 180)
+end
+
+local function rulesOf(p: any): any
+	for _, s in Session.active() do
+		local m = s.members[1]
+		if s.runner and m and m.rec and m.rec.player == p then
+			return s.runner.S
+		end
+	end
+	return nil
+end
+
 local function onCue(c: Client, d: any)
 	table.insert(c.cues, d)
 	if c.afk or not d.wait then
@@ -288,6 +310,33 @@ local function onCue(c: Client, d: any)
 	elseif d.k == "power" then
 		later(c, c.react, function()
 			input(c, Net.Input.power)
+		end)
+	elseif d.k == "dir" and c.probe then
+		c.probes = (c.probes or 0) + 1
+		if c.probes ~= 1 then
+			return
+		end
+		local S0 = rulesOf(c.p)
+		local t0 = if S0 then S0.t else -1
+		later(c, 1, function()
+			local S = rulesOf(c.p)
+			local me = S and S.by[FIRE]
+			local bot = S and S.by[BOT]
+			c.stood = S ~= nil and math.abs(S.t - t0) < 1e-6
+			if not (me and bot) then
+				return
+			end
+			-- 0.35 rad is inside the cone (0.6) and far from the enemy centre, so a snap-to-enemy fix shows up
+			local ex, ey = bot.x - me.x, bot.y - me.y
+			local a = 0.35
+			local dx = ex * math.cos(a) - ey * math.sin(a)
+			local dy = ex * math.sin(a) + ey * math.cos(a)
+			input(c, Net.Input.dir, dx, dy)
+			c.finger = gapDeg(dx, dy, me.dx, me.dy)
+			c.enemy = gapDeg(ex, ey, me.dx, me.dy)
+			S_.Players.PlayerRemoving:Fire(c.p)
+			c.p.Parent = nil
+			c.gone = true
 		end)
 	elseif d.k == "dir" then
 		later(c, c.react, function()
@@ -395,6 +444,37 @@ local function noWarnings(what: string)
 	end
 	check(#warns == 0, what .. ": no warnings")
 	table.clear(warns)
+end
+
+-- scene C: the clock stands until the tap, and the flight is the finger, not the enemy centre
+local warnsBefore = #warns
+local bea = join(500, "Bea", 0.05, 0, false)
+bea.probe = true
+local pi = 0
+while (bea.probes or 0) < 1 and pi < 40 do
+	run(1)
+	pi += 1
+end
+check((bea.probes or 0) >= 1, "C: the direction scene is reached")
+run(2)
+check(bea.stood == true, "C: time stands until the tap")
+check(
+	bea.finger ~= nil and bea.finger < 3,
+	`C: the tap flies along the finger ({string.format("%.1f", bea.finger or -1)}° off)`
+)
+check(
+	bea.enemy ~= nil and bea.enemy > 15,
+	`C: the flight is not snapped onto the enemy ({string.format("%.1f", bea.enemy or -1)}° away)`
+)
+if not bea.gone then
+	S_.Players.PlayerRemoving:Fire(bea.p)
+	bea.p.Parent = nil
+	bea.gone = true
+end
+run(0.2)
+-- leaving the probe mid-scene is not part of the cartoon; drop only the warnings it caused
+while #warns > warnsBefore do
+	table.remove(warns)
 end
 
 -- a normal new player: reacts in 1 s, misses scene C once
