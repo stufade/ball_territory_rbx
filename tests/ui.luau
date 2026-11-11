@@ -25,6 +25,7 @@ local Plaza = load("src/client/UI/Plaza.luau")
 local Level = load("src/client/UI/Level.luau")
 local Rules = load("src/shared/Rules/init.luau")
 local Economy = load("src/shared/Economy.luau")
+local Art = load("src/shared/Art.luau")
 local V2 = function(x: number, y: number): any
 	return { X = x, Y = y }
 end
@@ -87,6 +88,41 @@ end
 local function rectOf(o: any): { number }
 	local x, y, w, h = Gui.rect(o)
 	return { x, y, w, h }
+end
+
+local function inside(child: any, parent: any): boolean
+	local a, b = rectOf(child), rectOf(parent)
+	return a[1] >= b[1] - 1 and a[2] >= b[2] - 1 and a[1] + a[3] <= b[1] + b[3] + 1 and a[2] + a[4] <= b[2] + b[4] + 1
+end
+
+local function inScroll(o: any): boolean
+	local p = o.Parent
+	while p and p._p do
+		if p._p.ClassName == "ScrollingFrame" then
+			return true
+		end
+		p = p.Parent
+	end
+	return false
+end
+
+-- Chrome stays on the panel and on the canvas. Rows in a scroller stay inside their own card,
+-- and their buttons do not stick out of the panel sideways.
+local function buttonsFit(panel: any, cv: any, tag: string)
+	local pr = rectOf(panel)
+	check(pr[1] >= -1 and pr[2] >= -1 and pr[1] + pr[3] <= cv.X + 1 and pr[2] + pr[4] <= cv.Y + 1, `{tag}: panel on screen`)
+	for _, d in panel:GetDescendants() do
+		if d._p.ClassName == "TextButton" and d.Visible ~= false then
+			check(inside(d, d.Parent), `{tag}: {d.Name} inside its parent`)
+			local r = rectOf(d)
+			check(r[1] >= pr[1] - 1 and r[1] + r[3] <= pr[1] + pr[3] + 1, `{tag}: {d.Name} x inside panel`)
+			check(r[1] >= -1 and r[1] + r[3] <= cv.X + 1, `{tag}: {d.Name} x on screen`)
+			if not inScroll(d) then
+				check(inside(d, panel), `{tag}: {d.Name} inside panel`)
+				check(r[2] >= -1 and r[2] + r[4] <= cv.Y + 1, `{tag}: {d.Name} on screen`)
+			end
+		end
+	end
 end
 
 local function step(w: any, seconds: number)
@@ -513,6 +549,10 @@ do
 		coinBtn[1] >= rectOf(find(today, "Name"))[1] + rectOf(find(today, "Name"))[3],
 		"shop: price clear of the name"
 	)
+	check(find(find(panel, "Row5"), "Tier").Text == "COMMON", "shop: common tier is on the row")
+	check(find(find(panel, "Row11"), "Tier").Text == "RARE", "shop: rare tier is on the row")
+	check(find(panel, "TabBalls") and find(panel, "TabSpin") and find(panel, "TabSkins"), "shop: three tabs")
+	buttonsFit(panel, cv, "shop")
 	find(today, "PayCoins").Activated:Fire()
 	check(#acts == 1 and acts[1][1] == "buy" and acts[1][2] == 4 and acts[1][3] == "coins", "shop: Action buy coins")
 	find(find(panel, "Row11"), "PayGems").Activated:Fire()
@@ -581,8 +621,8 @@ do
 	v.spin = spinBoard(3)
 	Wallet.setProfile(w, v)
 	find(w.root, "SpinBtn").Activated:Fire()
-	local panel = find(w.pop, "SpinPanel")
-	check(panel ~= nil and w.open == "spin", "spin: open")
+	local panel = find(w.pop, "ShopPanel")
+	check(panel ~= nil and w.open == "shop" and panel:GetAttribute("Tab") == "spin", "spin: opens the shop on the spin tab")
 	local pr = rectOf(panel)
 	check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, "spin: panel on screen")
 	check(rectOf(find(panel, "Close"))[3] >= 72, "spin: close is a large tap")
@@ -595,7 +635,17 @@ do
 	check(string.find(find(panel, "PityGems").Text, "0/30") ~= nil, "spin: crystal guarantee counter")
 	local go = find(panel, "SpinGo")
 	check(find(go, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.coins.price)}`, "spin: coin price from Economy")
-	check(rectOf(go)[4] >= 112, "spin: the spin button is a large tap")
+	check(rectOf(go)[4] >= 52, "spin: the spin button is a large tap")
+	local reelIcons = 0
+	local reel = find(panel, "Reel")
+	for _, d in reel:GetDescendants() do
+		if d.Name == "Icon" and d.Image == Art.BALLS then
+			reelIcons += 1
+		end
+	end
+	check(reelIcons >= 8, `spin: reel shows ball icons ({reelIcons})`)
+	check(find(find(panel, "Coin_common"), "Icon").Image == Art.BALLS, "spin: odds row uses a ball icon")
+	buttonsFit(panel, cv, "spin")
 	check(find(panel, "ModeCoins") ~= nil and find(panel, "ModeGems") ~= nil, "spin: coin and crystal modes")
 	go.Activated:Fire()
 	check(
@@ -610,17 +660,18 @@ do
 	v.spin = spinBoard(4)
 	v.spinResult = { cur = "coins", tier = "rare", e = 11, back = 0, pity = 4, price = Economy.SPIN.coins.price }
 	Wallet.setProfile(w, v)
-	panel = find(w.pop, "SpinPanel")
+	panel = find(w.pop, "ShopPanel")
 	check(
 		panel:GetAttribute("Decided") == "rare" and panel:GetAttribute("DecidedBall") == 11,
 		"spin: outcome is set before the reel"
 	)
 	check(
-		find(panel, "Tile16").Text == "COMMON"
-			and find(panel, "Tile17").Text == "RARE"
-			and find(panel, "Tile18").Text == "EPIC",
+		find(panel, "Tile16"):GetAttribute("Tier") == "common"
+			and find(panel, "Tile17"):GetAttribute("Tier") == "rare"
+			and find(panel, "Tile18"):GetAttribute("Tier") == "epic",
 		"spin: neighbours are the fixed cycle"
 	)
+	check(find(find(panel, "Tile17"), "Icon").Image == Art.BALLS, "spin: the landed tile is a ball")
 	check(find(panel, "Result").Text == "", "spin: the prize waits for the stop")
 	find(panel, "SpinGo").Activated:Fire()
 	check(#acts == 1, "spin: no tap while the reel moves")
@@ -676,13 +727,22 @@ do
 		Wallet.setProfile(w, v)
 		find(w.root, "ShopBtn").Activated:Fire()
 		local shop = find(w.pop, "ShopPanel")
-		local looksBtn = find(shop, "LooksBtn")
-		check(looksBtn ~= nil and find(looksBtn, "Label").Text == "LOOKS", `{tag}: shop opens the shelf`)
-		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Close"))), `{tag}: LOOKS clear of close`)
-		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Head"))), `{tag}: LOOKS clear of the title`)
+		local looksBtn = find(shop, "TabSkins")
+		check(looksBtn ~= nil and find(looksBtn, "Label").Text == "SKINS", `{tag}: shop opens skins`)
+		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Close"))), `{tag}: SKINS clear of close`)
+		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Head"))), `{tag}: SKINS clear of the title`)
 		looksBtn.Activated:Fire()
-		local panel = find(w.pop, "ShelfPanel")
-		check(panel ~= nil and w.open == "shelf", `{tag}: shelf open`)
+		local panel = find(w.pop, "ShopPanel")
+		check(panel ~= nil and w.open == "shop" and panel:GetAttribute("Tab") == "skins", `{tag}: skins tab`)
+		local cardsN = 0
+		for _, c in find(panel, "Looks"):GetChildren() do
+			if string.sub(c.Name, 1, 2) == "R_" then
+				cardsN += 1
+				check(find(c, "Icon") ~= nil and find(c, "Name") ~= nil and find(c, "Kind") ~= nil, `{tag}: {c.Name} has icon, name, kind`)
+			end
+		end
+		check(cardsN == #Economy.LOOKS, `{tag}: every look is on the tab ({cardsN})`)
+		buttonsFit(panel, cv, `{tag} skins`)
 		local pr = rectOf(panel)
 		check(pr[1] >= 0 and pr[1] + pr[3] <= cv.X and pr[2] >= 0 and pr[2] + pr[4] <= cv.Y, `{tag}: panel on screen`)
 		check(find(panel, "Count").Text == "5/27", `{tag}: counter`)
@@ -704,7 +764,6 @@ do
 			`{tag}: five balls still send Action look`
 		)
 		check(not overlap(rectOf(find(panel, "Close")), rectOf(find(panel, "Head"))), `{tag}: close clear of the title`)
-		check(not overlap(rectOf(find(panel, "Back")), rectOf(find(panel, "Close"))), `{tag}: back clear of close`)
 	end
 
 	local earlyW, _, earlyActs = make(V2(960, 540))
@@ -715,7 +774,7 @@ do
 	early.shelf.robux = { frame_wood = 9301 }
 	Wallet.setProfile(earlyW, early)
 	find(earlyW.root, "ShopBtn").Activated:Fire()
-	find(earlyW.pop, "LooksBtn").Activated:Fire()
+	find(earlyW.pop, "TabSkins").Activated:Fire()
 	local earlyRow = find(earlyW.pop, "R_frame_wood")
 	check(
 		find(earlyW.pop, "Count").Text == "1/27"
@@ -739,7 +798,7 @@ do
 	v.shelf = shelfOf(27, {})
 	Wallet.setProfile(w, v)
 	find(w.root, "ShopBtn").Activated:Fire()
-	find(w.pop, "LooksBtn").Activated:Fire()
+	find(w.pop, "TabSkins").Activated:Fire()
 	local row = find(w.pop, "R_frame_wood")
 	check(find(w.pop, "Count").Text == "27/27" and find(w.pop, "Lock") == nil, "shelf: full set, no lock")
 	check(find(find(row, "PayCoins"), "Label").Text == "2,000", "shelf: coin price from Economy")
@@ -750,12 +809,48 @@ do
 	v.shelf = shelfOf(27, { "frame_wood" })
 	Wallet.setProfile(w, v)
 	local owned = find(w.pop, "R_frame_wood")
-	check(w.open == "shelf" and find(owned, "Own").Text == "YOURS", "shelf: the bought look reads YOURS")
+	check(w.open == "shop" and find(owned, "Own").Text == "YOURS", "shelf: the bought look reads YOURS")
 	check(find(owned, "PayCoins") == nil, "shelf: an owned look has no coin button")
 	find(owned, "Wear").Activated:Fire()
 	check(acts[2][1] == "wear" and acts[2][3] == "frame_wood", "shelf: wear sends the id")
-	find(w.pop, "Back").Activated:Fire()
-	check(find(w.pop, "ShopPanel") ~= nil, "shelf: back returns to the shop")
+	find(w.pop, "TabBalls").Activated:Fire()
+	check(find(w.pop, "ShopPanel"):GetAttribute("Tab") == "balls", "skins: BALLS tab returns to the balls")
+end
+
+-- Phone portrait and a 720p desktop: the shop panel and its buttons stay inside the screen.
+for _, vp in { { 390, 844 }, { 1280, 720 } } do
+	local s = math.min(vp[1] / 960, vp[2] / 540)
+	local cv = V2(vp[1] / s, vp[2] / s)
+	local tag = `{vp[1]}x{vp[2]}`
+	local w = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(5000, 80, false, 1)
+	v.dailyBall = { e = 4, coins = 700, crystals = 35, endsAt = 1e8 }
+	v.spin = spinBoard(1)
+	v.shelf = {
+		n = 5,
+		need = 27,
+		owned = {},
+		on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
+		robux = {},
+	}
+	Wallet.setProfile(w, v)
+	find(w.root, "SpinBtn").Activated:Fire()
+	local spinPage = find(w.pop, "ShopPanel")
+	check(spinPage:GetAttribute("Tab") == "spin", `{tag}: SPIN opens the spin tab`)
+	buttonsFit(spinPage, cv, `{tag} spin`)
+	find(spinPage, "TabSkins").Activated:Fire()
+	local skins = find(w.pop, "ShopPanel")
+	local n = 0
+	for _, c in find(skins, "Looks"):GetChildren() do
+		if string.sub(c.Name, 1, 2) == "R_" then
+			n += 1
+		end
+	end
+	check(n == #Economy.LOOKS, `{tag}: skins not empty ({n})`)
+	buttonsFit(skins, cv, `{tag} skins`)
+	find(skins, "TabBalls").Activated:Fire()
+	buttonsFit(find(w.pop, "ShopPanel"), cv, `{tag} balls`)
 end
 
 print(`{passed} passed, {fails} failed`)

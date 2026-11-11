@@ -13,7 +13,6 @@ local Money = require("./Money")
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Quests = require("./Quests")
 local Shop = require("./Shop")
-local Shelf = require("./Shelf")
 local Spin = require("./Spin")
 local Theme = require("./Theme")
 
@@ -41,6 +40,8 @@ export type Wallet = {
 	coins: Money.Roll?,
 	gems: Money.Roll?,
 	open: string?,
+	-- which shop tab is showing: balls, spin, skins
+	tab: Shop.Tab,
 	-- login claims count the screen opened by itself for (once per day per client)
 	autoFor: number?,
 	lobbyAt: number,
@@ -187,26 +188,11 @@ local function openPop(w: Wallet, which: string, claim: any?)
 			frames = w.fx.frames,
 			close = close,
 			act = w.ctx.act,
-			shelf = function()
-				openPop(w, "shelf")
-			end,
-		})
-	elseif which == "shelf" then
-		Shelf.build(w.pop, v, {
-			canvas = w.ctx.canvas,
-			frames = w.fx.frames,
-			close = close,
-			act = w.ctx.act,
-			shop = function()
+			tab = w.tab,
+			setTab = function(name: Shop.Tab)
+				w.tab = name
 				openPop(w, "shop")
 			end,
-		})
-	elseif which == "spin" then
-		Spin.build(w.pop, v, {
-			canvas = w.ctx.canvas,
-			frames = w.fx.frames,
-			close = close,
-			act = w.ctx.act,
 		})
 	else
 		Book.build(w.pop, v, { canvas = w.ctx.canvas, frames = w.fx.frames, close = close }, w.fresh)
@@ -294,8 +280,29 @@ function Wallet.render(w: Wallet)
 		btns.spin = spin
 	end
 	for name, b in btns do
-		Theme.select(b, w.open == name or (name == "shop" and w.open == "shelf"))
+		local on = (name == "shop" and w.open == "shop") or (name == "spin" and w.open == "shop" and w.tab == "spin")
+		Theme.select(b, on or w.open == name)
 		b.Activated:Connect(function()
+			if name == "spin" then
+				if w.open == "shop" and w.tab == "spin" then
+					closePop(w)
+					Wallet.render(w)
+				else
+					w.tab = "spin"
+					openPop(w, "shop")
+				end
+				return
+			end
+			if name == "shop" then
+				if w.open == "shop" and w.tab == "balls" then
+					closePop(w)
+					Wallet.render(w)
+				else
+					w.tab = "balls"
+					openPop(w, "shop")
+				end
+				return
+			end
 			if w.open == name then
 				closePop(w)
 				Wallet.render(w)
@@ -351,8 +358,9 @@ function Wallet.setProfile(w: Wallet, v: Net.ProfileView)
 	if v.claim and w.open == "daily" then
 		openPop(w, "daily", v.claim)
 	elseif v.spinResult and v.spin and v.spin.ok and onPlaza(w) then
-		openPop(w, "spin")
-	elseif w.open == "spin" and (not v.spin or not v.spin.ok) then
+		w.tab = "spin"
+		openPop(w, "shop")
+	elseif w.open == "shop" and w.tab == "spin" and (not v.spin or not v.spin.ok) then
 		closePop(w)
 	elseif w.open then
 		-- keep the open screen up to date (quest progress, book)
@@ -469,6 +477,7 @@ function Wallet.new(parent: Instance, ctx: Ctx): Wallet
 		coins = nil,
 		gems = nil,
 		open = nil,
+		tab = "balls",
 		autoFor = nil,
 		lobbyAt = 0,
 		fresh = {},

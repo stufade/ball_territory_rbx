@@ -1,12 +1,12 @@
 --!strict
--- Plaza spin. The reel is on screen as soon as SPIN opens: one currency at a time, odds of that
--- currency before the tap, one big button with the price. A tap sends Action "spin" with only the
--- currency. The strip is the fixed tier cycle and lands on the ball the server already chose
--- (Profile.spinResult). Neighbours are the previous and next labels of that cycle, not a near miss.
+-- Spin page inside the shop. The reel is on screen as soon as the SPIN tab opens: one currency at a
+-- time, odds of that currency before the tap, the price directly under the odds. A tap sends Action
+-- "spin" with only the currency. Tiles are real ball icons. Neighbours are the previous and next
+-- balls of the fixed cycle, not a near miss. The stop is the ball the server already chose.
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 
+local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
 local Money = require("./Money")
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Rules = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Rules"))
@@ -22,13 +22,12 @@ Spin.TIME = 1.1
 
 local CYCLE = { "common", "rare", "epic", "legendary", "refund" }
 
--- Wider and taller as the tier gets rarer, so the stop reads before the word does.
-local SPEC: { [string]: { w: number, h: number, color: Color3 } } = {
-	common = { w = 132, h = 68, color = Color3.fromHex("#3d6bff") },
-	rare = { w = 158, h = 86, color = Color3.fromHex("#14a4ff") },
-	epic = { w = 186, h = 104, color = Color3.fromHex("#c044ff") },
-	legendary = { w = 224, h = 118, color = Color3.fromHex("#ffd63c") },
-	refund = { w = 148, h = 68, color = Color3.fromHex("#2ed068") },
+local SPEC: { [string]: { w: number, color: Color3 } } = {
+	common = { w = 150, color = Color3.fromHex("#3d6bff") },
+	rare = { w = 166, color = Color3.fromHex("#14a4ff") },
+	epic = { w = 184, color = Color3.fromHex("#c044ff") },
+	legendary = { w = 214, color = Color3.fromHex("#ffd63c") },
+	refund = { w = 150, color = Color3.fromHex("#2ed068") },
 }
 
 local function labelOf(tier: string): string
@@ -57,11 +56,34 @@ local function shareOf(odds: Net.SpinOdds, tier: string): number
 	return odds.refund
 end
 
+local function playSfx(name: string)
+	local ok, mod = pcall(function()
+		local ui = script.Parent
+		local client = ui.Parent
+		local render = client:FindFirstChild("Render")
+		if not render then
+			return nil
+		end
+		local sfx = render:FindFirstChild("Sfx")
+		if not sfx then
+			return nil
+		end
+		return require(sfx)
+	end)
+	if ok and type(mod) == "table" then
+		local play = (mod :: any).play
+		if type(play) == "function" then
+			pcall(play, name)
+		end
+	end
+end
+
 export type Ctx = {
 	canvas: Vector2,
 	frames: { (dt: number) -> () },
 	close: () -> (),
 	act: (verb: string, arg: number?, cur: string?) -> (),
+	panel: Frame,
 }
 
 -- Sixth icon of the plaza row. Same row when it clears the coin pills; otherwise the first free cell under the row.
@@ -102,39 +124,23 @@ local function prize(hit: Net.SpinHit): string
 	return `{labelOf(hit.tier)} · {name}`
 end
 
-function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
-	parent:ClearAllChildren()
+local function heightOf(tier: string, reelH: number): number
+	local mul = if tier == "legendary" then 1 elseif tier == "epic" then 0.9 elseif tier == "rare" then 0.82 else 0.74
+	return math.max(64, math.floor((reelH - 14) * mul))
+end
+
+-- host is the shop body. w and h are its pixel size. Everything clickable stays inside host.
+function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: number)
 	local board = v.spin
+	local panel = ctx.panel
 	if not board or not board.ok then
+		Theme.label(host, "SPIN IS OFF", 28, UDim2.fromOffset(w - 24, 40), UDim2.fromOffset(12, 24), {
+			color = Theme.DIM,
+		})
 		return
 	end
-	local cv = ctx.canvas
-	local pw = math.min(cv.X - 40, 920)
-	local ph = math.min(cv.Y - 28, 500)
-	local bg = Theme.backdrop(parent, 0.18)
-	bg.Active = true
-	local panel = Theme.frame(parent, UDim2.fromOffset(pw, ph), UDim2.fromOffset(cv.X / 2, cv.Y / 2), Theme.PANEL, MID)
-	panel.Name = "SpinPanel"
-	panel.Active = true
-	Theme.round(panel, 22)
-	Theme.stroke(panel, 4, Theme.INK)
-	Theme.pop(panel, 0, 0.7)
-
-	Theme.text(panel, "SPIN", 36, UDim2.fromOffset(200, 40), UDim2.fromOffset(20, 8), {
-		anchor = V2(0, 0),
-		align = Enum.TextXAlignment.Left,
-		color = Theme.YELLOW,
-		stroke = 4,
-	}).Name =
-		"Head"
-
-	local close =
-		Theme.button(panel, "X", UDim2.fromOffset(76, 76), UDim2.new(1, -12, 0, 8), Theme.BAD, nil, 36, V2(1, 0))
-	close.Name = "Close"
-	close.Activated:Connect(ctx.close)
 
 	local hit = v.spinResult
-	-- Known before the reel moves. The strip only catches up to this.
 	if hit then
 		panel:SetAttribute("Decided", hit.tier)
 		if hit.e then
@@ -143,133 +149,171 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	end
 	panel:SetAttribute("SpinPhase", if hit then "spinning" else "odds")
 
+	local owned: { [number]: boolean } = {}
+	for _, e in v.balls do
+		owned[e] = true
+	end
+	local function sample(tier: string): number
+		local list = (Economy.TIERS :: { [string]: { number } })[tier]
+		for _, e in list do
+			if not owned[e] then
+				return e
+			end
+		end
+		return list[1]
+	end
+	local face: { [string]: number } = {
+		common = sample("common"),
+		rare = sample("rare"),
+		epic = sample("epic"),
+		legendary = sample("legendary"),
+	}
+
 	local lines: { [string]: Net.SpinLine } = { coins = board.coins, crystals = board.crystals }
 	local cur = if hit and lines[hit.cur] then hit.cur else "coins"
+
+	local gap = 6
+	local modeH, oddsH, pityH, btnH = 44, 66, 22, 58
+	local chrome = modeH + oddsH + pityH + btnH + gap * 4
+	local reelH = h - chrome
+	if reelH < 108 then
+		oddsH, btnH = 58, 52
+		chrome = modeH + oddsH + pityH + btnH + gap * 4
+		reelH = math.max(88, h - chrome)
+	end
+	reelH = math.min(reelH, 188)
 
 	local function prefix(c: string): string
 		return if c == "coins" then "Coin" else "Gem"
 	end
 
-	-- Odds of both currencies exist before the tap. Only the selected mode is shown.
-	local raw = { common = 3, rare = 3.4, epic = 3.8, legendary = 4.6, refund = 3.2 }
-	local units = 0
-	for _, tier in CYCLE do
-		units += raw[tier]
-	end
-	local gap = 8
-	local inner = pw - 32 - gap * (#CYCLE - 1)
-	local chipW: { [string]: number } = {}
-	local acc = 0
-	for _, tier in CYCLE do
-		local a = math.floor(inner * acc / units + 0.5)
-		acc += raw[tier]
-		local b = math.floor(inner * acc / units + 0.5)
-		chipW[tier] = math.max(64, b - a)
-	end
-	local chipH: { [string]: number } = { common = 46, rare = 52, epic = 56, legendary = 62, refund = 50 }
-	-- Below the close button: two mode tabs, then the odds of the selected mode.
-	local oddsY, oddsH = 148, 64
+	local y = 0
+	local tabW = math.floor((w - 16 - 8) / 2)
+	local modeCoins = Theme.button(host, "COINS", UDim2.fromOffset(tabW, modeH), UDim2.fromOffset(8, y), Theme.YELLOW, nil, 22)
+	modeCoins.Name = "ModeCoins"
+	local modeGems =
+		Theme.button(host, "CRYSTALS", UDim2.fromOffset(tabW, modeH), UDim2.fromOffset(8 + tabW + 8, y), GEM, nil, 22)
+	modeGems.Name = "ModeGems"
+	y += modeH + gap
 
+	local chipW = math.floor((w - 16 - 8 * (#CYCLE - 1)) / #CYCLE)
 	local function chips(c: string, line: Net.SpinLine)
-		local box = Theme.clear(panel, UDim2.fromOffset(pw - 32, oddsH), UDim2.fromOffset(16, oddsY))
+		local box = Theme.clear(host, UDim2.fromOffset(w - 16, oddsH), UDim2.fromOffset(8, y))
 		box.Name = if c == "coins" then "OddsCoins" else "OddsGems"
 		local x = 0
 		for _, tier in CYCLE do
-			local w, h = chipW[tier], chipH[tier]
 			local color = SPEC[tier].color
-			local row = Theme.frame(box, UDim2.fromOffset(w, h), UDim2.fromOffset(x, oddsH - h), color)
+			local row = Theme.frame(box, UDim2.fromOffset(chipW, oddsH), UDim2.fromOffset(x, 0), Theme.SLOT)
 			row.Name = `{prefix(c)}_{tier}`
 			row.ClipsDescendants = true
 			Theme.round(row, 12)
-			Theme.stroke(row, if tier == "legendary" then 3 else 2, Theme.INK)
-			local ink = Theme.onColor(color)
-			local word = labelOf(tier)
+			Theme.stroke(row, if tier == "legendary" then 3 else 2, color)
 			if tier == "refund" then
-				word = `+{Money.fmt(line.refund)}`
+				Money.icon(row, c, 32, UDim2.fromOffset(chipW / 2, 24))
+			else
+				local icon = Theme.ball(row, face[tier], 34, UDim2.fromOffset(chipW / 2, 26), MID)
+				icon.Name = "Icon"
 			end
-			Theme.text(row, word, if tier == "legendary" then 22 else 20, UDim2.fromOffset(w - 8, 24), UDim2.fromOffset(4, 2), {
-				anchor = V2(0, 0),
-				align = Enum.TextXAlignment.Left,
-				color = ink,
-				bold = true,
-				stroke = 2,
-			})
-			Theme.text(row, `{shareOf(line.odds, tier)}%`, 22, UDim2.fromOffset(w - 8, 22), UDim2.fromOffset(4, h - 24), {
-				anchor = V2(0, 0),
-				align = Enum.TextXAlignment.Right,
-				color = ink,
-				bold = true,
-				stroke = 2,
-			}).Name =
-				"Pct"
-			x += w + gap
+			Theme.label(row, `{shareOf(line.odds, tier)}%`, 20, UDim2.fromOffset(chipW - 8, 22), UDim2.fromOffset(4, oddsH - 24), {
+				color = Theme.TEXT,
+			}).Name = "Pct"
+			x += chipW + 8
 		end
+	end
+	chips("coins", board.coins)
+	chips("crystals", board.crystals)
+	y += oddsH + 2
+
+	local function pityLine(c: string, line: Net.SpinLine)
 		local left = line.every - line.pity
 		local pityName = if line.tier == "legendary" then "LEGENDARY" else "EPIC+"
-		local pity = Theme.text(
-			panel,
+		local pity = Theme.label(
+			host,
 			`{pityName}  {line.pity}/{line.every} · {left} LEFT`,
 			20,
-			UDim2.fromOffset(pw - 40, 24),
-			UDim2.fromOffset(20, oddsY + oddsH + 2),
-			{ anchor = V2(0, 0), align = Enum.TextXAlignment.Left, color = Theme.YELLOW_TXT, bold = true }
+			UDim2.fromOffset(w - 20, pityH),
+			UDim2.fromOffset(10, y),
+			{ align = Enum.TextXAlignment.Left, color = Theme.YELLOW_TXT }
 		)
 		pity.Name = if c == "coins" then "PityCoins" else "PityGems"
 	end
+	pityLine("coins", board.coins)
+	pityLine("crystals", board.crystals)
+	y += pityH + gap
 
-	chips("coins", board.coins)
-	chips("crystals", board.crystals)
-
-	local tabW = math.floor((pw - 32 - 12) / 2)
-	local tabY = 88
-	local modeCoins =
-		Theme.button(panel, "COINS", UDim2.fromOffset(tabW, 52), UDim2.fromOffset(16, tabY), Theme.YELLOW, nil, 24)
-	modeCoins.Name = "ModeCoins"
-	local modeGems = Theme.button(
-		panel,
-		"CRYSTALS",
-		UDim2.fromOffset(tabW, 52),
-		UDim2.fromOffset(16 + tabW + 12, tabY),
-		GEM,
+	local go = Theme.button(
+		host,
+		`SPIN {Money.fmt(lines[cur].price)}`,
+		UDim2.fromOffset(w - 24, btnH),
+		UDim2.fromOffset(12, y),
+		if cur == "coins" then Theme.YELLOW else GEM,
 		nil,
-		24
+		28
 	)
-	modeGems.Name = "ModeGems"
+	go.Name = "SpinGo"
+	y += btnH + gap
 
-	local reelY, reelH = 242, 120
-	local window = Theme.frame(panel, UDim2.fromOffset(pw - 32, reelH), UDim2.fromOffset(16, reelY), Theme.BG)
+	local window = Theme.frame(host, UDim2.fromOffset(w - 16, reelH), UDim2.fromOffset(8, y), Theme.BG)
 	window.Name = "Reel"
 	window.ClipsDescendants = true
 	Theme.round(window, 16)
 	Theme.stroke(window, 3, Theme.YELLOW)
 
-	local viewW = pw - 32
+	local viewW = w - 16
 	local copies = 6
-	local tiles = copies * #CYCLE
+	local tilesN = copies * #CYCLE
 	local xs: { number } = {}
 	local cursor = 0
-	for i = 1, tiles do
+	for i = 1, tilesN do
 		xs[i] = cursor
 		cursor += SPEC[CYCLE[((i - 1) % #CYCLE) + 1]].w
 	end
 	local strip = Theme.clear(window, UDim2.fromOffset(cursor, reelH), UDim2.fromOffset(0, 0))
 	strip.Name = "Strip"
-	for i = 1, tiles do
+
+	local refundTiles: { Frame } = {}
+	for i = 1, tilesN do
 		local tier = CYCLE[((i - 1) % #CYCLE) + 1]
 		local spec = SPEC[tier]
-		local cell = Theme.text(
+		local th = heightOf(tier, reelH)
+		local cell = Theme.frame(
 			strip,
-			labelOf(tier),
-			if tier == "legendary" then 28 else 22,
-			UDim2.fromOffset(spec.w - 8, spec.h - 8),
-			UDim2.fromOffset(xs[i] + 4, math.floor((reelH - spec.h) / 2) + 4),
-			{ anchor = V2(0, 0), color = Theme.onColor(spec.color), bold = true, stroke = 3 }
+			UDim2.fromOffset(spec.w - 10, th),
+			UDim2.fromOffset(xs[i] + 5, math.floor((reelH - th) / 2)),
+			Theme.BG:Lerp(spec.color, 0.22)
 		)
 		cell.Name = `Tile{i}`
-		cell.BackgroundColor3 = spec.color
-		cell.BackgroundTransparency = 0
-		Theme.round(cell, 12)
-		Theme.stroke(cell, if tier == "legendary" then 4 else 2, Theme.INK)
+		cell.ClipsDescendants = true
+		cell.ZIndex = 3
+		cell:SetAttribute("Tier", tier)
+		Theme.round(cell, 14)
+		Theme.stroke(cell, if tier == "legendary" then 4 else 2, spec.color)
+		local glow = Theme.disc(cell, math.floor(th * 0.72), spec.color, UDim2.fromScale(0.5, 0.4), 0.62)
+		glow.Name = "Glow"
+		glow.ZIndex = 3
+		if tier == "refund" then
+			table.insert(refundTiles, cell)
+			Theme.label(cell, "REFUND", 20, UDim2.fromOffset(spec.w - 16, 22), UDim2.new(0.5, 0, 1, -6), {
+				anchor = V2(0.5, 1),
+				color = Theme.TEXT,
+				z = 5,
+			}).Name = "Caption"
+		else
+			local e = face[tier]
+			cell:SetAttribute("Ball", e)
+			local icon = Theme.ball(cell, e, math.floor(th * 0.46), UDim2.fromScale(0.5, 0.4), MID)
+			icon.Name = "Icon"
+			icon.ZIndex = 4
+			local nm = Theme.label(
+				cell,
+				Rules.Config.TITLE[e] or "?",
+				20,
+				UDim2.fromOffset(spec.w - 16, 22),
+				UDim2.new(0.5, 0, 1, -6),
+				{ anchor = V2(0.5, 1), color = Theme.nameColor(e), z = 5 }
+			)
+			nm.Name = "Caption"
+		end
 	end
 
 	local function at(i: number): number
@@ -281,25 +325,23 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	marker.Name = "Marker"
 	marker.ZIndex = 6
 	Theme.stroke(marker, 2, Theme.INK)
-
-	local result = Theme.text(panel, "", 32, UDim2.fromOffset(pw - 48, 40), UDim2.fromOffset(pw / 2, reelY + reelH - 4), {
-		anchor = V2(0.5, 1),
+	Theme.label(window, "▼", 22, UDim2.fromOffset(36, 24), UDim2.new(0.5, 0, 0, 0), {
+		anchor = V2(0.5, 0),
 		color = Theme.YELLOW,
-		stroke = 4,
 		z = 8,
 	})
-	result.Name = "Result"
+	Theme.label(window, "▲", 22, UDim2.fromOffset(36, 24), UDim2.new(0.5, 0, 1, 0), {
+		anchor = V2(0.5, 1),
+		color = Theme.YELLOW,
+		z = 8,
+	})
 
-	local go = Theme.button(
-		panel,
-		`SPIN {Money.fmt(lines[cur].price)}`,
-		UDim2.fromOffset(pw - 32, Theme.BTN_H),
-		UDim2.fromOffset(16, ph - 14 - Theme.BTN_H),
-		if cur == "coins" then Theme.YELLOW else GEM,
-		nil,
-		36
-	)
-	go.Name = "SpinGo"
+	local result = Theme.label(window, "", 26, UDim2.fromOffset(viewW - 24, 32), UDim2.new(0.5, 0, 1, -8), {
+		anchor = V2(0.5, 1),
+		color = Theme.YELLOW,
+		z = 9,
+	})
+	result.Name = "Result"
 
 	local hold = false
 	local function paint(c: string)
@@ -309,10 +351,10 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		cur = c
 		panel:SetAttribute("SpinCur", c)
 		local coinOn = c == "coins"
-		local oddsC = panel:FindFirstChild("OddsCoins") :: GuiObject?
-		local oddsG = panel:FindFirstChild("OddsGems") :: GuiObject?
-		local pityC = panel:FindFirstChild("PityCoins") :: GuiObject?
-		local pityG = panel:FindFirstChild("PityGems") :: GuiObject?
+		local oddsC = host:FindFirstChild("OddsCoins") :: GuiObject?
+		local oddsG = host:FindFirstChild("OddsGems") :: GuiObject?
+		local pityC = host:FindFirstChild("PityCoins") :: GuiObject?
+		local pityG = host:FindFirstChild("PityGems") :: GuiObject?
 		if oddsC then
 			oddsC.Visible = coinOn
 		end
@@ -324,6 +366,14 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		end
 		if pityG then
 			pityG.Visible = not coinOn
+		end
+		for _, cell in refundTiles do
+			local old = cell:FindFirstChild("Coin") or cell:FindFirstChild("Gem")
+			if old then
+				old:Destroy()
+			end
+			local icon = Money.icon(cell, c, 36, UDim2.fromScale(0.5, 0.38))
+			icon.ZIndex = 4
 		end
 		Theme.select(modeCoins, coinOn)
 		Theme.select(modeGems, not coinOn)
@@ -364,13 +414,100 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		span += SPEC[tier].w
 	end
 
+	local function celebrate(tier: string, tile: GuiObject?)
+		local sound = if tier == "legendary"
+			then "legend"
+			elseif tier == "epic" then "epic"
+			elseif tier == "rare" then "rare"
+			else "hit"
+		playSfx(sound)
+		if Theme.reduced() then
+			return
+		end
+		local amp = if tier == "legendary" then 8 elseif tier == "epic" then 4 elseif tier == "rare" then 2 else 0
+		local bits = if tier == "legendary" then 16 elseif tier == "epic" then 9 elseif tier == "rare" then 5 else 0
+		local color = SPEC[tier].color
+		local flash = Theme.frame(window, UDim2.fromScale(1, 1), nil, color)
+		flash.Name = "Flash"
+		flash.BackgroundTransparency = if tier == "common" or tier == "refund" then 0.72 else 0.45
+		flash.ZIndex = 7
+		local born: { { f: Frame, x: number, y: number, vx: number, vy: number } } = {}
+		local cx, cy = viewW / 2, reelH / 2
+		for i = 1, bits do
+			local ang = (i / bits) * math.pi * 2
+			local d = Theme.disc(window, if tier == "legendary" then 14 else 10, color, UDim2.fromOffset(cx, cy), 0.1)
+			d.ZIndex = 8
+			table.insert(born, {
+				f = d,
+				x = cx,
+				y = cy,
+				vx = math.cos(ang) * (if tier == "legendary" then 220 else 140),
+				vy = math.sin(ang) * (if tier == "legendary" then 160 else 100),
+			})
+		end
+		local ox = panel.Position.X.Offset
+		local oy = panel.Position.Y.Offset
+		local life = 0
+		local dur = if tier == "legendary" then 0.55 elseif tier == "epic" then 0.4 else 0.28
+		table.insert(ctx.frames, function(dt)
+			if not window.Parent then
+				return
+			end
+			life += dt
+			local u = math.clamp(life / dur, 0, 1)
+			flash.BackgroundTransparency = flash.BackgroundTransparency + (1 - flash.BackgroundTransparency) * math.min(1, dt * 6)
+			if amp > 0 and panel.Parent then
+				local damp = (1 - u) * (1 - u)
+				local k = math.sin(life * 48) * amp * damp
+				panel.Position = UDim2.fromOffset(ox + k, oy)
+			end
+			for _, bit in born do
+				if bit.f.Parent then
+					bit.x += bit.vx * dt
+					bit.y += bit.vy * dt
+					bit.vy += 280 * dt
+					bit.f.Position = UDim2.fromOffset(bit.x, bit.y)
+					bit.f.BackgroundTransparency = u
+				end
+			end
+			if life >= dur then
+				if panel.Parent then
+					panel.Position = UDim2.fromOffset(ox, oy)
+				end
+				flash:Destroy()
+				for _, bit in born do
+					if bit.f.Parent then
+						bit.f:Destroy()
+					end
+				end
+			end
+		end)
+		if tile then
+			local pop = if tier == "legendary" then 1.16 elseif tier == "epic" then 1.1 elseif tier == "rare" then 1.06 else 1.03
+			Theme.scaleOf(tile).Scale = pop
+		end
+	end
+
 	if hit then
 		local idx = table.find(CYCLE, hit.tier) or #CYCLE
-		-- Copy 4 of the fixed cycle. Neighbours are the previous and next labels in that cycle.
 		local land = (4 - 1) * #CYCLE + idx
+		local prizeTile = strip:FindFirstChild(`Tile{land}`) :: Frame?
+		if prizeTile and hit.e and hit.tier ~= "refund" then
+			prizeTile:SetAttribute("Ball", hit.e)
+			local icon = prizeTile:FindFirstChild("Icon") :: ImageLabel?
+			if icon then
+				local Art = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Art"))
+				icon.Image = Art.BALLS
+				icon.ImageRectOffset = Art.ballRect(hit.e)
+			end
+			local cap = prizeTile:FindFirstChild("Caption") :: TextLabel?
+			if cap then
+				cap.Text = Rules.Config.TITLE[hit.e] or "?"
+				cap.TextColor3 = Theme.nameColor(hit.e)
+			end
+		end
 		local x0, x1 = at(3), at(land)
 		strip.Position = UDim2.fromOffset(x0, 0)
-		local prizeTile = strip:FindFirstChild(`Tile{land}`) :: TextLabel?
 		local t = 0
 		local done = false
 		local function stop()
@@ -381,9 +518,8 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			strip.Position = UDim2.fromOffset(x1, 0)
 			if prizeTile then
 				prizeTile.ZIndex = 5
-				Theme.scaleOf(prizeTile).Scale = 1.12
 			end
-			Theme.scaleOf(marker).Scale = 1.2
+			Theme.scaleOf(marker).Scale = if hit.tier == "legendary" then 1.3 else 1.15
 			if hit.e then
 				marker.BackgroundColor3 = Theme.nameColor(hit.e)
 			end
@@ -393,6 +529,7 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			go.Active = bal >= lines[cur].price
 			result.Text = prize(hit)
 			result.TextColor3 = if hit.e then Theme.nameColor(hit.e) else Theme.YELLOW
+			celebrate(hit.tier, prizeTile)
 		end
 		if Theme.reduced() then
 			stop()
@@ -405,8 +542,8 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				local u = t / Spin.TIME
 				local k = 1 - (1 - u) ^ 4
 				strip.Position = UDim2.fromOffset(x0 + (x1 - x0) * k, 0)
-				if prizeTile and u > 0.82 then
-					Theme.scaleOf(prizeTile).Scale = 1 + 0.12 * (u - 0.82) / 0.18
+				if prizeTile and u > 0.86 then
+					Theme.scaleOf(prizeTile).Scale = 1 + 0.08 * (u - 0.86) / 0.14
 				end
 				if t >= Spin.TIME then
 					stop()
@@ -422,7 +559,7 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				if not strip.Parent or panel:GetAttribute("SpinPhase") == "spinning" then
 					return
 				end
-				x -= 70 * dt
+				x -= 80 * dt
 				if x < base - span then
 					x += span
 				end
@@ -443,20 +580,11 @@ function Spin.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				return
 			end
 			age += dt
-			sc.Scale = 1 + 0.035 * math.sin(age * 3)
+			sc.Scale = 1 + 0.02 * math.sin(age * 3)
 		end)
 	end
 
-	GuiService.SelectedObject = if go.Active then go else close
-	UserInputService.InputBegan:Connect(function(input)
-		if panel.Parent == nil then
-			return
-		end
-		local key = input.KeyCode
-		if key == Enum.KeyCode.ButtonB or key == Enum.KeyCode.Escape then
-			ctx.close()
-		end
-	end)
+	GuiService.SelectedObject = if go.Active then go else modeCoins
 end
 
 return Spin
