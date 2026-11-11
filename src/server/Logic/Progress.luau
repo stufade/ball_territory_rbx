@@ -46,6 +46,11 @@ export type Data = {
 	trialBonus: number,
 	dailyBall: Meta.DailyBall,
 	friend: Meta.DayCount,
+	-- developer products (Logic/Receipt)
+	receipts: { string },
+	starterBought: boolean,
+	robuxBall: number,
+	robuxEpic: number,
 }
 
 export type Cfg = {
@@ -162,7 +167,8 @@ function Progress.owns(d: Data, e: number): boolean
 	return table.find(d.balls, e) ~= nil
 end
 
-local function give(d: Data, e: number): boolean
+-- Inserts a ball the profile does not own. Level-ups, the tutorial reward, and Robux grants (Logic/Receipt) use this.
+function Progress.give(d: Data, e: number): boolean
 	if Progress.owns(d, e) then
 		return false
 	end
@@ -234,7 +240,7 @@ function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number, l
 			-- the level before this one picked the ball; a pick that became owned meanwhile is re-picked
 			Progress.plan(d, cfg, rand, d.level)
 			if d.nextBall then
-				give(d, d.nextBall)
+				Progress.give(d, d.nextBall)
 				up.e = d.nextBall
 			end
 		else
@@ -284,7 +290,7 @@ end
 -- Developer button: every ball into the collection.
 function Progress.giveAll(d: Data, cfg: Cfg, rand: () -> number)
 	for e = 0, NEL - 1 do
-		give(d, e)
+		Progress.give(d, e)
 	end
 	Progress.plan(d, cfg, rand)
 end
@@ -299,10 +305,10 @@ function Progress.tutorialReward(d: Data, now: number, cfg: Cfg, rand: () -> num
 	end
 	d.rewarded = true
 	for _, e in cfg.BASE_BALLS do
-		give(d, e)
+		Progress.give(d, e)
 	end
 	local legend = Progress.spin(d, cfg, rand)
-	give(d, legend)
+	Progress.give(d, legend)
 	d.boostUntil = math.max(d.boostUntil, now) + cfg.XP.boostTime
 	Progress.plan(d, cfg, rand)
 	return { balls = table.clone(cfg.BASE_BALLS), legend = legend, boost = cfg.XP.boostTime }

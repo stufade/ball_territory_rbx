@@ -50,6 +50,12 @@ function Meta.fresh(): { [string]: any }
 		dailyBall = { day = -1, e = -1, recent = {} } :: DailyBall,
 		-- friend bonus matches today (anti-farm limit)
 		friend = { day = -1, n = 0 } :: DayCount,
+		-- developer products (Logic/Receipt): handled PurchaseIds, starter pack already granted,
+		-- ball chosen before the tier prompt, epic chosen before the starter prompt (-1 = none)
+		receipts = {} :: { string },
+		starterBought = false,
+		robuxBall = -1,
+		robuxEpic = -1,
 	}
 end
 
@@ -110,6 +116,24 @@ function Meta.read(d: any, raw: { [string]: any })
 		d.dailyBall = { day = int(b.day, -1, 1e7, -1), e = int(b.e, -1, 26, -1), recent = recent }
 	end
 	d.friend = dayCount(raw.friend)
+	d.starterBought = raw.starterBought == true
+	d.robuxBall = int(raw.robuxBall, -1, 26, -1)
+	d.robuxEpic = int(raw.robuxEpic, -1, 26, -1)
+	-- PurchaseIds, oldest first. Keep the newest 100 (same cap as Logic/Receipt).
+	d.receipts = {}
+	if type(raw.receipts) == "table" then
+		local all, seen = {}, {}
+		for _, id in raw.receipts do
+			if type(id) == "string" and #id > 0 and #id <= 128 and not seen[id] then
+				seen[id] = true
+				table.insert(all, id)
+			end
+		end
+		local from = math.max(1, #all - 99)
+		for i = from, #all do
+			table.insert(d.receipts, all[i])
+		end
+	end
 end
 
 -- With the config: drops book names that are not reactions and quests that are not in the pool.

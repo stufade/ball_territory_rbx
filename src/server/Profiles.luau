@@ -14,6 +14,7 @@ local Config = require("./Config")
 local Daily = require("./Logic/Daily")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Progress = require("./Logic/Progress")
+local Receipt = require("./Logic/Receipt")
 local Shop = require("./Logic/Shop")
 local Spin = require("./Logic/Spin")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
@@ -474,6 +475,39 @@ function Profiles.tick()
 			end
 		end
 	end
+end
+
+-- Writes the profile now. False when it is not durable yet (still saving, temporary, or the write failed):
+-- ProcessReceipt must answer NotProcessedYet in that case.
+function Profiles.commit(player: Player): boolean
+	local p = profiles[player]
+	if not p or not p.ready or p.temp or p.saving then
+		return false
+	end
+	save(p, false)
+	return not p.dirty and not p.temp
+end
+
+-- The ball (slot "ball") or the starter epic (slot "epic") chosen before the purchase prompt.
+function Profiles.chooseRobux(player: Player, slot: string, e: number): boolean
+	local p = Profiles.get(player)
+	if not p or not Receipt.choose(p.data, slot, e, Config.ECON) then
+		return false
+	end
+	saveSoon(p)
+	return true
+end
+
+-- A Robux grant is in memory: refresh the next level ball, the attributes, and the client.
+function Profiles.showGain(player: Player, log: { any })
+	local p = profiles[player]
+	if not p or not p.ready then
+		return
+	end
+	Progress.plan(p.data, Config :: any, rand)
+	attrs(p)
+	local g = gains(player, log)
+	Profiles.send(player, nil, if g then { gains = g } else nil)
 end
 
 function Profiles.start()
