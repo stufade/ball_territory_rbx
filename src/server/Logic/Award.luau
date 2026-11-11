@@ -5,6 +5,7 @@ local Book = require("./Book")
 local Daily = require("./Daily")
 local Earn = require("./Earn")
 local Progress = require("./Progress")
+local Shop = require("./Shop")
 local Wallet = require("./Wallet")
 
 local Award = {}
@@ -85,9 +86,15 @@ end
 function Award.view(d: Progress.Data, now: number, serverNow: number, cfg: any, total: number): { [string]: any }
 	local E = cfg.ECON
 	local cards, pos, ready = Daily.cards(d, now, E)
+	Shop.refresh(d, now, E)
+	local deal = Shop.offer(d, E)
 	return {
 		coins = d.coins,
 		crystals = d.crystals,
+		-- ball of the day: both prices are already the floored 30% off; nil once that ball is owned
+		dailyBall = if deal
+			then { e = deal.e, coins = deal.coins, crystals = deal.crystals, endsAt = serverNow + Daily.left(now) }
+			else nil,
 		daily = { n = d.loginDays, pos = pos, ready = ready, cards = cards },
 		quests = {
 			list = Daily.questView(d, E),

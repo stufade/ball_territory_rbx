@@ -14,6 +14,7 @@ local Config = require("./Config")
 local Daily = require("./Logic/Daily")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Progress = require("./Logic/Progress")
+local Shop = require("./Logic/Shop")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Rules = require(ReplicatedStorage.Shared.Rules)
 local Store = require("./Store")
@@ -347,6 +348,26 @@ function Profiles.claimDaily(player: Player)
 	Analytics.login(player, c.n, c.pos, c.cycle)
 	print(`[BT] login reward of {player.Name}: day {c.pos} (claim {c.n})`)
 	Profiles.send(player, nil, { gains = gains(player, log), claim = c })
+end
+
+-- Action buy: ball `e` for "coins" or "crystals". The price comes from the tier. A refusal spends nothing
+-- and sends nothing. A purchase is in the same profile snapshot as the other rewards: `balls`, `coins`,
+-- `crystals`, and the ball-of-the-day prices on `dailyBall`. The spend is a Shop sink in the economy log.
+function Profiles.buyBall(player: Player, e: any, cur: any)
+	local p = Profiles.get(player)
+	if not p then
+		return
+	end
+	local log = {}
+	local bought = Shop.buy(p.data, e, cur, clock(), Config.ECON, log)
+	if not bought then
+		return
+	end
+	Progress.plan(p.data, Config :: any, rand)
+	saveSoon(p)
+	attrs(p)
+	print(`[BT] {player.Name} bought {Rules.Config.TITLE[bought.e]} for {bought.n} {bought.cur}`)
+	Profiles.send(player, nil, { gains = gains(player, log) })
 end
 
 -- Debug: ServerScriptService attribute DebugDay = n shifts this server's profile clock by n days (login and

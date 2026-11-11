@@ -113,14 +113,14 @@ Players.PlayerRemoving:Connect(function(player)
 	Analytics.forget(player)
 end)
 
-Remotes.Action.OnServerEvent:Connect(function(player, verb, arg)
+Remotes.Action.OnServerEvent:Connect(function(player, verb, arg, cur)
 	local r = Roster.get(player)
 	if not r or not Guard.take(r.action, os.clock()) then
 		return
 	end
 	local v, a = Guard.action(verb, arg, Net.Action)
 	if v then
-		Lobby.action(r, v, a, Roster.now())
+		Lobby.action(r, v, a, Roster.now(), cur)
 	end
 end)
 

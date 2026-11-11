@@ -15,7 +15,7 @@ Net.Remote = {
 	Match = "Match", -- RemoteEvent S->C (kind: string, data: table)
 	State = "State", -- RemoteEvent S->C (st: State)
 	Input = "Input", -- RemoteEvent C->S (kind: number, dx: number?, dy: number?)
-	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?)
+	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?). buy: ("buy", e, "coins"|"crystals")
 	Party = "Party", -- RemoteEvent S->C (view: PartyView), M1.6
 	Profile = "Profile", -- RemoteEvent S->C (view: ProfileView), T2.2
 }
@@ -55,6 +55,8 @@ Net.Action = {
 	devballs = "devballs",
 	-- M3.1: take today's login reward (once per UTC day, the server decides)
 	daily = "daily",
+	-- M3.2: buy ball e for the currency in the third argument ("coins" | "crystals"). The server prices it.
+	buy = "buy",
 }
 
 -- Action "queue" argument.
@@ -202,6 +204,9 @@ export type ProfileView = {
 	bookTotal: number?,
 	-- duel wins in a row
 	streak: number?,
+	-- ball of the day (M3.2): the ball, both prices after the 30% floor, ends at the next 00:00 UTC.
+	-- nil when that ball is already owned or nothing is missing. The client does not choose the ball.
+	dailyBall: { e: number, coins: number, crystals: number, endsAt: number }?,
 	-- one-off fields of this change: wallet gains, new book reactions, quests just done, the login claim
 	gains: { { cur: string, n: number, why: string } }?,
 	found: { string }?,

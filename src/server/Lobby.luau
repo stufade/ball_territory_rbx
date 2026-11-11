@@ -179,7 +179,7 @@ local function hello(r: Roster.Rec, now: number)
 	Party.send(r)
 end
 
-function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
+function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number, cur: any?)
 	if verb == A.hello then
 		hello(r, now)
 		Profiles.send(r.player)
@@ -191,6 +191,11 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number)
 	end
 	if verb == A.daily then
 		Profiles.claimDaily(r.player)
+		return
+	end
+	-- ball id and currency; the price, the discount and the refusal are the server's (works in a match too)
+	if verb == A.buy then
+		Profiles.buyBall(r.player, arg, cur)
 		return
 	end
 	-- (works anywhere, the server checks who)

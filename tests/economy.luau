@@ -1,7 +1,8 @@
 --!strict
 -- M3.1 economy, pure: profile v1 -> v2 migration, XP cap and level 10+ pay, match coins (AFK, friend limit, x2,
 -- streak), login reward by UTC days (no reset on a missed day, VOID on the 7th), daily quests (reset at 00:00 UTC,
--- all-done bonus once), the reaction book (no duplicates, crystals every 10, all 42), analytics flows.
+-- all-done bonus once), the reaction book (no duplicates, crystals every 10, all 42), analytics flows,
+-- direct buy (full tier price, ball-of-the-day 30% in both currencies, owned / short balance / a second buy).
 -- lune run tests/economy
 local process = require("@lune/process")
 local Mock = require("./Mock")
@@ -10,6 +11,7 @@ local Book = require("../src/server/Logic/Book")
 local Daily = require("../src/server/Logic/Daily")
 local Earn = require("../src/server/Logic/Earn")
 local Progress = require("../src/server/Logic/Progress")
+local Shop = require("../src/server/Logic/Shop")
 local Wallet = require("../src/server/Logic/Wallet")
 
 local fails, passed = 0, 0
@@ -432,6 +434,122 @@ do
 	-- spend (M3.2 shop): never below zero
 	check(not Wallet.spend(d, "coins", d.coins + 1, "x", "Shop", log), "spend: not more than the balance")
 	check(Wallet.spend(d, "coins", 10, "x", "Shop", log) and log[#log].sink, "spend: a sink flow")
+end
+
+-- 8. Direct buy: full price, ball of the day, owned / short, a second buy does not charge again -------------------
+do
+	local function tierOf(e: number): string
+		for tier, list in E.TIERS do
+			if table.find(list, e) then
+				return tier
+			end
+		end
+		error(`no tier for {e}`)
+	end
+	local function off(n: number): number
+		return math.floor(n * (1 - E.DAILY_BALL.off))
+	end
+	local function copies(d: any, e: number): number
+		local n = 0
+		for _, x in d.balls do
+			if x == e then
+				n += 1
+			end
+		end
+		return n
+	end
+
+	-- full tier price, not the ball of the day
+	local d = Progress.new()
+	Shop.refresh(d, NOW, E)
+	local sale = d.dailyBall.e
+	local e = if sale == 0 then 1 else 0
+	local full = E.PRICE.coins[tierOf(e)]
+	d.coins = full + 50
+	local log = {}
+	local bought = Shop.buy(d, e, "coins", NOW, E, log)
+	check(bought ~= nil and bought.n == full and not bought.daily, `regular price: {full} coins`)
+	check(d.coins == 50 and copies(d, e) == 1, "regular price: paid the full tier price, ball owned")
+	check(
+		log[1].sink and log[1].n == full and log[1].why == `ball_{e}` and log[1].kind == "Shop",
+		"regular price: sink"
+	)
+
+	-- ball of the day: both prices are 30% off (floor), the buy charges that, not the full price
+	local day = Progress.new()
+	local view = Award.view(day, NOW, 9000, cfg, 27)
+	local deal = view.dailyBall
+	local dayTier = tierOf(deal.e)
+	local coinOff = off(E.PRICE.coins[dayTier])
+	local gemOff = off(E.PRICE.crystals[dayTier])
+	check(
+		deal.coins == coinOff and deal.crystals == gemOff and deal.endsAt == 9000 + 12 * 3600,
+		`daily ball: coins {deal.coins}, crystals {deal.crystals}`
+	)
+	day.crystals = E.PRICE.crystals[dayTier]
+	local paid = Shop.buy(day, deal.e, "crystals", NOW, E, {})
+	check(paid ~= nil and paid.daily and paid.n == gemOff, `daily ball: charged {gemOff} crystals, not the full price`)
+	check(day.crystals == E.PRICE.crystals[dayTier] - gemOff and copies(day, deal.e) == 1, "daily ball: discount kept")
+	check(Award.view(day, NOW, 9000, cfg, 27).dailyBall == nil, "daily ball: gone from the snapshot once owned")
+
+	-- the same buy again does not charge and does not add a second copy
+	local left = day.crystals
+	check(Shop.buy(day, deal.e, "crystals", NOW, E, {}) == nil, "repeat buy: refused")
+	check(day.crystals == left and copies(day, deal.e) == 1, "repeat buy: no second charge, still one ball")
+
+	-- already owned, before any buy of it
+	local owned = Progress.new()
+	table.insert(owned.balls, 4)
+	owned.coins = 5000
+	check(Shop.buy(owned, 4, "coins", NOW, E, {}) == nil, "owned ball: refused")
+	check(owned.coins == 5000 and copies(owned, 4) == 1, "owned ball: nothing spent")
+
+	-- one coin short of the real price (full, or the day's discount when this ball is the offer)
+	local poor = Progress.new()
+	Shop.refresh(poor, NOW, E)
+	local want = if poor.dailyBall.e == 0 then 1 else 0
+	local cost = if want == poor.dailyBall.e then off(E.PRICE.coins[tierOf(want)]) else E.PRICE.coins[tierOf(want)]
+	poor.coins = cost - 1
+	check(Shop.buy(poor, want, "coins", NOW, E, {}) == nil, "short balance: refused")
+	check(poor.coins == cost - 1 and copies(poor, want) == 0, "short balance: nothing spent, ball not given")
+
+	-- bad currency and an unknown id, same rule
+	local junk = Progress.new()
+	junk.coins = 100000
+	check(Shop.buy(junk, 4, "robux", NOW, E, {}) == nil, "bad currency: refused")
+	check(Shop.buy(junk, 99, "coins", NOW, E, {}) == nil, "unknown id: refused")
+	check(Shop.buy(junk, 1.5, "coins", NOW, E, {}) == nil, "fractional id: refused")
+	check(junk.coins == 100000 and #junk.balls == 0, "bad requests: nothing spent")
+
+	-- the offer is one missing ball, legendaries included, stable for the day, not repeated for 7 days
+	local legends = Progress.new()
+	for _, tier in { "common", "rare", "epic" } do
+		for _, id in E.TIERS[tier] do
+			table.insert(legends.balls, id)
+		end
+	end
+	Shop.refresh(legends, NOW, E)
+	check(table.find(E.TIERS.legendary, legends.dailyBall.e) ~= nil, "daily: a legendary can be the offer")
+	local again = legends.dailyBall.e
+	Shop.refresh(legends, NOW, E)
+	check(legends.dailyBall.e == again, "daily: the same day keeps the same ball")
+
+	local seen: { [number]: boolean } = {}
+	local week = Progress.new()
+	local unique = true
+	for i = 0, E.DAILY_BALL.repeatDays - 1 do
+		Shop.refresh(week, NOW + i * DAY, E)
+		if seen[week.dailyBall.e] then
+			unique = false
+		end
+		seen[week.dailyBall.e] = true
+	end
+	check(unique, "daily: the same ball is not offered again within 7 days")
+
+	local other = Progress.new()
+	table.insert(other.balls, again)
+	Shop.refresh(other, NOW, E)
+	check(other.dailyBall.e ~= again, "daily: an owned ball is not the offer")
 end
 
 print(`{passed} passed, {fails} failed`)
