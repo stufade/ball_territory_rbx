@@ -1,8 +1,13 @@
 --!strict
--- E3.1 economy simulation. Reads the game values (src/shared/Economy.luau, src/server/Config.luau XP) and plays
--- many players of each kind day by day: matches, XP and levels, coins, quests, login days, reaction book, spins,
--- direct buys. Prints days to 50% / 100% of the 27 balls, the first coin purchase, coins on hand.
+-- E3.2 economy simulation. Reads the live game values (src/shared/Economy.luau, src/server/Config.luau XP) and
+-- the M3.2 design tables below (milestones, cosmetics). Plays many players of each kind day by day: matches,
+-- XP and levels, coins, quests, login days, reaction book, spins, direct buys, then looks once the 27 balls
+-- are owned. Prints days to 50% / 100% of the balls, the first coin purchase, coins on hand, the empty-middle
+-- gaps, and how fast the cosmetic sink drains coins.
 -- lune run tools/econ/sim [players]      (default 400 per kind)
+--
+-- MILE and LOOKS are the spec for M3.2. They are not in Economy.luau yet: M3.1 is what the game runs, and this
+-- task does not change src/. luau-coder copies these tables into Economy when the shop is built.
 local process = require("@lune/process")
 local E = require("../../src/shared/Economy")
 -- Config reads Economy through ReplicatedStorage (M3.1): load it with the test loader that maps Roblox paths
@@ -28,6 +33,56 @@ local A = {
 	questAt = { 3, 5, 8 },
 	vipQuestAt = 6,
 	days = 120,
+}
+
+-- Login-day chests, once each. Missed calendar days do not skip or reset them: the counter is login days,
+-- same as the 7-day track. Sized as a ball, not a daily crumb (rare is 3 000, epic 6 000, legendary 12 000).
+-- Weekly, and worth a real ball: a rare is 3 000, an epic is 6 000. 6 000 every week was too much —
+-- a 30-min free player then finished the 27 balls on day 28, and x2 (249 R$) only saved about 5 days.
+-- 4 000 / 4 000 / 6 000 / 6 000 / 8 000 keeps a new ball about every week and leaves the paid skip ahead.
+local MILE = {
+	{ day = 14, coins = 4000 },
+	{ day = 21, coins = 4000, crystals = 50 },
+	{ day = 28, coins = 6000 },
+	{ day = 35, coins = 6000, crystals = 50 },
+	{ day = 42, coins = 8000 },
+}
+
+-- Cosmetic sink. Opens only when all 27 balls are owned. No combat stats. Coin price is the free path,
+-- Robux is a one-time developer product (not a gamepass, not random).
+local LOOKS = {
+	{ id = "frame_wood", coins = 2000, robux = 49 },
+	{ id = "skin_ink", coins = 2500, robux = 49 },
+	{ id = "skin_chalk", coins = 2500, robux = 49 },
+	{ id = "trail_dust", coins = 2500, robux = 49 },
+	{ id = "force_pulse", coins = 3000, robux = 49 },
+	{ id = "skin_stripe", coins = 3500, robux = 79 },
+	{ id = "skin_speckle", coins = 3500, robux = 79 },
+	{ id = "trail_sparks", coins = 4000, robux = 79 },
+	{ id = "skin_marble", coins = 5000, robux = 99 },
+	{ id = "skin_candy", coins = 5000, robux = 99 },
+	{ id = "frame_iron", coins = 5000, robux = 79 },
+	{ id = "trail_ribbon", coins = 6000, robux = 99 },
+	{ id = "force_ring", coins = 6000, robux = 99 },
+	{ id = "skin_chrome", coins = 7000, robux = 129 },
+	{ id = "skin_glass", coins = 7000, robux = 129 },
+	{ id = "frame_gold", coins = 8000, robux = 149 },
+	{ id = "trail_comet", coins = 8000, robux = 149 },
+	{ id = "skin_neon", coins = 9000, robux = 149 },
+	{ id = "skin_galaxy", coins = 9000, robux = 149 },
+	{ id = "force_burst", coins = 9000, robux = 149 },
+	{ id = "trail_rainbow", coins = 10000, robux = 199 },
+	{ id = "skin_prism", coins = 12000, robux = 199 },
+	{ id = "skin_crown", coins = 12000, robux = 199 },
+	{ id = "frame_myth", coins = 12000, robux = 199 },
+	{ id = "force_nova", coins = 14000, robux = 249 },
+	{ id = "trail_void", coins = 14000, robux = 249 },
+	-- Prestige shelf. A 2 h/day player cleared the 26 looks above by ~day 84 and then hoarded
+	-- ~80 000 coins by day 120. These four keep a next purchase in front of that player.
+	{ id = "podium_spot", coins = 18000, robux = 299 },
+	{ id = "ko_card", coins = 22000, robux = 349 },
+	{ id = "trail_eclipse", coins = 28000, robux = 399 },
+	{ id = "frame_champion", coins = 36000, robux = 499 },
 }
 
 local NB = 27
@@ -79,6 +134,13 @@ type P = {
 	gotToday: boolean,
 	lvlToday: boolean,
 	daily: number?,
+	rewards: { number },
+	ballDays: { number },
+	legDays: { number },
+	looks: { [string]: boolean },
+	lookN: number,
+	lookFirst: number?,
+	lookAll: number?,
 }
 
 local function missing(p: P, tier: string): { number }
@@ -98,6 +160,11 @@ local function give(p: P, e: number, day: number)
 	p.owned[e] = true
 	p.n += 1
 	p.gotToday = true
+	table.insert(p.rewards, day)
+	table.insert(p.ballDays, day)
+	if tierOf[e] == "legendary" then
+		table.insert(p.legDays, day)
+	end
 	if p.n >= 14 and not p.d50 then
 		p.d50 = day
 	end
@@ -194,6 +261,35 @@ local function markBuy(p: P, day: number)
 	end
 end
 
+-- After the 27 balls, coins buy the cheapest look still missing. Robux looks are not auto-bought:
+-- the coin path is what this measures.
+local function spendLooks(p: P, day: number)
+	if p.n < NB then
+		return
+	end
+	while p.lookN < #LOOKS do
+		local best: any = nil
+		for _, item in LOOKS do
+			if not p.looks[item.id] and (best == nil or item.coins < best.coins) then
+				best = item
+			end
+		end
+		if best == nil or p.coins < best.coins then
+			return
+		end
+		p.coins -= best.coins
+		p.looks[best.id] = true
+		p.lookN += 1
+		table.insert(p.rewards, day)
+		if not p.lookFirst then
+			p.lookFirst = day
+		end
+		if p.lookN == #LOOKS then
+			p.lookAll = day
+		end
+	end
+end
+
 -- Free path: spend coins on what gives the most ball value per coin.
 local function spendCoins(p: P, day: number)
 	while p.n < NB do
@@ -211,7 +307,9 @@ local function spendCoins(p: P, day: number)
 			end
 		end
 		local s = E.SPIN.coins
-		if p.coins >= s.price then
+		if p.kind.noSpin then
+			-- paid-random policy: both roulettes stay hidden, so this player never spins
+		elseif p.coins >= s.price then
 			local ratio = spinValue(p, s, cp) / s.price
 			if ratio > math.max(bestRatio, 1) then
 				best, bestRatio = "spin", ratio
@@ -235,6 +333,7 @@ local function spendCoins(p: P, day: number)
 			end
 		end
 	end
+	spendLooks(p, day)
 end
 
 -- Payers put crystals into the collection (upper bound: real payers also spend them in the draft).
@@ -243,7 +342,7 @@ local function spendCrystals(p: P, day: number)
 	while p.n < NB and p.kind.crystalsToBalls do
 		local s = E.SPIN.crystals
 		local ratio = spinValue(p, s, xp) / s.price
-		if p.crystals >= s.price and ratio >= 1 then
+		if not p.kind.noSpin and p.crystals >= s.price and ratio >= 1 then
 			p.crystals -= s.price
 			if doSpin(p, s, "pityX", day) == "refund" then
 				p.crystals += s.refund
@@ -392,6 +491,11 @@ local function newPlayer(kind: any): P
 		newAnyDays = 0,
 		gotToday = false,
 		lvlToday = false,
+		rewards = {},
+		ballDays = {},
+		legDays = {},
+		looks = {},
+		lookN = 0,
 	}
 	-- tutorial: 4 starters + a legendary from the free spin
 	for _, e in Config.BASE_BALLS do
@@ -452,6 +556,18 @@ local function day(p: P, d: number)
 	end
 	if r.ball then
 		give(p, r.ball, d)
+	end
+	for _, m in MILE do
+		if p.loginDay == m.day then
+			if m.coins then
+				coinsGain(p, m.coins)
+			end
+			if m.crystals then
+				p.crystals += m.crystals
+				p.freeCr += m.crystals
+			end
+			table.insert(p.rewards, d)
+		end
 	end
 	-- ball of the day: one missing ball
 	local miss = {}
@@ -516,6 +632,7 @@ end
 local KINDS = {
 	{ name = "free 10 min/day", minutes = 10, friendShare = 0, buys = {} },
 	{ name = "free 30 min/day", minutes = 30, friendShare = 0, buys = {} },
+	{ name = "policy 30m, no spins", minutes = 30, friendShare = 0, buys = {}, noSpin = true },
 	{ name = "free 30 min + friend", minutes = 30, friendShare = 0.3, buys = {} },
 	{ name = "free 2 h/day", minutes = 120, friendShare = 0, buys = {} },
 	{ name = "free 30m, crystal spins", minutes = 30, friendShare = 0, buys = {}, crystalsToBalls = true },
@@ -543,15 +660,55 @@ local KINDS = {
 	},
 }
 
+-- Longest quiet stretch inside [lo, hi] between events. The tail after the last event is not counted:
+-- once the 27th ball lands, "no new ball" is the cosmetic phase, not an empty collection.
+local function maxGap(marks: { number }, lo: number, hi: number): number
+	local seq = {}
+	for _, d in marks do
+		if d >= lo and d <= hi then
+			table.insert(seq, d)
+		end
+	end
+	table.sort(seq)
+	local gap, prev = 0, lo
+	for _, d in seq do
+		if d ~= prev then
+			gap = math.max(gap, d - prev)
+			prev = d
+		end
+	end
+	return gap
+end
+
+-- Longest wait between legendary balls from the 7th login day (VOID) onward.
+local function legGap(days: { number }): number
+	local seq = {}
+	for _, d in days do
+		if d >= 7 then
+			table.insert(seq, d)
+		end
+	end
+	table.sort(seq)
+	local gap = 0
+	for i = 2, #seq do
+		gap = math.max(gap, seq[i] - seq[i - 1])
+	end
+	return gap
+end
+
 local N = tonumber(process.args[1]) or 400
-print(("E3.1 economy sim, %d players per kind, %d days"):format(N, A.days))
+print(("E3.2 economy sim, %d players per kind, %d days, %d looks"):format(N, A.days, #LOOKS))
 print(
 	"kind                    | 1st coin buy   | 50% day      | 100% day       | coins on hand d1/3/7/14/30   | wk1 days new ball/any | R$"
 )
 for _, kind in KINDS do
 	local fb, fbm, d50, d100 = {}, {}, {}, {}
-	local hands = { [1] = {}, [3] = {}, [7] = {}, [14] = {}, [30] = {} }
+	local hands = { [1] = {}, [3] = {}, [7] = {}, [14] = {}, [30] = {}, [60] = {}, [120] = {} }
 	local nb, na, rbx, n7, n14, n28 = {}, {}, {}, {}, {}, {}
+	local n21, n35, n42, n48 = {}, {}, {}, {}
+	local gapR, gapB, gapL = {}, {}, {}
+	local leg3, leg4, leg5 = {}, {}, {}
+	local look30, look60, look120, lookFirst, lookAll = {}, {}, {}, {}, {}
 	local lv7, lv30, earn30, cr7, cr30 = {}, {}, {}, {}, {}
 	local never = 0
 	for _ = 1, N do
@@ -567,6 +724,9 @@ for _, kind in KINDS do
 				table.insert(lv30, p.level)
 				table.insert(earn30, p.earned / 30)
 				table.insert(cr30, p.freeCr)
+				table.insert(look30, p.lookN)
+			elseif d == 60 then
+				table.insert(look60, p.lookN)
 			end
 		end
 		table.insert(fb, if p.firstBuy then p.firstBuy.day else 999)
@@ -586,7 +746,22 @@ for _, kind in KINDS do
 		table.insert(rbx, p.robux)
 		table.insert(n7, balls[7])
 		table.insert(n14, balls[14])
+		table.insert(n21, balls[21])
 		table.insert(n28, balls[28])
+		table.insert(n35, balls[35])
+		table.insert(n42, balls[42])
+		table.insert(n48, balls[48])
+		table.insert(gapR, maxGap(p.rewards, 14, 48))
+		table.insert(gapB, maxGap(p.ballDays, 14, 48))
+		table.insert(gapL, legGap(p.legDays))
+		local legs = table.clone(p.legDays)
+		table.sort(legs)
+		table.insert(leg3, legs[3] or 999)
+		table.insert(leg4, legs[4] or 999)
+		table.insert(leg5, legs[5] or 999)
+		table.insert(look120, p.lookN)
+		table.insert(lookFirst, p.lookFirst or 999)
+		table.insert(lookAll, p.lookAll or 999)
 	end
 	print(
 		("%-23s | d%-2d %4.0f min | d%-3d (%d-%d) | d%-3d (%d-%d) %s| %5d %5d %5d %5d %5d | %d / %d | %d"):format(
@@ -621,6 +796,41 @@ for _, kind in KINDS do
 			median(earn30),
 			median(cr7),
 			median(cr30)
+		)
+	)
+	print(
+		("%-23s   d14-48 gap reward/ball/legendary: %d / %d / %d days, balls 14/21/28/35/42/48: %d %d %d %d %d %d"):format(
+			"",
+			median(gapR),
+			median(gapB),
+			median(gapL),
+			median(n14),
+			median(n21),
+			median(n28),
+			median(n35),
+			median(n42),
+			median(n48)
+		)
+	)
+	print(
+		("%-23s   legendary ball 3/4/5 on day %d / %d / %d (1 and 2 are the tutorial spin and VOID)"):format(
+			"",
+			median(leg3),
+			median(leg4),
+			median(leg5)
+		)
+	)
+	print(
+		("%-23s   looks d30/60/120: %d / %d / %d of %d, first d%d, all d%d, coins d60/d120: %d / %d"):format(
+			"",
+			median(look30),
+			median(look60),
+			median(look120),
+			#LOOKS,
+			median(lookFirst),
+			median(lookAll),
+			median(hands[60]),
+			median(hands[120])
 		)
 	)
 end
