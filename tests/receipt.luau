@@ -29,27 +29,38 @@ local function receipt(productId: number, purchaseId: string, playerId: number?)
 	return { PlayerId = playerId or USER, ProductId = productId, PurchaseId = purchaseId }
 end
 
--- Live table: placeholders only. A receipt against it grants nothing.
+-- Live table: every id is a real asset id, none repeats, and each one is indexed for a receipt.
 do
-	check(#Products.crystals == #E.CRYSTAL_PACKS, "one placeholder id per crystal pack")
-	for _, id in Products.crystals do
-		check(id == 0, "crystal product id is not a live asset id")
+	check(#Products.crystals == #E.CRYSTAL_PACKS, "one id per crystal pack")
+	local seen: { [number]: boolean } = {}
+	local count = 0
+	local function live(id: number, what: string)
+		check(id > 0, `{what} has a product id`)
+		check(not seen[id], `{what} id is not reused`)
+		seen[id] = true
+		count += 1
 	end
-	for _, id in Products.ball do
-		check(id == 0, "ball product id is not a live asset id")
+	for i, id in Products.crystals do
+		live(id, `crystal pack {i}`)
 	end
-	check(Products.starter == 0, "starter product id is not a live asset id")
+	for tier in E.PRICE.robux do
+		live(Products.ball[tier] or 0, `ball {tier}`)
+	end
+	live(Products.starter, "starter")
 	for _, look in E.LOOKS do
-		check(Products.looks[look.id] == 0, `look {look.id} product id is not a live asset id`)
+		live(Products.looks[look.id] or 0, `look {look.id}`)
 	end
-	local live = Receipt.index(E, Products)
+	for pass in E.PASSES do
+		check((Products.passes[pass] or 0) > 0, `pass {pass} has a pass id`)
+	end
+	local index = Receipt.index(E, Products)
 	local n = 0
-	for _ in live do
+	for _ in index do
 		n += 1
 	end
-	check(n == 0, "placeholder ids are not for sale")
+	check(n == count, "every live product id is indexed")
 	local d = fresh()
-	check(Receipt.apply(d, receipt(0, "live-0"), USER, live, E, {}) == "later", "product 0 is refused")
+	check(Receipt.apply(d, receipt(0, "live-0"), USER, index, E, {}) == "later", "product 0 is refused")
 	check(d.crystals == 0 and #d.receipts == 0, "refused product 0 changes nothing")
 end
 

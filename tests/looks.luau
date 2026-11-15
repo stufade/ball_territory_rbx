@@ -105,7 +105,7 @@ do
 	check(table.concat(d.balls, ",") == table.concat(ballsBefore, ","), "equipping does not change the balls")
 	local view = Looks.snapshot(d, E, Products)
 	check(view.n == 27 and view.need == 27 and view.owned[1] == CHEAP.id, "the shelf view lists the owned look")
-	check(view.robux[CHEAP.id] == nil, "a placeholder product id is not offered")
+	check(view.robux[CHEAP.id] == Products.looks[CHEAP.id], "a live product id is offered")
 	local priced = Looks.snapshot(d, E, { looks = { frame_wood = 9301, skin_ink = 0 } })
 	check(priced.robux.frame_wood == 9301 and priced.robux.skin_ink == nil, "only a live product id is sent")
 end
