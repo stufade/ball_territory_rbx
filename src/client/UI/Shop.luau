@@ -253,26 +253,27 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			Theme.stroke(card, 5, tint:Lerp(Color3.new(1, 1, 1), 0.35))
 			local wash = Instance.new("UIGradient")
 			wash.Rotation = 16
-			wash.Color = ColorSequence.new(tint:Lerp(Color3.new(1, 1, 1), 0.28), tint:Lerp(Theme.BG, 0.18))
+			wash.Color = ColorSequence.new(tint:Lerp(Color3.new(1, 1, 1), 0.12), tint:Lerp(Theme.BG, 0.55))
 			wash.Parent = card
 			endsParent = card
-			local ballD = math.floor(cardH * 0.92)
-			local bx, byc = 6 + ballD / 2, cardH / 2
-			local rayLen = math.floor(math.max(bodyW, cardH) * 1.15)
+			local ballD = math.floor(cardH * 0.74)
+			local span = math.ceil(ballD / 0.88)
+			local bx, byc = 10 + span / 2, cardH / 2
+			local rayLen = math.floor((bodyW - bx) * 2.2)
+			local glowCol = Color3.fromHex("#ffd24a")
 			for i = 1, 14 do
 				local ray = Theme.frame(
 					card,
-					UDim2.fromOffset(26, rayLen),
+					UDim2.fromOffset(18, rayLen),
 					UDim2.fromOffset(bx, byc),
-					if i % 2 == 0 then Color3.new(1, 1, 1) else tint:Lerp(Color3.new(1, 1, 1), 0.45),
+					if i % 2 == 0 then glowCol else Color3.new(1, 1, 1),
 					MID
 				)
-				ray.Rotation = 12 + (i - 1) * (156 / 13)
-				ray.BackgroundTransparency = 0.38
+				ray.Rotation = 8 + (i - 1) * (164 / 13)
+				ray.BackgroundTransparency = 0.22
 				ray.ZIndex = 1
 			end
-			local glow =
-				Theme.disc(card, math.floor(cardH * 1.55), Color3.new(1, 1, 1), UDim2.fromOffset(bx, byc), 0.35)
+			local glow = Theme.disc(card, math.floor(span * 1.45), glowCol, UDim2.fromOffset(bx, byc), 0.28)
 			glow.ZIndex = 2
 			local icon = Theme.ball(card, deal.e, ballD, UDim2.fromOffset(bx, byc), MID)
 			icon.Name = "Icon"
@@ -280,7 +281,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			local bw, bh = 156, 68
 			local gemX = bodyW - 14 - bw
 			local coinX = gemX - 8 - bw
-			local textX = math.floor(6 + ballD + 16)
+			local textX = math.floor(10 + span + 14)
 			local textW = math.max(80, coinX - 12 - textX)
 			local title = Rules.Config.TITLE[deal.e] or "?"
 			local metaY = cardH - 30
@@ -345,7 +346,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			ends.Size = UDim2.fromOffset(1, 1)
 		else
 			local bannerH = math.clamp(math.floor(bodyH * 0.48), 188, 228)
-			local textX = math.floor(6 + math.floor(bannerH * 0.92) + 16)
+			local textX = math.floor(10 + math.ceil(math.floor(bannerH * 0.74) / 0.88) + 14)
 			local coinX = bodyW - 14 - 156 - 8 - 156
 			local textW = math.max(80, coinX - 12 - textX)
 			ends.Position = UDim2.fromOffset(textX + math.floor(textW * 0.62), bannerH - 30)

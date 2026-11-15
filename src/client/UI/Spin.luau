@@ -214,26 +214,30 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	Theme.stroke(window, 3, SPEC[featuredTier].color)
 	local wash = Instance.new("UIGradient")
 	wash.Rotation = 18
-	wash.Color = ColorSequence.new(SPEC[featuredTier].color:Lerp(Color3.new(1, 1, 1), 0.35), SPEC[featuredTier].color)
+	wash.Color = ColorSequence.new(
+		SPEC[featuredTier].color:Lerp(Color3.new(1, 1, 1), 0.08),
+		SPEC[featuredTier].color:Lerp(Theme.BG, 0.45)
+	)
 	wash.Parent = window
-	local heroD = math.floor(reelH * 0.92)
-	local heroX = math.floor(6 + heroD / 2)
+	local heroD = math.floor(reelH * 0.74)
+	local heroSpan = math.ceil(heroD / 0.88)
+	local heroX = math.floor(8 + heroSpan / 2)
 	local heroY = math.floor(reelH / 2)
-	local rayLen = math.floor(math.max(innerW, reelH) * 1.2)
+	local rayLen = math.floor((innerW - heroX) * 2.2)
+	local glowCol = Color3.fromHex("#ffd24a")
 	for i = 1, 14 do
 		local ray = Theme.frame(
 			window,
-			UDim2.fromOffset(24, rayLen),
+			UDim2.fromOffset(16, rayLen),
 			UDim2.fromOffset(heroX, heroY),
-			if i % 2 == 0 then Color3.new(1, 1, 1) else SPEC[featuredTier].color:Lerp(Color3.new(1, 1, 1), 0.4),
+			if i % 2 == 0 then glowCol else Color3.new(1, 1, 1),
 			MID
 		)
-		ray.Rotation = 12 + (i - 1) * (156 / 13)
-		ray.BackgroundTransparency = 0.38
+		ray.Rotation = 8 + (i - 1) * (164 / 13)
+		ray.BackgroundTransparency = 0.2
 		ray.ZIndex = 1
 	end
-	local heroGlow =
-		Theme.disc(window, math.floor(reelH * 1.45), Color3.new(1, 1, 1), UDim2.fromOffset(heroX, heroY), 0.32)
+	local heroGlow = Theme.disc(window, math.floor(heroSpan * 1.4), glowCol, UDim2.fromOffset(heroX, heroY), 0.25)
 	heroGlow.ZIndex = 1
 
 	local viewW = innerW
@@ -285,7 +289,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	marker.BackgroundTransparency = 0.15
 
 	local kicker = if deal and featured == deal.e then "BALL OF THE DAY" else "FEATURED"
-	local textX = math.floor(heroX + heroD / 2 + 14)
+	local textX = math.floor(heroX + heroSpan / 2 + 12)
 	local titleW = math.max(80, viewW - textX - 12)
 	local title = Rules.Config.TITLE[featured] or "?"
 	local nameH = math.floor(reelH * 0.5)

@@ -125,18 +125,14 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 	local paint = paintOf(id)
 	local kind = kindOf(id)
 	local cx, cy = w / 2, h / 2
-	box.BackgroundColor3 = paint.base
+	box.BackgroundColor3 = Theme.BG:Lerp(paint.base, 0.35)
 	if kind == "SKIN" then
-		cy = math.floor(h * 0.42)
-		local d = math.floor(math.max(w, h) * 0.98)
-		local ball = Theme.ball(box, e, d, UDim2.fromScale(0.5, 0.42), MID)
+		local d = math.floor(math.min(w, h) * 0.78)
+		local ball = Theme.ball(box, e, d, UDim2.fromScale(0.5, 0.5), MID)
 		ball.Name = "Ball"
-		ball.ImageColor3 = paint.base:Lerp(
-			Color3.new(1, 1, 1),
-			if paint.pat == "ink" or paint.pat == "neon" or paint.pat == "stars" then 0.12 else 0.45
-		)
+		ball.ImageColor3 = paint.base:Lerp(Color3.new(1, 1, 1), if paint.pat == "ink" then 0.55 else 0.5)
 		ball.ZIndex = 3
-		local ring = Theme.ring(box, d, Theme.INK, 4, UDim2.fromOffset(cx, cy))
+		local ring = Theme.ring(box, d, Theme.INK, 4, UDim2.fromScale(0.5, 0.5))
 		ring.ZIndex = 6
 		if paint.pat == "stripe" then
 			bars(box, cx, cy, d, { paint.accent, paint.base:Lerp(Color3.new(1, 1, 1), 0.7) })
@@ -191,9 +187,12 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 			Theme.crown(box, math.floor(d * 0.42), UDim2.fromOffset(cx, cy - d * 0.28)).ZIndex = 6
 		end
 	elseif kind == "TRAIL" then
-		local bandH = math.max(28, math.floor(h * 0.38))
-		local bandY = math.floor(h * 0.4)
-		local band = Theme.frame(box, UDim2.fromOffset(w, bandH), UDim2.fromOffset(cx, bandY), paint.accent, MID)
+		local headD = math.floor(math.min(h * 0.7, w * 0.22))
+		local bandH = math.max(16, math.floor(h * 0.28))
+		local bandW = w - 20 - headD
+		local bandX = 10 + bandW / 2
+		local bandY = cy
+		local band = Theme.frame(box, UDim2.fromOffset(bandW, bandH), UDim2.fromOffset(bandX, bandY), paint.accent, MID)
 		band.Name = "Stripe"
 		band.ZIndex = 3
 		Theme.round(band, math.floor(bandH / 2))
@@ -218,30 +217,30 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 				box,
 				math.max(8, math.floor(h * 0.16)),
 				paint.base,
-				UDim2.fromOffset(w * 0.16 + i * (w * 0.12), bandY - bandH * 0.2),
+				UDim2.fromOffset(bandX - bandW * 0.35 + i * (bandW * 0.12), bandY - bandH * 0.55),
 				0.1
 			)
 			dot.ZIndex = 4
 		end
-		local head = Theme.ball(box, e, math.floor(h * 0.42), UDim2.fromOffset(w * 0.78, bandY), MID)
+		local headSpan = math.ceil(headD / 0.88)
+		local head = Theme.ball(box, e, headD, UDim2.fromOffset(w - 6 - headSpan / 2, bandY), MID)
 		head.Name = "Ball"
 		head.ZIndex = 5
 	elseif kind == "FORCE" then
-		local reach = math.floor(math.sqrt(w * w + h * h))
-		local thick = math.max(16, math.floor(math.min(w, h) * 0.2))
-		for i = 1, 12 do
-			local ray = Theme.frame(box, UDim2.fromOffset(thick, reach), UDim2.fromOffset(cx, cy), paint.accent, MID)
-			ray.Rotation = (i - 1) * 15
-			ray.BackgroundTransparency = 0.08
+		local reach = math.floor(math.min(w, h) * 0.92)
+		local thick = math.max(5, math.floor(reach * 0.08))
+		box.BackgroundColor3 = Theme.BG
+		for i = 1, 8 do
+			local ray = Theme.frame(box, UDim2.fromOffset(thick, reach), UDim2.fromOffset(cx, cy), paint.base, MID)
+			ray.Rotation = (i - 1) * 22.5
+			ray.BackgroundTransparency = 0
 			ray.ZIndex = 2
 			ray.Name = "Flash"
 		end
 		if paint.pat == "ring" then
-			Theme.ring(box, math.floor(math.min(w, h) * 0.72), paint.accent, 6, UDim2.fromOffset(cx, cy)).ZIndex = 4
+			Theme.ring(box, math.floor(reach * 0.7), paint.accent, 5, UDim2.fromOffset(cx, cy)).ZIndex = 4
 		end
-		Theme.disc(box, math.floor(math.min(w, h) * 0.46), paint.base, UDim2.fromOffset(cx, cy), 0.05).ZIndex = 4
-		local core =
-			Theme.disc(box, math.floor(math.min(w, h) * 0.28), Color3.new(1, 1, 1), UDim2.fromOffset(cx, cy), 0.02)
+		local core = Theme.disc(box, math.floor(reach * 0.2), Color3.new(1, 1, 1), UDim2.fromOffset(cx, cy), 0)
 		core.Name = "Flash"
 		core.ZIndex = 5
 	elseif kind == "FRAME" or kind == "CARD" then
@@ -258,8 +257,8 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 		inner.ZIndex = 2
 		Theme.round(inner, 10)
 		Theme.stroke(inner, 4, paint.accent)
-		local d = math.floor(math.max(w, h) * 0.82)
-		local ball = Theme.ball(inner, e, d, UDim2.fromScale(0.5, 0.38), MID)
+		local d = math.floor(math.min(w - margin * 2, h - margin * 2) * 0.72)
+		local ball = Theme.ball(inner, e, d, UDim2.fromScale(0.5, 0.5), MID)
 		ball.Name = "Ball"
 		ball.ZIndex = 3
 		if id == "frame_champion" or paint.pat == "crown" then
@@ -377,12 +376,17 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 		Theme.round(row, 16)
 		Theme.stroke(row, if look.coins >= 12000 then 4 else 3, tint)
 
-		local icon = Theme.frame(row, UDim2.fromOffset(cardW - 12, cardH - 12), UDim2.fromOffset(6, 6), Theme.BG)
+		local top = 36
+		local previewH = math.max(40, cardH - top - bh - 14)
+		local square = kind ~= "TRAIL"
+		local iconW = if square then previewH else cardW - 16
+		local iconX = if square then math.floor((cardW - iconW) / 2) else 8
+		local icon = Theme.frame(row, UDim2.fromOffset(iconW, previewH), UDim2.fromOffset(iconX, top), Theme.BG)
 		icon.Name = "Icon"
 		icon.ClipsDescendants = true
 		Theme.round(icon, 12)
 		Theme.stroke(icon, 4, tint)
-		picture(icon, id, worn, cardW - 12, cardH - 12)
+		picture(icon, id, worn, iconW, previewH)
 
 		local scrim = Theme.frame(row, UDim2.fromOffset(cardW - 16, 28), UDim2.fromOffset(8, 6), Theme.INK)
 		scrim.BackgroundTransparency = 0.28
