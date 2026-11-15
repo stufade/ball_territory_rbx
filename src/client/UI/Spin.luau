@@ -1,7 +1,10 @@
 --!strict
--- Spin page inside the shop. One featured card: a banner of the ball of the day (or VOID), a row of
--- real balls with the server percent on each, and the pack buttons inside that card. The reel spins
--- the balls. A legendary stop is a flash, a shake and a burst stronger than the tutorial reward.
+-- Spin page inside the shop, in the day-7 family (Daily, BALLS): one orange scene card. On top a dark
+-- reel well: a drum of tier cards (a ball on its glow and shadow, the tier word) drifting slowly under a gold
+-- slot. Under it the odds as tier chips (ball + percent) and the guarantee as a bar ("EPIC+ IN 7"). At the
+-- bottom the currency switch and one big 3D SPIN button. The server picks the prize before the reel moves;
+-- the reel only shows it. The reveal grows with the tier: common pops, rare glows, epic adds rays and a
+-- burst, legendary flashes the window white, shakes it and throws confetti.
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,21 +18,22 @@ local Theme = require("./Theme")
 
 local V2 = Vector2.new
 local MID = V2(0.5, 0.5)
-local GEM = Color3.fromHex("#7a3cff")
+local WHITE = Color3.new(1, 1, 1)
 local VOID = 13
 
 local Spin = {}
 
-Spin.TIME = 1.1
+-- Reel run time (s). Long enough to read the tiers going by, short enough to spin again.
+Spin.TIME = 2
 
 local CYCLE = { "common", "rare", "epic", "legendary", "refund" }
 
-local SPEC: { [string]: { w: number, color: Color3 } } = {
-	common = { w = 128, color = Color3.fromHex("#3d6bff") },
-	rare = { w = 144, color = Color3.fromHex("#14a4ff") },
-	epic = { w = 168, color = Color3.fromHex("#c044ff") },
-	legendary = { w = 268, color = Color3.fromHex("#ffd63c") },
-	refund = { w = 128, color = Color3.fromHex("#2ed068") },
+local TIER_COL: { [string]: Color3 } = {
+	common = Color3.fromHex("#3d8bff"),
+	rare = Color3.fromHex("#14c4ff"),
+	epic = Color3.fromHex("#c044ff"),
+	legendary = Color3.fromHex("#ffc21a"),
+	refund = Color3.fromHex("#2ed068"),
 }
 
 local function labelOf(tier: string): string
@@ -126,13 +130,14 @@ local function prize(hit: Net.SpinHit): string
 	return `{labelOf(hit.tier)} · {name}`
 end
 
-local function tierOf(e: number): string?
-	for tier, list in Economy.TIERS :: { [string]: { number } } do
-		if table.find(list, e) then
-			return tier
+-- Every GuiObject under o (and o) gets ZIndex z: a whole piece drawn above its siblings.
+local function lift(o: GuiObject, z: number)
+	o.ZIndex = z
+	for _, c in o:GetDescendants() do
+		if c:IsA("GuiObject") then
+			c.ZIndex = z
 		end
 	end
-	return nil
 end
 
 -- host is the shop body. w and h are its pixel size. Everything clickable stays inside host.
@@ -154,6 +159,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		end
 	end
 	panel:SetAttribute("SpinPhase", if hit then "spinning" else "odds")
+	local still = Theme.reduced()
 
 	local owned: { [number]: boolean } = {}
 	for _, e in v.balls do
@@ -174,254 +180,314 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		epic = sample("epic"),
 		legendary = sample("legendary"),
 	}
-	local deal = v.dailyBall
-	local featured = if deal and not owned[deal.e] then deal.e else face.legendary or VOID
-	local featuredTier = tierOf(featured) or "legendary"
 
 	local lines: { [string]: Net.SpinLine } = { coins = board.coins, crystals = board.crystals }
 	local cur = if hit and lines[hit.cur] then hit.cur else "coins"
 
-	local pad = 10
-	local btnH = if h < 300 then 52 else 58
-	local pityH = 22
-	local reelH = math.clamp(math.floor(h * 0.44), 120, 230)
-	local oddsH = h - pad - reelH - 6 - 4 - pityH - 4 - btnH - pad
-	if oddsH < 100 then
-		reelH -= 100 - oddsH
-		oddsH = 100
-	end
-	local btnY = h - pad - btnH
-	local pityY = btnY - 4 - pityH
-	local oddsY = pityY - 4 - oddsH
+	-- layout: reel well on top, chips + guarantee row, then the buttons. Buttons >= 64 design px
+	-- (44 px on a 390 px tall phone).
+	local pad = 12
+	local gap = 10
+	local btnH = 66
+	local rowH = math.clamp(math.floor(h * 0.19), 52, 66)
+	local reelH = math.max(112, h - pad * 2 - gap * 2 - rowH - btnH)
 	local reelY = pad
-
-	local card = Theme.frame(host, UDim2.fromOffset(w, h), UDim2.fromOffset(0, 0), Theme.BG)
-	card.Name = "SpinCard"
-	card.ClipsDescendants = true
-	Theme.round(card, 18)
-	Theme.stroke(card, 4, SPEC[featuredTier].color)
-
-	local function prefix(c: string): string
-		return if c == "coins" then "Coin" else "Gem"
-	end
-
+	local rowY = reelY + reelH + gap
+	local btnY = rowY + rowH + gap
 	local innerW = w - pad * 2
-	local window =
-		Theme.frame(card, UDim2.fromOffset(innerW, reelH), UDim2.fromOffset(pad, reelY), SPEC[featuredTier].color)
+
+	local card = Theme.card(host, UDim2.fromOffset(w, h), UDim2.fromOffset(0, 0), Theme.ORANGE, Theme.BG, 20)
+	card.Name = "SpinCard"
+	local edge = card:FindFirstChild("Edge") :: UIStroke
+	edge.Thickness = 5
+	edge.Color = Theme.YELLOW
+	Theme.pattern(card, WHITE, 0.92, 40)
+
+	-- the reel well: dark inset with a faint tier wash, clips the drum
+	local window = Theme.frame(card, UDim2.fromOffset(innerW, reelH), UDim2.fromOffset(pad, reelY), Theme.BG)
 	window.Name = "Reel"
 	window.ClipsDescendants = true
 	Theme.round(window, 16)
-	Theme.stroke(window, 3, SPEC[featuredTier].color)
-	local wash = Instance.new("UIGradient")
-	wash.Rotation = 18
-	wash.Color = ColorSequence.new(
-		SPEC[featuredTier].color:Lerp(Color3.new(1, 1, 1), 0.08),
-		SPEC[featuredTier].color:Lerp(Theme.BG, 0.45)
-	)
-	wash.Parent = window
-	local heroD = math.floor(reelH * 0.74)
-	local heroSpan = math.ceil(heroD / 0.88)
-	local heroX = math.floor(8 + heroSpan / 2)
-	local heroY = math.floor(reelH / 2)
-	local rayLen = math.floor((innerW - heroX) * 2.2)
-	local glowCol = Color3.fromHex("#ffd24a")
-	for i = 1, 14 do
-		local ray = Theme.frame(
-			window,
-			UDim2.fromOffset(16, rayLen),
-			UDim2.fromOffset(heroX, heroY),
-			if i % 2 == 0 then glowCol else Color3.new(1, 1, 1),
-			MID
-		)
-		ray.Rotation = 8 + (i - 1) * (164 / 13)
-		ray.BackgroundTransparency = 0.2
-		ray.ZIndex = 1
-	end
-	local heroGlow = Theme.disc(window, math.floor(heroSpan * 1.4), glowCol, UDim2.fromOffset(heroX, heroY), 0.25)
-	heroGlow.ZIndex = 1
+	Theme.stroke(window, 4, Theme.INK)
+	Theme.gradient(window, Theme.GLOW, Theme.BG)
+	Theme.pattern(window, Theme.GLOW:Lerp(WHITE, 0.25), 0.78, 44)
 
+	local tileH = reelH - 20
+	local tileW = math.floor(tileH * 0.86)
+	local slotW = tileW + 8
 	local viewW = innerW
 	local copies = 6
 	local tilesN = copies * #CYCLE
-	local xs: { number } = {}
-	local cursor = 0
-	for i = 1, tilesN do
-		xs[i] = cursor
-		cursor += SPEC[CYCLE[((i - 1) % #CYCLE) + 1]].w
-	end
-	local strip = Theme.clear(window, UDim2.fromOffset(cursor, reelH), UDim2.fromOffset(0, 0))
+	local strip = Theme.clear(window, UDim2.fromOffset(slotW * tilesN, reelH), UDim2.fromOffset(0, 0))
 	strip.Name = "Strip"
 	strip.ZIndex = 3
 
 	local refundTiles: { Frame } = {}
+	local ballD = math.floor(tileH * 0.52)
 	for i = 1, tilesN do
 		local tier = CYCLE[((i - 1) % #CYCLE) + 1]
-		local spec = SPEC[tier]
-		local th = reelH - 42
-		local cell = Theme.clear(strip, UDim2.fromOffset(spec.w - 8, th), UDim2.fromOffset(xs[i] + 4, 4))
+		local col = TIER_COL[tier]
+		local cell = Theme.card(
+			strip,
+			UDim2.fromOffset(tileW, tileH),
+			UDim2.fromOffset((i - 1) * slotW + 4, 10),
+			col:Lerp(WHITE, 0.08),
+			col:Lerp(Theme.BG, 0.62),
+			14
+		)
 		cell.Name = `Tile{i}`
-		cell.ZIndex = 3
 		cell:SetAttribute("Tier", tier)
-		local d = math.floor(th * (if tier == "legendary" then 0.86 elseif tier == "epic" then 0.72 else 0.62))
-		local glow = Theme.disc(cell, math.floor(d * 1.15), spec.color, UDim2.fromScale(0.5, 0.46), 0.62)
-		glow.Name = "Glow"
-		glow.ZIndex = 3
+		local cEdge = cell:FindFirstChild("Edge") :: UIStroke
+		if tier == "legendary" then
+			cEdge.Thickness = 4
+			cEdge.Color = Theme.YELLOW
+		end
+		local by = math.floor(tileH * 0.42)
+		Theme.glow(cell, math.floor(ballD * 1.7), col:Lerp(WHITE, 0.3), UDim2.fromOffset(tileW / 2, by), 4, 0.8)
+		Theme.shadow(cell, math.floor(ballD * 0.7), UDim2.fromOffset(tileW / 2, by + ballD / 2 + 2))
 		if tier == "refund" then
 			table.insert(refundTiles, cell)
 		else
 			local e = face[tier]
 			cell:SetAttribute("Ball", e)
-			local icon = Theme.ball(cell, e, d, UDim2.fromScale(0.5, 0.46), MID)
+			local icon = Theme.ball(cell, e, ballD, UDim2.fromOffset(tileW / 2, by), MID)
 			icon.Name = "Icon"
-			icon.ZIndex = 4
+			if tier == "legendary" then
+				local cr = Theme.crown(cell, math.floor(ballD * 0.5), UDim2.fromOffset(tileW / 2, by - ballD * 0.52))
+				cr.Name = "Crown"
+			end
 		end
+		local word = Theme.label(
+			cell,
+			labelOf(tier),
+			Theme.fit(labelOf(tier), 20, tileW - 8, 22),
+			UDim2.fromOffset(tileW - 6, 22),
+			UDim2.fromOffset(tileW / 2, tileH - 8),
+			{ anchor = V2(0.5, 1), stroke = 2 }
+		)
+		word.Name = "Word"
 	end
 
 	local function at(i: number): number
-		local tier = CYCLE[((i - 1) % #CYCLE) + 1]
-		return viewW / 2 - (xs[i] + SPEC[tier].w / 2)
+		return viewW / 2 - ((i - 1) * slotW + slotW / 2)
 	end
 
-	local marker =
-		Theme.frame(window, UDim2.fromOffset(4, reelH - 32), UDim2.fromScale(0.5, 0), Theme.YELLOW, V2(0.5, 0))
+	-- dark fades at both ends so the drum reads as round
+	for side = 0, 1 do
+		local fade = Theme.frame(
+			window,
+			UDim2.fromOffset(math.floor(viewW * 0.22), reelH),
+			UDim2.fromScale(side, 0),
+			Theme.BG,
+			V2(side, 0)
+		)
+		fade.Name = "Fade"
+		fade.ZIndex = 5
+		local g = Instance.new("UIGradient")
+		g.Rotation = if side == 0 then 0 else 180
+		g.Transparency = NumberSequence.new(0.05, 1)
+		g.Parent = fade
+	end
+
+	-- the gold slot: outline round the middle tile and two pointers biting into the well
+	local marker = Theme.clear(window, UDim2.fromOffset(slotW + 4, reelH - 6), UDim2.fromScale(0.5, 0.5), MID)
 	marker.Name = "Marker"
 	marker.ZIndex = 6
-	marker.BackgroundTransparency = 0.15
+	Theme.round(marker, 16)
+	local mEdge = Theme.stroke(marker, 5, Theme.YELLOW)
+	mEdge.Name = "Edge"
+	for k = 0, 1 do
+		local tip = Theme.frame(window, UDim2.fromOffset(26, 26), UDim2.fromScale(0.5, k), Theme.YELLOW, MID)
+		tip.Name = "Pointer"
+		tip.Rotation = 45
+		tip.ZIndex = 7
+		Theme.stroke(tip, 3, Theme.INK)
+	end
 
-	local kicker = if deal and featured == deal.e then "BALL OF THE DAY" else "FEATURED"
-	local textX = math.floor(heroX + heroSpan / 2 + 12)
-	local titleW = math.max(80, viewW - textX - 12)
-	local title = Rules.Config.TITLE[featured] or "?"
-	local nameH = math.floor(reelH * 0.5)
-	local namePx = Theme.fit(title, 92, titleW, nameH)
-	Theme.label(window, kicker, 22, UDim2.fromOffset(titleW, 24), UDim2.fromOffset(textX, 8), {
-		align = Enum.TextXAlignment.Left,
-		color = Theme.YELLOW,
-		z = 11,
-	})
+	-- header pieces over the well: the ribbon and the top prize
+	local ribbon = Theme.ribbon(card, "LUCKY SPIN", Theme.ORANGE, UDim2.fromOffset(pad + 14, reelY + 8), 30)
+	lift(ribbon, 9)
+	local topName = Rules.Config.TITLE[face.legendary] or "VOID"
 	local prizeName = Theme.label(
-		window,
-		title,
-		namePx,
-		UDim2.fromOffset(titleW, nameH),
-		UDim2.fromOffset(textX, math.floor(reelH * 0.24)),
-		{
-			align = Enum.TextXAlignment.Left,
-			color = Theme.nameColor(featured),
-			z = 11,
-		}
+		card,
+		`TOP PRIZE: {topName}`,
+		22,
+		UDim2.fromOffset(math.floor(innerW * 0.34), 28),
+		UDim2.fromOffset(pad + innerW - 16, reelY + 9),
+		{ anchor = V2(1, 0), align = Enum.TextXAlignment.Right, color = Theme.YELLOW_TXT, stroke = 3, z = 9 }
 	)
 	prizeName.Name = "Prize"
-	Theme.label(window, labelOf(featuredTier), 22, UDim2.fromOffset(titleW, 24), UDim2.fromOffset(textX, reelH - 32), {
-		align = Enum.TextXAlignment.Left,
-		color = Color3.new(1, 1, 1),
-		z = 11,
-	})
 
-	local result = Theme.label(window, "", 22, UDim2.fromOffset(viewW - 24, 24), UDim2.fromOffset(12, 4), {
-		align = Enum.TextXAlignment.Right,
-		color = Theme.YELLOW,
-		z = 12,
+	-- the prize banner, shown when the reel stops
+	local resultBox = Theme.frame(window, UDim2.fromOffset(360, 40), UDim2.new(0.5, 0, 1, -8), Theme.YELLOW, V2(0.5, 1))
+	resultBox.Name = "ResultBox"
+	resultBox.Visible = false
+	Theme.round(resultBox, 12)
+	Theme.stroke(resultBox, 3, Theme.INK)
+	Theme.gradient(resultBox, WHITE, Color3.fromRGB(200, 200, 200))
+	local result = Theme.label(resultBox, "", 26, UDim2.new(1, -12, 1, 0), UDim2.fromScale(0.5, 0.5), {
+		anchor = MID,
+		stroke = 3,
 	})
 	result.Name = "Result"
+	lift(resultBox, 12)
 
+	local function prefix(c: string): string
+		return if c == "coins" then "Coin" else "Gem"
+	end
+
+	-- odds: one chip per tier, left of the guarantee
+	local pityW = math.clamp(math.floor(innerW * 0.34), 240, 340)
+	local oddsW = innerW - pityW - gap
 	local function chips(c: string, line: Net.SpinLine)
-		local box = Theme.clear(card, UDim2.fromOffset(innerW, oddsH), UDim2.fromOffset(pad, oddsY))
+		local box = Theme.clear(card, UDim2.fromOffset(oddsW, rowH), UDim2.fromOffset(pad, rowY))
 		box.Name = if c == "coins" then "OddsCoins" else "OddsGems"
-		local weight = { common = 1, rare = 1.02, epic = 1.08, legendary = 2.15, refund = 0.78 }
+		local weight = { common = 1, rare = 1, epic = 1, legendary = 1.25, refund = 1 }
 		local sum = 0
 		for _, tier in CYCLE do
 			sum += weight[tier]
 		end
-		local gap = 8
-		local free = innerW - gap * (#CYCLE - 1)
+		local cg = 6
+		local free = oddsW - cg * (#CYCLE - 1)
 		local x = 0
 		for i, tier in CYCLE do
-			local color = SPEC[tier].color
-			local chipW = if i == #CYCLE then innerW - x else math.floor(free * weight[tier] / sum)
+			local col = TIER_COL[tier]
+			local chipW = if i == #CYCLE then oddsW - x else math.floor(free * weight[tier] / sum)
 			local legend = tier == "legendary"
-			local chipH = if legend then oddsH else math.floor(oddsH * 0.68)
-			local chipY = oddsH - chipH
-			local row = Theme.frame(
+			local chip = Theme.card(
 				box,
-				UDim2.fromOffset(chipW, chipH),
-				UDim2.fromOffset(x, chipY),
-				if legend then color:Lerp(Color3.new(1, 1, 1), 0.28) else color:Lerp(Theme.BG, 0.32)
+				UDim2.fromOffset(chipW, rowH),
+				UDim2.fromOffset(x, 0),
+				col:Lerp(WHITE, 0.05),
+				col:Lerp(Theme.BG, 0.55),
+				14
 			)
-			row.Name = `{prefix(c)}_{tier}`
-			row.ClipsDescendants = true
-			Theme.round(row, 14)
-			Theme.stroke(row, if legend then 8 else 4, if legend then Theme.YELLOW else color)
-			local pctSize = if legend then 36 else 26
-			local ballD = math.floor(chipH * (if legend then 0.5 else 0.42))
-			if tier == "refund" then
-				Money.icon(row, c, ballD, UDim2.fromScale(0.5, 0.34))
-			else
-				local poster = if legend then VOID else face[tier]
-				local icon = Theme.ball(row, poster, ballD, UDim2.fromScale(0.5, 0.34), MID)
-				icon.Name = "Icon"
-				icon.ZIndex = 4
+			chip.Name = `{prefix(c)}_{tier}`
+			if legend then
+				local ce = chip:FindFirstChild("Edge") :: UIStroke
+				ce.Thickness = 4
+				ce.Color = Theme.YELLOW
 			end
+			local d = rowH - 14
+			local ix = 6 + d / 2
+			if tier == "refund" then
+				Money.icon(chip, c, math.floor(d * 0.86), UDim2.fromOffset(ix, rowH / 2))
+			else
+				local icon =
+					Theme.ball(chip, if legend then VOID else face[tier], d, UDim2.fromOffset(ix, rowH / 2), MID)
+				icon.Name = "Icon"
+			end
+			local pctText = `{shareOf(line.odds, tier)}%`
+			local tw = chipW - d - 14
 			Theme.label(
-				row,
-				`{shareOf(line.odds, tier)}%`,
-				pctSize,
-				UDim2.fromScale(1, 0.5),
-				UDim2.fromScale(0.5, 0.5),
-				{
-					anchor = MID,
-					color = Color3.new(1, 1, 1),
-					z = 6,
-				}
+				chip,
+				pctText,
+				Theme.fit(pctText, if legend then 30 else 28, tw, rowH - 8),
+				UDim2.fromOffset(tw, rowH - 8),
+				UDim2.fromOffset(d + 10 + tw / 2, rowH / 2),
+				{ anchor = MID, stroke = 3 }
 			).Name =
 				"Pct"
-			x += chipW + gap
+			x += chipW + cg
 		end
 	end
 	chips("coins", board.coins)
 	chips("crystals", board.crystals)
 
-	local function pityLine(c: string, line: Net.SpinLine)
-		local left = line.every - line.pity
-		local pityName = if line.tier == "legendary" then "LEGENDARY" else "EPIC+"
-		local pity = Theme.label(
+	-- guarantee: the tier it promises, how many spins left, a filling bar
+	local function pityBox(c: string, line: Net.SpinLine)
+		local legend = line.tier == "legendary"
+		local col = if legend then TIER_COL.legendary else TIER_COL.epic
+		local box = Theme.card(
 			card,
-			`{pityName}  {line.pity}/{line.every} · {left} LEFT`,
-			18,
-			UDim2.fromOffset(innerW, pityH),
-			UDim2.fromOffset(pad, pityY),
-			{ align = Enum.TextXAlignment.Left, color = Theme.YELLOW_TXT }
+			UDim2.fromOffset(pityW, rowH),
+			UDim2.fromOffset(pad + oddsW + gap, rowY),
+			Theme.SLOT:Lerp(col, 0.3),
+			Theme.BG,
+			14
 		)
-		pity.Name = if c == "coins" then "PityCoins" else "PityGems"
+		box.Name = if c == "coins" then "PityBoxCoins" else "PityBoxGems"
+		local be = box:FindFirstChild("Edge") :: UIStroke
+		be.Color = col
+		local d = rowH - 12
+		local icon = Theme.ball(box, if legend then VOID else face.epic, d, UDim2.fromOffset(6 + d / 2, rowH / 2), MID)
+		icon.Name = "Icon"
+		local left = math.max(0, line.every - line.pity)
+		local head = if left <= 1
+			then `{if legend then "LEGENDARY" else "EPIC+"} NEXT SPIN!`
+			else `{if legend then "LEGENDARY" else "EPIC+"} IN {left}`
+		local tx = d + 14
+		local tw = pityW - tx - 10
+		local barH = math.floor(rowH * 0.32)
+		local headH = rowH - barH - 14
+		Theme.label(
+			box,
+			head,
+			Theme.fit(head, 24, tw, headH),
+			UDim2.fromOffset(tw, headH),
+			UDim2.fromOffset(tx, 4),
+			{ align = Enum.TextXAlignment.Left, color = Theme.YELLOW_TXT, stroke = 3 }
+		).Name =
+			"Head"
+		local bar = Theme.frame(box, UDim2.fromOffset(tw, barH), UDim2.fromOffset(tx, rowH - barH - 8), Theme.INK)
+		bar.Name = "Bar"
+		Theme.round(bar, barH / 2)
+		local u = math.clamp(line.pity / math.max(1, line.every), 0, 1)
+		if u > 0 then
+			local fill = Theme.frame(bar, UDim2.fromScale(u, 1), nil, col)
+			fill.Name = "Fill"
+			Theme.round(fill, barH / 2)
+			Theme.gradient(fill, col:Lerp(WHITE, 0.35), col)
+		end
+		local count = Theme.label(
+			bar,
+			`{line.pity}/{line.every}`,
+			math.max(Theme.MIN_TEXT, barH),
+			UDim2.fromScale(1, 1),
+			UDim2.fromScale(0.5, 0.5),
+			{ anchor = MID, stroke = 2, z = 4 }
+		)
+		count.Name = if c == "coins" then "PityCoins" else "PityGems"
 	end
-	pityLine("coins", board.coins)
-	pityLine("crystals", board.crystals)
+	pityBox("coins", board.coins)
+	pityBox("crystals", board.crystals)
 
-	local modeW = math.clamp(math.floor(innerW * 0.2), 100, 148)
+	-- buttons: the currency switch (coin / crystal pills) and the big SPIN
+	local iconFn = function(parent: Instance, c: string, d: number, pos: UDim2): GuiObject
+		return Money.icon(parent, c, d, pos)
+	end
+	local modeW = math.clamp(math.floor(innerW * 0.19), 150, 190)
 	local modeCoins =
-		Theme.button(card, "COINS", UDim2.fromOffset(modeW, btnH), UDim2.fromOffset(pad, btnY), Theme.YELLOW, nil, 20)
+		Theme.price(card, "COINS", UDim2.fromOffset(modeW, btnH), UDim2.fromOffset(pad, btnY), "coins", iconFn, 24)
 	modeCoins.Name = "ModeCoins"
-	local modeGems = Theme.button(
+	local modeGems = Theme.price(
 		card,
 		"CRYSTALS",
 		UDim2.fromOffset(modeW, btnH),
 		UDim2.fromOffset(pad + modeW + 8, btnY),
-		GEM,
-		nil,
-		20
+		"crystals",
+		iconFn,
+		24
 	)
 	modeGems.Name = "ModeGems"
-	local goW = innerW - modeW * 2 - 16
+	local goX = pad + modeW * 2 + 18
+	local goW = innerW + pad - goX
 	local go = Theme.button(
 		card,
 		`SPIN {Money.fmt(lines[cur].price)}`,
 		UDim2.fromOffset(goW, btnH),
-		UDim2.fromOffset(pad + modeW * 2 + 16, btnY),
-		if cur == "coins" then Theme.YELLOW else GEM,
+		UDim2.fromOffset(goX, btnY),
+		Theme.PRICE_COIN,
 		nil,
-		24
+		34
 	)
 	go.Name = "SpinGo"
+	local goLip = math.clamp(math.floor(btnH * 0.1 + 0.5), 4, 9)
+	local goLabel = go:FindFirstChild("Label") :: TextLabel?
+	modeCoins.NextSelectionRight = modeGems
+	modeGems.NextSelectionLeft = modeCoins
+	modeGems.NextSelectionRight = go
+	go.NextSelectionLeft = modeGems
 
 	local hold = false
 	local function paint(c: string)
@@ -431,42 +497,50 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		cur = c
 		panel:SetAttribute("SpinCur", c)
 		local coinOn = c == "coins"
-		local oddsC = card:FindFirstChild("OddsCoins") :: GuiObject?
-		local oddsG = card:FindFirstChild("OddsGems") :: GuiObject?
-		local pityC = card:FindFirstChild("PityCoins") :: GuiObject?
-		local pityG = card:FindFirstChild("PityGems") :: GuiObject?
-		if oddsC then
-			oddsC.Visible = coinOn
-		end
-		if oddsG then
-			oddsG.Visible = not coinOn
-		end
-		if pityC then
-			pityC.Visible = coinOn
-		end
-		if pityG then
-			pityG.Visible = not coinOn
+		for name, on in { OddsCoins = coinOn, OddsGems = not coinOn, PityBoxCoins = coinOn, PityBoxGems = not coinOn } do
+			local o = card:FindFirstChild(name) :: GuiObject?
+			if o then
+				o.Visible = on
+			end
 		end
 		for _, cell in refundTiles do
 			local old = cell:FindFirstChild("Coin") or cell:FindFirstChild("Gem")
 			if old then
 				old:Destroy()
 			end
-			local icon = Money.icon(cell, c, math.floor(reelH * 0.36), UDim2.fromScale(0.5, 0.46))
-			icon.ZIndex = 4
+			Money.icon(cell, c, math.floor(ballD * 0.82), UDim2.fromOffset(tileW / 2, math.floor(tileH * 0.42)))
 		end
-		Theme.select(modeCoins, coinOn)
-		Theme.select(modeGems, not coinOn)
+		for b, on in { [modeCoins] = coinOn, [modeGems] = not coinOn } do
+			local base = if b == modeCoins then Theme.PRICE_COIN else Theme.PRICE_GEM
+			b.BackgroundColor3 = if on then base else base:Lerp(Theme.SLOT, 0.6)
+			Theme.select(b, on)
+			local l = b:FindFirstChild("Label") :: TextLabel?
+			if l then
+				l.TextColor3 = if on then Theme.TEXT else Theme.DIM
+			end
+		end
 		local price = lines[c].price
-		local bal = if c == "coins" then v.coins or 0 else v.crystals or 0
+		local bal = if coinOn then v.coins or 0 else v.crystals or 0
 		local afford = bal >= price
-		local label = go:FindFirstChild("Label") :: TextLabel?
-		if label then
-			label.Text = `SPIN {Money.fmt(price)}`
-			label.TextColor3 = if afford then Theme.TEXT else Theme.DIM
+		local text = `SPIN {Money.fmt(price)}`
+		local old = go:FindFirstChild("Coin") or go:FindFirstChild("Gem")
+		if old then
+			old:Destroy()
+		end
+		if goLabel then
+			goLabel.Text = text
+			goLabel.TextColor3 = if afford then Theme.TEXT else Theme.DIM
+			-- the currency icon sits just left of the centred text
+			local d = math.min(40, btnH - goLip - 16)
+			local tw = math.min(goW - d - 40, goLabel.TextSize * 0.6 * #text)
+			goLabel.Size = UDim2.fromOffset(tw + 8, btnH - goLip)
+			goLabel.Position = UDim2.fromOffset(goW / 2 + (d + 10) / 2, 0)
+			local ic =
+				Money.icon(go, c, d, UDim2.fromOffset(goW / 2 - tw / 2 - 10 - d / 2 + (d + 10) / 2, (btnH - goLip) / 2))
+			lift(ic, 4)
 		end
 		go.Active = afford and panel:GetAttribute("SpinPhase") ~= "spinning"
-		go.BackgroundColor3 = if afford then (if c == "coins" then Theme.YELLOW else GEM) else Theme.PANEL_HI
+		go.BackgroundColor3 = if afford then (if coinOn then Theme.PRICE_COIN else Theme.PRICE_GEM) else Theme.PANEL_HI
 	end
 
 	modeCoins.Activated:Connect(function()
@@ -489,108 +563,149 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	end)
 	paint(cur)
 
-	local span = 0
-	for _, tier in CYCLE do
-		span += SPEC[tier].w
-	end
-
-	local function celebrate(tier: string, tile: GuiObject?)
+	-- the reveal, stronger with the tier
+	local function celebrate(tier: string, tile: Frame?)
 		local sound = if tier == "legendary"
 			then "legend"
 			elseif tier == "epic" then "epic"
 			elseif tier == "rare" then "rare"
 			else "hit"
 		playSfx(sound)
-		if Theme.reduced() then
+		if tile then
+			Theme.scaleOf(tile).Scale = if tier == "legendary"
+				then 1.12
+				elseif tier == "epic" then 1.08
+				elseif tier == "rare" then 1.05
+				else 1.02
+		end
+		resultBox.BackgroundColor3 = TIER_COL[tier]
+		local rw = math.min(viewW - 40, math.floor(26 * 0.62 * #result.Text) + 40)
+		resultBox.Size = UDim2.fromOffset(rw, 40)
+		resultBox.Visible = true
+		if still then
 			return
 		end
-		local color = SPEC[tier].color
-		local amp = if tier == "legendary" then 18 elseif tier == "epic" then 8 elseif tier == "rare" then 3 else 0
-		local bits = if tier == "legendary" then 48 elseif tier == "epic" then 18 elseif tier == "rare" then 8 else 0
-		local flash =
-			Theme.frame(panel, UDim2.fromScale(1, 1), nil, if tier == "legendary" then Color3.new(1, 1, 1) else color)
+		Theme.pop(resultBox, 0.05, 0.4)
+		local col = TIER_COL[tier]
+		local cx, cy = viewW / 2, reelH / 2
+		local spinRays: Frame? = nil
+		-- rare+: a soft glow over the slot; epic+: turning rays and a dim around the slot
+		if tier ~= "common" and tier ~= "refund" then
+			local glow =
+				Theme.glow(window, math.floor(tileH * 1.7), col:Lerp(WHITE, 0.35), UDim2.fromOffset(cx, cy), 5, 0.7)
+			lift(glow, 4)
+			Theme.pop(glow, 0, 0.3)
+		end
+		if tier == "epic" or tier == "legendary" then
+			local dim = Theme.frame(window, UDim2.fromScale(1, 1), nil, Theme.INK)
+			dim.Name = "Dim"
+			dim.BackgroundTransparency = 0.45
+			dim.ZIndex = 4
+			local r = Theme.rays(
+				window,
+				if tier == "legendary" then 16 else 10,
+				math.floor(viewW * 0.9),
+				if tier == "legendary" then 34 else 22,
+				UDim2.fromOffset(cx, cy),
+				col,
+				WHITE,
+				0.35
+			)
+			lift(r, 4)
+			spinRays = r
+			-- the prize itself, big, above the dim and the rays
+			if hit and hit.e then
+				local big = Theme.ball(window, hit.e, math.floor(tileH * 0.84), UDim2.fromOffset(cx, cy - 6), MID)
+				big.Name = "Big"
+				big.ZIndex = 8
+				Theme.pop(big, 0, 0.3)
+			end
+		end
+		local flash = Theme.frame(panel, UDim2.fromScale(1, 1), nil, if tier == "legendary" then WHITE else col)
 		flash.Name = "Flash"
-		flash.BackgroundTransparency = if tier == "legendary" then 0.25 elseif tier == "epic" then 0.4 else 0.62
+		flash.BackgroundTransparency = if tier == "legendary"
+			then 0.15
+			elseif tier == "epic" then 0.4
+			elseif tier == "rare" then 0.65
+			else 0.85
 		flash.ZIndex = 20
+		local flashA = flash.BackgroundTransparency
 		if tier == "legendary" or tier == "epic" then
-			local e = if hit and hit.e then hit.e else featured
+			local e = if hit and hit.e then hit.e else VOID
 			local px, py = panel.Size.X.Offset / 2, panel.Size.Y.Offset / 2
-			local rays = Cheer.rays(panel, ctx, e, px, py, if tier == "legendary" then 860 else 420)
-			rays.ZIndex = 8
 			Cheer.burst(panel, ctx, e, px, py)
 			if tier == "legendary" then
+				local rays = Cheer.rays(panel, ctx, e, px, py, 860)
+				rays.ZIndex = 8
 				Cheer.confetti(panel, ctx)
 			end
 		end
-		local born: { { f: Frame, x: number, y: number, vx: number, vy: number } } = {}
-		local cx, cy = viewW / 2, reelH / 2
+		-- sparks out of the slot
+		local bits = if tier == "legendary" then 40 elseif tier == "epic" then 18 elseif tier == "rare" then 8 else 0
+		local motes: { { f: Frame, x: number, y: number, vx: number, vy: number } } = {}
 		for i = 1, bits do
 			local ang = (i / bits) * math.pi * 2
-			local speed = if tier == "legendary" then 340 else 160
-			local d = Theme.disc(window, if tier == "legendary" then 16 else 10, color, UDim2.fromOffset(cx, cy), 0.05)
-			d.ZIndex = 14
-			table.insert(born, {
-				f = d,
-				x = cx,
-				y = cy,
-				vx = math.cos(ang) * speed,
-				vy = math.sin(ang) * speed * 0.75,
-			})
+			local speed = if tier == "legendary" then 340 else 170
+			local d = Theme.disc(
+				window,
+				if tier == "legendary" then 14 else 10,
+				col:Lerp(WHITE, 0.3),
+				UDim2.fromOffset(cx, cy),
+				0
+			)
+			d.ZIndex = 11
+			table.insert(motes, { f = d, x = cx, y = cy, vx = math.cos(ang) * speed, vy = math.sin(ang) * speed * 0.7 })
 		end
-		local ox = panel.Position.X.Offset
-		local oy = panel.Position.Y.Offset
+		local amp = if tier == "legendary" then 16 elseif tier == "epic" then 7 elseif tier == "rare" then 2 else 0
+		local ox, oy = panel.Position.X.Offset, panel.Position.Y.Offset
 		local life = 0
-		local dur = if tier == "legendary" then 0.95 elseif tier == "epic" then 0.5 else 0.28
+		local dur = if tier == "legendary" then 1 elseif tier == "epic" then 0.6 else 0.3
 		table.insert(ctx.frames, function(dt)
 			if not window.Parent then
 				return
 			end
 			life += dt
 			local u = math.clamp(life / dur, 0, 1)
+			if spinRays then
+				spinRays.Rotation = life * 30
+			end
 			if flash.Parent then
-				flash.BackgroundTransparency = flash.BackgroundTransparency
-					+ (1 - flash.BackgroundTransparency) * math.min(1, dt * 4)
+				flash.BackgroundTransparency = 1 - (1 - flashA) * math.max(0, 1 - u * 1.4)
 			end
-			if amp > 0 and panel.Parent then
+			if amp > 0 and panel.Parent and life <= dur then
 				local damp = (1 - u) * (1 - u)
-				local k = math.sin(life * 52) * amp * damp
-				panel.Position = UDim2.fromOffset(ox + k, oy + math.cos(life * 47) * amp * 0.45 * damp)
+				panel.Position = UDim2.fromOffset(
+					ox + math.sin(life * 52) * amp * damp,
+					oy + math.cos(life * 47) * amp * 0.45 * damp
+				)
 			end
-			for _, bit in born do
-				if bit.f.Parent then
-					bit.x += bit.vx * dt
-					bit.y += bit.vy * dt
-					bit.vy += 360 * dt
-					bit.f.Position = UDim2.fromOffset(bit.x, bit.y)
-					bit.f.BackgroundTransparency = u
+			for _, m in motes do
+				if m.f.Parent then
+					m.x += m.vx * dt
+					m.y += m.vy * dt
+					m.vy += 360 * dt
+					m.f.Position = UDim2.fromOffset(m.x, m.y)
+					m.f.BackgroundTransparency = u
 				end
 			end
 			if life >= dur then
-				if panel.Parent then
+				if panel.Parent and amp > 0 then
 					panel.Position = UDim2.fromOffset(ox, oy)
+					amp = 0
 				end
 				if flash.Parent then
 					flash:Destroy()
 				end
-				for _, bit in born do
-					if bit.f.Parent then
-						bit.f:Destroy()
+				for _, m in motes do
+					if m.f.Parent then
+						m.f:Destroy()
 					end
 				end
 			end
 		end)
-		if tile then
-			local pop = if tier == "legendary"
-				then 1.34
-				elseif tier == "epic" then 1.16
-				elseif tier == "rare" then 1.08
-				else 1.03
-			Theme.scaleOf(tile).Scale = pop
-		end
 	end
 
 	if hit then
-		strip.Visible = true
 		local idx = table.find(CYCLE, hit.tier) or #CYCLE
 		local land = (4 - 1) * #CYCLE + idx
 		local prizeTile = strip:FindFirstChild(`Tile{land}`) :: Frame?
@@ -606,28 +721,24 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		strip.Position = UDim2.fromOffset(x0, 0)
 		local t = 0
 		local done = false
+		local lastTile = 3
+		local lastTick = 0
 		local function stop()
 			if done then
 				return
 			end
 			done = true
 			strip.Position = UDim2.fromOffset(x1, 0)
-			if prizeTile then
-				prizeTile.ZIndex = 5
-			end
-			Theme.scaleOf(marker).Scale = if hit.tier == "legendary" then 1.4 else 1.15
-			if hit.e then
-				marker.BackgroundColor3 = Theme.nameColor(hit.e)
-			end
+			Theme.scaleOf(marker).Scale = if hit.tier == "legendary" then 1.08 else 1.04
+			mEdge.Color = TIER_COL[hit.tier]:Lerp(WHITE, 0.2)
 			panel:SetAttribute("SpinOn", hit.tier)
 			panel:SetAttribute("SpinPhase", "odds")
 			local bal = if cur == "coins" then v.coins or 0 else v.crystals or 0
 			go.Active = bal >= lines[cur].price
 			result.Text = prize(hit)
-			result.TextColor3 = if hit.e then Theme.nameColor(hit.e) else Theme.YELLOW
 			celebrate(hit.tier, prizeTile)
 		end
-		if Theme.reduced() then
+		if still then
 			stop()
 		else
 			table.insert(ctx.frames, function(dt)
@@ -636,46 +747,43 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 				end
 				t = math.min(Spin.TIME, t + dt)
 				local u = t / Spin.TIME
+				-- fast start, long slow end: the last tiers crawl past the slot
 				local k = 1 - (1 - u) ^ 4
-				strip.Position = UDim2.fromOffset(x0 + (x1 - x0) * k, 0)
-				if prizeTile and u > 0.86 then
-					Theme.scaleOf(prizeTile).Scale = 1 + 0.12 * (u - 0.86) / 0.14
+				local x = x0 + (x1 - x0) * k
+				strip.Position = UDim2.fromOffset(x, 0)
+				local under = 3 + math.floor((x0 - x) / slotW + 0.5)
+				if under ~= lastTile and t - lastTick > 0.07 then
+					lastTile = under
+					lastTick = t
+					playSfx("hit")
+					Theme.scaleOf(marker).Scale = 1.05
 				end
+				local ms = Theme.scaleOf(marker)
+				ms.Scale = 1 + ((ms.Scale or 1) - 1) * math.max(0, 1 - dt * 12)
 				if t >= Spin.TIME then
 					stop()
 				end
 			end)
 		end
 	else
-		local hero = strip:FindFirstChild("Tile4") :: Frame?
-		if hero then
-			hero:SetAttribute("Ball", featured)
-			local icon = hero:FindFirstChild("Icon") :: ImageLabel?
-			if icon then
-				icon.Image = Art.BALLS
-				icon.ImageRectOffset = Art.ballRect(featured)
-			end
-		end
-		strip.Position = UDim2.fromOffset(at(4), 0)
-		strip.Visible = false
-		marker.BackgroundTransparency = 1
-		local shown = Theme.ball(window, featured, heroD, UDim2.fromOffset(heroX, heroY), MID)
-		shown.Name = "Hero"
-		shown.ZIndex = 8
-		if not Theme.reduced() and hero then
-			local sc = Theme.scaleOf(hero)
+		-- idle: the drum drifts so the tiers go by, the slot breathes
+		strip.Position = UDim2.fromOffset(at(3), 0)
+		if not still then
 			local age = 0
+			local span = slotW * #CYCLE
+			local ms = Theme.scaleOf(marker)
 			table.insert(ctx.frames, function(dt)
-				if not hero.Parent or panel:GetAttribute("SpinPhase") == "spinning" then
+				if not strip.Parent or panel:GetAttribute("SpinPhase") == "spinning" then
 					return
 				end
 				age += dt
-				sc.Scale = 1 + 0.04 * math.sin(age * 2.4)
+				strip.Position = UDim2.fromOffset(at(3) - (age * 34) % span, 0)
+				ms.Scale = 1 + 0.02 * math.sin(age * 3)
 			end)
 		end
 	end
 
-	if not Theme.reduced() then
+	if not still then
 		local sc = Theme.scaleOf(go)
 		local age = 0
 		table.insert(ctx.frames, function(dt)
@@ -687,7 +795,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 				return
 			end
 			age += dt
-			sc.Scale = 1 + 0.02 * math.sin(age * 3)
+			sc.Scale = 1 + 0.025 * math.sin(age * 3)
 		end)
 	end
 

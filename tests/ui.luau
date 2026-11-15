@@ -691,7 +691,7 @@ do
 	check(find(panel, "Result").Text == "", "spin: the prize waits for the stop")
 	find(panel, "SpinGo").Activated:Fire()
 	check(#acts == 1, "spin: no tap while the reel moves")
-	step(w, 1.2)
+	step(w, 2.1)
 	check(panel:GetAttribute("SpinOn") == "rare", "spin: reel stops on the server tier")
 	check(find(panel, "Result").Text == "RARE · LAVA", "spin: the stopped prize is the server ball")
 	find(panel, "ModeGems").Activated:Fire()
@@ -715,6 +715,34 @@ do
 	check(
 		find(w.root, "SpinBtn") == nil and not w.pop.Visible,
 		"spin: restricted policy hides the button and the screen"
+	)
+end
+
+-- Spin on 1280x720 (canvas 960x540) and on a 844x390 phone (canvas 1168x540, scale 0.72): every button
+-- inside the card and >= 62 design px tall (44 px on the phone).
+for _, cv in { V2(960, 540), V2(1168, 540) } do
+	local tag = `{cv.X} spin fit`
+	local w = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(5000, 49, false, 1)
+	v.spin = spinBoard(3)
+	Wallet.setProfile(w, v)
+	find(w.root, "SpinBtn").Activated:Fire()
+	local panel = find(w.pop, "ShopPanel")
+	buttonsFit(panel, cv, tag)
+	local cardR = rectOf(find(panel, "SpinCard"))
+	for _, name in { "ModeCoins", "ModeGems", "SpinGo" } do
+		local r = rectOf(find(panel, name))
+		check(r[4] >= 62, `{tag}: {name} tall enough ({r[4]})`)
+		check(inside(find(panel, name), find(panel, "SpinCard")), `{tag}: {name} inside the card`)
+		check(
+			r[1] >= cardR[1] and r[1] + r[3] <= cardR[1] + cardR[3] and r[2] + r[4] <= cardR[2] + cardR[4],
+			`{tag}: {name} {r[1]},{r[2]} {r[3]}x{r[4]} in card {cardR[1]},{cardR[2]} {cardR[3]}x{cardR[4]}`
+		)
+	end
+	check(
+		rectOf(find(panel, "Reel"))[2] + rectOf(find(panel, "Reel"))[4] <= rectOf(find(panel, "OddsCoins"))[2],
+		`{tag}: odds under the reel`
 	)
 end
 
