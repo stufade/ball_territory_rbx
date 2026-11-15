@@ -580,7 +580,7 @@ function Shop.packs(body: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 				strip,
 				if isVip then "OfferVip" else "OfferCoins2x",
 				if isVip then "VIP" else "2X COINS",
-				if isVip then "+QUEST +PICK" else "IN MATCHES",
+				if isVip then "+QUEST" else "IN MATCHES",
 				P.robux,
 				(if isVip then Theme.YELLOW else Theme.GOOD):Lerp(Theme.BG, 0.45),
 				x,

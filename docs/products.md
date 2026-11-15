@@ -46,5 +46,5 @@ Universe 10775439626, created 2026-11-15 via Creator Dashboard. Managed Pricing 
 | Trail Eclipse | developer product | 399 | 3732004806 |
 | Frame Champion | developer product | 499 | 3732004812 |
 | 2x Match Coins | game pass (`passes.coins2x`) | 249 | 2089810640 |
-| VIP | game pass (`passes.vip`) | 249 | 2088964657 |
+| VIP (+1 «Любой шар» — после драфта, пока не обещаем) | game pass (`passes.vip`) | 249 | 2088964657 |
 | Fast Spin | game pass (`passes.fastSpin`) | 99 | 2088970590 |
