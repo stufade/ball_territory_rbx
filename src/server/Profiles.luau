@@ -141,6 +141,8 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [st
 		dev = if Profiles.isDev(player) then true else nil,
 		news = news,
 	}
+	-- VIP pass: a fourth quest a day (the pass may arrive after the day's draw)
+	Daily.quests(d, clock(), Config.ECON, rand, if Passes.has(player, "vip") then 1 else 0)
 	for k, v in Award.view(d, clock(), serverNow(), Config, #NAMES) do
 		(view :: any)[k] = v
 	end
@@ -477,19 +479,34 @@ function Profiles.spin(player: Player, cur: any)
 		return
 	end
 	local log = {}
-	local hit = Spin.roll(p.data, cur, Config.ECON, rand, log, false)
-	if not hit then
+	-- Fast Spin pass: "coins10" / "crystals10" is ten spins for one payment (server-checked ownership)
+	local ten = cur == "coins10" or cur == "crystals10"
+	if ten and not Passes.has(player, "fastSpin") then
+		Profiles.send(player)
+		return
+	end
+	local hits: { Spin.Hit }? = nil
+	if ten then
+		hits = Spin.roll10(p.data, string.sub(cur, 1, -3), Config.ECON, rand, log, false)
+	else
+		local one = Spin.roll(p.data, cur, Config.ECON, rand, log, false)
+		hits = if one then { one } else nil
+	end
+	if not hits or #hits == 0 then
 		-- short balance or a bad currency: nothing was spent; refresh so the buttons match the wallet
 		Profiles.send(player)
 		return
 	end
+	local hit = hits[#hits]
 	Progress.plan(p.data, Config :: any, rand)
 	saveSoon(p)
 	attrs(p)
-	Analytics.spin(player, hit.cur, hit.tier, hit.pity)
 	local what = if hit.e then Rules.Config.TITLE[hit.e] else `refund +{hit.back}`
 	print(`[BT] {player.Name} spun {hit.cur}: {hit.tier} {what}`)
-	Profiles.send(player, nil, { gains = gains(player, log), spinResult = hit })
+	for _, h in hits do
+		Analytics.spin(player, h.cur, h.tier, h.pity)
+	end
+	Profiles.send(player, nil, { gains = gains(player, log), spinResult = hit, spinHits = if ten then hits else nil })
 end
 
 -- Debug: ServerScriptService attribute DebugDay = n shifts this server's profile clock by n days (login and

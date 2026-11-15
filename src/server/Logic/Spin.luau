@@ -102,7 +102,15 @@ function Spin.board(d: any, E: any, ok: boolean): Board
 end
 
 -- One spin. Nil, and the wallet untouched, when the currency is wrong, the balance is short, or `blocked`.
-function Spin.roll(d: any, cur: any, E: any, rng: () -> number, log: { Wallet.Flow }?, blocked: boolean?): Hit?
+function Spin.roll(
+	d: any,
+	cur: any,
+	E: any,
+	rng: () -> number,
+	log: { Wallet.Flow }?,
+	blocked: boolean?,
+	prepaid: boolean?
+): Hit?
 	if blocked or (cur ~= "coins" and cur ~= "crystals") then
 		return nil
 	end
@@ -110,7 +118,7 @@ function Spin.roll(d: any, cur: any, E: any, rng: () -> number, log: { Wallet.Fl
 	if not spin then
 		return nil
 	end
-	if not Wallet.spend(d, cur, spin.price, `spin_{cur}`, "Shop", log) then
+	if not prepaid and not Wallet.spend(d, cur, spin.price, `spin_{cur}`, "Shop", log) then
 		return nil
 	end
 	local order: { string } = E.TIER_ORDER
@@ -169,6 +177,31 @@ function Spin.roll(d: any, cur: any, E: any, rng: () -> number, log: { Wallet.Fl
 	table.insert(d.balls, e)
 	local given: Hit = { cur = currency, tier = result, e = e, back = 0, pity = count, price = spin.price }
 	return given
+end
+
+-- Fast Spin x10 (the pass is checked by the caller): one payment, ten rolls, the pity counter runs through all
+-- ten. Crystals use price10, coins ten times the price. Nil and the wallet untouched when short, bad or blocked.
+function Spin.roll10(d: any, cur: any, E: any, rng: () -> number, log: { Wallet.Flow }?, blocked: boolean?): { Hit }?
+	if blocked or (cur ~= "coins" and cur ~= "crystals") then
+		return nil
+	end
+	local spin = E.SPIN[cur]
+	if not spin then
+		return nil
+	end
+	local total = spin.price10 or spin.price * 10
+	if not Wallet.spend(d, cur, total, `spin10_{cur}`, "Shop", log) then
+		return nil
+	end
+	local hits: { Hit } = {}
+	for _ = 1, 10 do
+		local hit = Spin.roll(d, cur, E, rng, log, false, true)
+		if not hit then
+			break
+		end
+		table.insert(hits, hit)
+	end
+	return hits
 end
 
 return Spin

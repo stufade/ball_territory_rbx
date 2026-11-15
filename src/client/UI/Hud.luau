@@ -95,6 +95,11 @@ local function seatColor(seat: Net.Seat): Color3
 	return Theme.SEAT[seat.side % 4 + 1]
 end
 
+-- VIP pass: a golden name (the plate frame keeps the seat colour)
+local function nameColor(seat: Net.Seat): Color3
+	return if seat.vip then Theme.YELLOW else seatColor(seat)
+end
+
 local function portrait(parent: Instance, seat: Net.Seat, d: number, pos: UDim2)
 	local disc = Theme.disc(parent, d, Theme.PANEL, pos)
 	Theme.stroke(disc, 4, seatColor(seat))
@@ -134,6 +139,9 @@ local function nameOf(self: Hud, seat: Net.Seat): string
 	if seat.userId <= 0 and self.start.mode == "ffa" then
 		return `BOT {seat.side + 1}`
 	end
+	if seat.vip then
+		return `[VIP] {string.upper(seat.name)}`
+	end
 	return string.upper(seat.name)
 end
 
@@ -166,7 +174,7 @@ local function makePlate(self: Hud, seat: Net.Seat, slot: number, right: boolean
 			28,
 			UDim2.fromOffset(196, 34),
 			UDim2.fromOffset(mx(right, 96, 196), 6),
-			{ color = seatColor(seat), align = align }
+			{ color = nameColor(seat), align = align }
 		)
 		for i = 1, Config.DUEL_SIZE do
 			local x = mx(right, 96 + (i - 1) * 34, 32)
@@ -205,7 +213,7 @@ local function makePlate(self: Hud, seat: Net.Seat, slot: number, right: boolean
 			24,
 			UDim2.fromOffset(210, 30),
 			UDim2.fromOffset(mx(right, 84, 210), 4),
-			{ color = seatColor(seat), align = align }
+			{ color = nameColor(seat), align = align }
 		)
 		Theme.ball(f, e, 38, UDim2.fromOffset(mx(right, 84, 38) + 19, 54))
 		pct = Theme.text(

@@ -63,7 +63,7 @@ local function shareOf(odds: Net.SpinOdds, tier: string): number
 end
 
 local function playSfx(name: string)
-	local ok, mod = pcall(function()
+	local ok, mod: any = pcall(function(): any
 		local ui = script.Parent
 		local client = ui.Parent
 		local render = client:FindFirstChild("Render")
@@ -159,7 +159,8 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		end
 	end
 	panel:SetAttribute("SpinPhase", if hit then "spinning" else "odds")
-	local still = Theme.reduced()
+	-- reduced motion, or the Fast Spin pass (server-owned, v.passes): the result shows without the reel run
+	local still = Theme.reduced() or (v.passes ~= nil and v.passes.fastSpin == true)
 
 	local owned: { [number]: boolean } = {}
 	for _, e in v.balls do
@@ -497,7 +498,9 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		cur = c
 		panel:SetAttribute("SpinCur", c)
 		local coinOn = c == "coins"
-		for name, on in { OddsCoins = coinOn, OddsGems = not coinOn, PityBoxCoins = coinOn, PityBoxGems = not coinOn } do
+		local show: { [string]: boolean } =
+			{ OddsCoins = coinOn, OddsGems = not coinOn, PityBoxCoins = coinOn, PityBoxGems = not coinOn }
+		for name, on in show do
 			local o = card:FindFirstChild(name) :: GuiObject?
 			if o then
 				o.Visible = on

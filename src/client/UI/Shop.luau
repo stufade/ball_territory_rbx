@@ -95,7 +95,6 @@ local function iconFn(parent: Instance, cur: string, d: number, pos: UDim2): Gui
 end
 
 -- Sizes (design px). Header: title, wallet and close in one row; tabs under it; body below.
-local HEAD_H = 84
 local TAB_Y, TAB_H = 88, 54
 local BODY_Y = TAB_Y + TAB_H + 10
 local CARD_NAT = 126 -- natural height of a grid card; rows stretch so only whole rows show
@@ -315,7 +314,12 @@ end
 function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	parent:ClearAllChildren()
 	local cv = ctx.canvas
+	-- paid random restricted (PolicyService): no SPIN tab, no Fast Spin; the cosmetics stay
+	local spinOk = v.spin ~= nil and v.spin.ok
 	local tab: Tab = ctx.tab or "balls"
+	if tab == "spin" and not spinOk then
+		tab = "balls"
+	end
 	local owned: { [number]: boolean } = {}
 	for _, e in v.balls do
 		owned[e] = true
@@ -384,8 +388,12 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 
 	-- tabs: each in its own colour; the open one is bright, taller, with the yellow edge
 	local tabGap = 10
-	local tabW = math.floor((pw - 32 - tabGap * 2) / 3)
-	local order: { Tab } = { "balls", "spin", "skins" }
+	local order: { Tab } = { "balls" }
+	if spinOk then
+		table.insert(order, "spin")
+	end
+	table.insert(order, "skins")
+	local tabW = math.floor((pw - 32 - tabGap * (#order - 1)) / #order)
 	local tabName = { balls = "TabBalls", spin = "TabSpin", skins = "TabSkins" }
 	local tabWord = { balls = "BALLS", spin = "SPIN", skins = "SKINS" }
 	local tabCol = { balls = Theme.YELLOW, spin = Theme.ORANGE, skins = Theme.PURPLE }
@@ -403,9 +411,10 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				l.TextColor3 = Theme.DIM
 			end
 		end
+		local target: Tab = if id == "balls" then "balls" elseif id == "spin" then "spin" else "skins"
 		b.Activated:Connect(function()
-			if tab ~= id then
-				ctx.setTab(id)
+			if not on then
+				ctx.setTab(target)
 			end
 		end)
 	end

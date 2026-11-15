@@ -6,6 +6,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Analytics = require("./Analytics")
 local Config = require("./Config")
 local Guard = require("./Logic/Guard")
+local Passes = require("./Passes")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Rules = require(ReplicatedStorage.Shared.Rules)
@@ -86,7 +87,11 @@ end
 local function startData(r: Runner, you: number?, key: buffer): { [string]: any }
 	local seats = {}
 	for _, s in r.seats do
-		table.insert(seats, { e = s.e, name = s.name, userId = s.userId, side = s.side })
+		local vip = s.rec ~= nil and Passes.has(s.rec.player, "vip")
+		table.insert(
+			seats,
+			{ e = s.e, name = s.name, userId = s.userId, side = s.side, vip = if vip then true else nil }
+		)
 	end
 	local arena = r.session.arena
 	return {

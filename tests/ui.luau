@@ -561,7 +561,8 @@ do
 		rectOf(find(panel, "Row5"))[3] < rectOf(find(panel, "List"))[3] * 0.6,
 		"shop: shelf is a card grid, not a full-width row"
 	)
-	check(find(panel, "TabBalls") and find(panel, "TabSpin") and find(panel, "TabSkins"), "shop: three tabs")
+	check(find(panel, "TabBalls") and find(panel, "TabSkins"), "shop: balls and skins tabs")
+	check(find(panel, "TabSpin") == nil, "shop: no SPIN tab until the server allows paid random")
 	buttonsFit(panel, cv, "shop")
 	find(today, "PayCoins").Activated:Fire()
 	check(#acts == 1 and acts[1][1] == "buy" and acts[1][2] == 4 and acts[1][3] == "coins", "shop: Action buy coins")
@@ -961,6 +962,67 @@ for _, vp in { { 390, 844 }, { 1280, 720 } } do
 	buttonsFit(skins, cv, `{tag} skins`)
 	find(skins, "TabBalls").Activated:Fire()
 	buttonsFit(find(w.pop, "ShopPanel"), cv, `{tag} balls`)
+end
+
+-- Shop under PolicyService: SPIN tab hidden (v.spin missing or ok = false), cosmetics stay; allowed: three tabs.
+do
+	local cv = V2(1168, 540)
+	local off = spinBoard(0)
+	off.ok = false
+	for name, board in { restricted = off, allowed = spinBoard(0) } do
+		local w = make(cv)
+		Wallet.setState(w, { ph = "lobby" })
+		local v = view(5000, 49, false, 1)
+		v.spin = board
+		Wallet.setProfile(w, v)
+		find(w.root, "ShopBtn").Activated:Fire()
+		local panel = find(w.pop, "ShopPanel")
+		local want = name == "allowed"
+		check((find(panel, "TabSpin") ~= nil) == want, `spin policy {name}: SPIN tab visible = {want}`)
+		check(
+			find(panel, "TabBalls") ~= nil and find(panel, "TabSkins") ~= nil,
+			`spin policy {name}: balls and skins stay`
+		)
+		if not want then
+			check(find(w.root, "SpinBtn") == nil, "spin policy: kiosk SPIN button hidden")
+			find(panel, "TabSkins").Activated:Fire()
+			check(find(w.pop, "Looks") ~= nil, "spin policy: cosmetics stay on sale")
+		end
+	end
+end
+
+-- Shelf: the R$ button asks the server (action pay with the look id); the client never opens a prompt.
+do
+	local cv = V2(1168, 540)
+	local w, _, acts = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(5000, 10, false, 1)
+	local robux: { [string]: number } = {}
+	for _, l in Economy.LOOKS do
+		robux[l.id] = 1234
+	end
+	v.shelf = {
+		n = 5,
+		need = 27,
+		owned = {},
+		on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
+		robux = robux,
+	}
+	Wallet.setProfile(w, v)
+	find(w.root, "ShopBtn").Activated:Fire()
+	find(find(w.pop, "ShopPanel"), "TabSkins").Activated:Fire()
+	local card = find(w.pop, "R_trail_dust")
+	local pay = card and find(card, "PayRobux")
+	check(pay ~= nil, "pay: R$ button on the look card")
+	if pay then
+		local before = #acts
+		pay.Activated:Fire()
+		local last = acts[#acts]
+		check(
+			#acts == before + 1 and last[1] == "pay" and last[2] == nil and last[3] == "trail_dust",
+			"pay: Shelf R$ sends action pay with the look id"
+		)
+	end
 end
 
 print(`{passed} passed, {fails} failed`)

@@ -5,8 +5,6 @@
 -- Every preview is drawn inside its well: a skin is a ball in its material on a glow (dark skins on a light one),
 -- a trail is the player's ball with its tail, a force is the ball in a ring and flash of its colour, a frame is a
 -- portrait of the ball in that frame.
-local MarketplaceService = game:GetService("MarketplaceService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
@@ -473,15 +471,6 @@ local function picture(box: Frame, id: string, e: number, w: number, h: number)
 	end
 end
 
-local function prompt(productId: number)
-	local player = Players.LocalPlayer
-	if player and type(MarketplaceService.PromptProductPurchase) == "function" then
-		pcall(function()
-			MarketplaceService:PromptProductPurchase(player, productId)
-		end)
-	end
-end
-
 local function iconFn(parent: Instance, cur: string, d: number, pos: UDim2): GuiObject
 	return Money.icon(parent, cur, d, pos)
 end
@@ -736,7 +725,7 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 			if type(pid) == "number" and pid > 0 then
 				pay.Active = true
 				pay.Activated:Connect(function()
-					prompt(pid :: number)
+					ctx.act(Net.Action.pay, nil, id)
 				end)
 			else
 				Theme.disable(pay)

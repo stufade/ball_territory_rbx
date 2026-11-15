@@ -125,7 +125,8 @@ Net.SNAP_MAX = Snap.MAX
 
 export type ModeName = "duel" | "ffa" | "intro" | "tutor"
 
-export type Seat = { e: number, name: string, userId: number, side: number }
+-- vip: owns the VIP pass (gold name and tag on the plate)
+export type Seat = { e: number, name: string, userId: number, side: number, vip: boolean? }
 
 export type MatchStart = {
 	id: number,
@@ -242,6 +243,8 @@ export type ProfileView = {
 	refused: { key: string, why: string }?,
 	-- Set on the snapshot that paid for a spin. The reel only displays it.
 	spinResult: SpinHit?,
+	-- Fast Spin x10 ("coins10" / "crystals10"): all ten hits in order; spinResult is the last one
+	spinHits: { SpinHit }?,
 	-- Cosmetic shelf. n/need is the collection size, not a lock. robux lists asset ids that are actually for sale.
 	shelf: {
 		n: number,

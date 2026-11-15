@@ -54,3 +54,22 @@
 - Покупка облика, шара, набора, пака и пасса через `pay`: окно открывает сервер, у купленного — отказ без окна (после переделки Shelf).
 - `UserOwnsGamePassAsync` с реальными id и покупка пасса в сессии → `v.passes` обновляется.
 - В Studio рулетки видны (политика открыта), x2 монет у владельца пасса.
+
+## Хвосты (luau-coder, 2026-11-16)
+
+`stylua` и `luau-lsp analyze` по `src` чисто (ошибок типов в Shop и Spin больше нет). Все `tests/*.luau` через lune зелёные (economy 565+, ui 2496+, pay 27, profile 407, receipt 125, looks, server, flow, net, party, tutor, actors, aim, balance, parity, render); `duel`, `trace`, `tune` — тяжёлые инструменты, отрабатывают. Studio не трогал.
+
+| # | Что | Где | Тест |
+|---|---|---|---|
+| 1 | Кнопка R$ полки обликов шлёт `ctx.act("pay", nil, lookId)`; `PromptProductPurchase` в клиенте больше нет (удалены `prompt` и сервисы). | `UI/Shelf.luau` | `tests/ui` («pay: Shelf R$…») |
+| 2 | Запрет платного рандома (`v.spin` нет или `ok = false`): вкладки SPIN нет (две вкладки на ту же ширину), открытая SPIN уходит в BALLS; косметика остаётся. Кнопка SPIN киоска и Fast Spin (offer) уже были скрыты сервером/Wallet. | `UI/Shop.luau` | `tests/ui` («spin policy…») |
+| 3 | Типы: `Tab` в `Shop` (вычисляется явно), `playSfx` (`any`) и таблица видимости в `Spin`. Убран неиспользуемый `HEAD_H`. Вид не менялся. | `Shop`, `Spin` | analyze |
+| 4a | VIP: +1 задание (4 вместо 3) — `Daily.quests(..., extra)`, докидывается и в середине дня, если пасс пришёл позже; не дублирует квест. | `Logic/Daily`, `Profiles.send` | `tests/economy` |
+| 4b | VIP: золотое имя и `[VIP]` на плашке матча (`Seat.vip` от `Passes.has`). | `Runner`, `Net`, `UI/Hud` | analyze (без Studio) |
+| 4c | Fast Spin: серверный x10 (`Spin.roll10`: одна оплата, 10 прокрутов, гарантия идёт через все; монеты 10×1000, кристаллы `price10` 399), действие `spin` с `coins10`/`crystals10` только при `Passes.has fastSpin` и без запрета; клиенту `spinHits`. Клиентская лента пропускает анимацию (как reduced motion) при `v.passes.fastSpin`. | `Logic/Spin`, `Profiles.spin`, `Net`, `UI/Spin` | `tests/economy` |
+
+### Не сделано
+- **Кнопки R$ в BALLS (Shop) и паки кристаллов в Wallet не существуют в UI**: нечему идти через `pay`. Серверная часть (`pay` с `ball`, `starter`, `pack`, `pass_*`) готова и покрыта `tests/pay`. Нужен дизайнер: R$ на карточке шара, паки, стартовый набор, офферы пассов.
+- **VIP «+1 бесплатный Любой шар за дуэль»**: драфта «Любой шар» нет, перк не построен.
+- **Fast Spin x10: кнопки нет в UI** (нужен дизайнер); серверная часть и `spinHits` готовы, клиент пока показывает только последний исход. Тест `Profiles.spin` с пассом отсутствует (Passes в mock без MarketplaceService), логика покрыта на уровне `Spin.roll10`.
+- Проверить в Studio: плашка VIP, пропуск анимации, закрытие SPIN при запрете.

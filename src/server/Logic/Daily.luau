@@ -111,13 +111,20 @@ local function def(E: any, id: string): any
 end
 
 -- Today's quests: drawn at the first look of the day, one of each tier (QUESTS.perDay of them).
-function Daily.quests(d: any, now: number, E: any, rand: () -> number)
+-- `extra` is the VIP pass (+1, docs/economy.md): one more quest drawn from the pool among those not drawn yet.
+-- A pass bought or loaded after the day's draw tops the day up, unless all quests of the day were already paid.
+function Daily.quests(d: any, now: number, E: any, rand: () -> number, extra: number?)
 	local today = Daily.day(now)
+	local more = math.max(0, math.floor(extra or 0))
+	local base = math.min(E.QUESTS.perDay, #TIERS)
 	if d.quests.day == today then
+		if more > 0 and #d.quests.list < base + more and not d.quests.all then
+			Daily.addExtra(d, E, rand, base + more)
+		end
 		return
 	end
 	local list = {}
-	for i = 1, math.min(E.QUESTS.perDay, #TIERS) do
+	for i = 1, base do
 		local of = {}
 		for _, q in E.QUESTS.pool do
 			if q.tier == TIERS[i] then
@@ -130,6 +137,29 @@ function Daily.quests(d: any, now: number, E: any, rand: () -> number)
 		end
 	end
 	d.quests = { day = today, list = list, all = false }
+	if more > 0 then
+		Daily.addExtra(d, E, rand, base + more)
+	end
+end
+
+function Daily.addExtra(d: any, E: any, rand: () -> number, size: number)
+	while #d.quests.list < size do
+		local left = {}
+		for _, q in E.QUESTS.pool do
+			local drawn = false
+			for _, r in d.quests.list do
+				drawn = drawn or r.id == q.id
+			end
+			if not drawn then
+				table.insert(left, q)
+			end
+		end
+		if #left == 0 then
+			return
+		end
+		local q = left[math.floor(rand() * #left) + 1]
+		table.insert(d.quests.list, { id = q.id, n = 0, done = false })
+	end
 end
 
 local function count(q: any, m: QMatch): number

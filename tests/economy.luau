@@ -777,6 +777,47 @@ do
 	check(gems.crystals == E.SPIN.crystals.price * 30 - spent, "crystal price and refund come from Economy")
 end
 
+-- Pass perks: VIP quest, Fast Spin x10 ------------------------------------------------------------------------
+do
+	local d = Progress.new()
+	Daily.quests(d, NOW, E, rng(7))
+	check(#d.quests.list == 3, "no VIP: 3 quests")
+	Daily.quests(d, NOW, E, rng(7), 1)
+	check(#d.quests.list == 4, "VIP bought later in the day tops up to 4")
+	Daily.quests(d, NOW, E, rng(7), 1)
+	check(#d.quests.list == 4, "VIP top-up is not repeated")
+	local ids = {}
+	for _, q in d.quests.list do
+		check(not ids[q.id], "VIP quest is not a duplicate")
+		ids[q.id] = true
+	end
+	local fresh = Progress.new()
+	Daily.quests(fresh, NOW, E, rng(3), 1)
+	check(#fresh.quests.list == 4, "VIP: 4 quests at the day's draw")
+
+	local function zero(): number
+		return 0
+	end
+	local coins = Progress.new()
+	coins.coins = 20000
+	local hits = Spin.roll10(coins, "coins", E, zero, {})
+	check(hits ~= nil and #hits == 10, "x10 coins: ten hits")
+	check(coins.coins >= 20000 - E.SPIN.coins.price * 10 and coins.coins < 20000, "x10 coins: paid ten times the price")
+	local gems = Progress.new()
+	gems.crystals = E.SPIN.crystals.price10 - 1
+	check(
+		Spin.roll10(gems, "crystals", E, zero, {}) == nil and gems.crystals == E.SPIN.crystals.price10 - 1,
+		"x10 crystals short: nothing spent"
+	)
+	gems.crystals = 1000
+	local gh = Spin.roll10(gems, "crystals", E, zero, {})
+	check(gh ~= nil and #gh == 10 and gems.crystals >= 1000 - E.SPIN.crystals.price10, "x10 crystals uses price10")
+	local banned = Progress.new()
+	banned.coins = 20000
+	check(Spin.roll10(banned, "coins", E, zero, {}, true) == nil and banned.coins == 20000, "x10 under a ban: refused")
+	check(Spin.roll10(coins, "robux", E, zero, {}) == nil, "x10 bad currency refused")
+end
+
 print(`{passed} passed, {fails} failed`)
 if fails > 0 then
 	process.exit(1)
