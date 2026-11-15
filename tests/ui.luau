@@ -746,7 +746,7 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	)
 end
 
--- Shelf: live at 1/27 and at 5/27. The cheapest row buys for coins and then reads YOURS.
+-- Shelf: live at 1/27 and at 5/27. The cheapest row buys for coins and then reads OWNED.
 -- R$ stays grey only while the product id is 0.
 do
 	local function shelfOf(n: number, owned: { string }): any
@@ -804,8 +804,48 @@ do
 			end
 		end
 		check(cardsN == #Economy.LOOKS, `{tag}: every look is on the tab ({cardsN})`)
+		-- every piece of every preview stays inside its well, the well and buttons inside the card
+		for _, c in find(panel, "Looks"):GetChildren() do
+			if string.sub(c.Name, 1, 2) == "R_" then
+				local icon = find(c, "Icon")
+				check(inside(icon, c), `{tag}: {c.Name} well inside the card`)
+				local bad = nil
+				for _, d in icon:GetDescendants() do
+					local cn = d._p.ClassName
+					if (cn == "Frame" or cn == "ImageLabel" or cn == "TextLabel") and d.Name ~= "Rays" then
+						if d.Parent and d.Parent.Name ~= "Rays" and not inside(d, icon) then
+							bad = d.Name
+						end
+					end
+				end
+				check(bad == nil, `{tag}: {c.Name} preview piece {bad} spills out of the well`)
+				for _, b in { "PayCoins", "PayRobux", "Wear", "Name", "Kind" } do
+					local o = c:FindFirstChild(b)
+					if o then
+						check(inside(o, c), `{tag}: {c.Name} {b} inside the card`)
+					end
+				end
+				local pc = c:FindFirstChild("PayCoins")
+				check(pc == nil or rectOf(pc)[4] * 0.72 >= 44, `{tag}: {c.Name} price is 44 px on a phone`)
+			end
+		end
+		-- filter chips: SKINS shows the twelve skins only, ALL brings back all of them
+		local chip = find(panel, "Chip_SKIN")
+		check(chip ~= nil and rectOf(chip)[4] * 0.72 >= 44, `{tag}: chip is 44 px on a phone`)
+		chip.Activated:Fire()
+		local skinsN, others = 0, 0
+		for _, c in find(w.pop, "Looks"):GetChildren() do
+			if string.sub(c.Name, 1, 7) == "R_skin_" then
+				skinsN += 1
+			elseif string.sub(c.Name, 1, 2) == "R_" then
+				others += 1
+			end
+		end
+		check(skinsN == 12 and others == 0, `{tag}: SKINS chip filters ({skinsN}, {others})`)
+		find(w.pop, "Chip_all").Activated:Fire()
+		check(find(w.pop, "R_frame_wood") ~= nil, `{tag}: ALL chip brings every look back`)
 		local looks = find(panel, "Looks")
-		for _, id in { "R_trail_dust", "R_force_pulse" } do
+		for _, id in { "R_trail_dust", "R_skin_chalk" } do
 			local card = find(panel, id)
 			check(
 				card ~= nil and inside(card, looks) and inside(find(card, "PayCoins"), card),
@@ -822,9 +862,9 @@ do
 			`{tag}: counter stays readable`
 		)
 		local row = find(panel, "R_frame_wood")
-		check(row and find(row, "Name").Text == "FRAME WOOD", `{tag}: cheapest row`)
+		check(row and find(row, "Name").Text == "WOOD" and find(row, "Kind").Text == "FRAME", `{tag}: cheapest row`)
 		local pay = find(row, "PayCoins")
-		check(pay and pay.Active == true and rectOf(pay)[4] >= 72, `{tag}: coin price is a live button`)
+		check(pay and pay.Active == true and rectOf(pay)[4] >= 62, `{tag}: coin price is a live button`)
 		check(find(row, "PayRobux").Active == false, `{tag}: a placeholder Robux id stays grey`)
 		local before = #acts
 		pay.Activated:Fire()
@@ -879,7 +919,7 @@ do
 	v.shelf = shelfOf(27, { "frame_wood" })
 	Wallet.setProfile(w, v)
 	local owned = find(w.pop, "R_frame_wood")
-	check(w.open == "shop" and find(owned, "Own").Text == "YOURS", "shelf: the bought look reads YOURS")
+	check(w.open == "shop" and find(owned, "Own").Text == "OWNED", "shelf: the bought look reads OWNED")
 	check(find(owned, "PayCoins") == nil, "shelf: an owned look has no coin button")
 	find(owned, "Wear").Activated:Fire()
 	check(acts[2][1] == "wear" and acts[2][3] == "frame_wood", "shelf: wear sends the id")
