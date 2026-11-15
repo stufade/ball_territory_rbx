@@ -53,6 +53,8 @@ export type Wallet = {
 	owed: { [string]: number },
 }
 
+local ROBUX_COL = Color3.fromHex("#1c9e6a")
+
 local Wallet = {}
 
 local function onPlaza(w: Wallet): boolean
@@ -243,6 +245,50 @@ function Wallet.render(w: Wallet)
 	if w.st and w.st.ph == "queue" then
 		return
 	end
+	-- "+" at the right end of the crystal counter: the crystal packs. The disc is drawn in the pill; the hit area
+	-- is 62 design px (44 px on a phone) and only reaches into the gap above, never down onto PLAY.
+	local gemsBox = gems.box
+	if gemsBox then
+		local value = gemsBox:FindFirstChild("Value") :: TextLabel?
+		if value then
+			value.Position = UDim2.new(1, -54, 0.5, 0)
+			value.Size = UDim2.fromOffset(L.moneyW - 98, 30)
+		end
+	end
+	local add = Instance.new("TextButton")
+	add.Name = "AddGems"
+	add.Text = ""
+	add.AutoButtonColor = false
+	add.BackgroundTransparency = 1
+	add.Size = UDim2.fromOffset(62, 62)
+	add.AnchorPoint = V2(1, 0.5)
+	add.Position = UDim2.fromOffset(L.right, L.moneyY[2] + L.moneyH / 2 - 2)
+	add.ZIndex = 5
+	add.Parent = layer
+	local disc = Theme.frame(add, UDim2.fromOffset(36, 36), UDim2.new(1, -4, 0.5, 2), ROBUX_COL, V2(1, 0.5))
+	disc.Name = "Disc"
+	disc.ZIndex = 6
+	Theme.round(disc, 18)
+	Theme.stroke(disc, 3, Theme.INK)
+	Theme.label(
+		disc,
+		"+",
+		32,
+		UDim2.fromScale(1, 1),
+		UDim2.fromScale(0.5, 0.45),
+		{ anchor = V2(0.5, 0.5), stroke = 3, z = 7 }
+	).Name =
+		"Plus"
+	Theme.press(add)
+	add.Activated:Connect(function()
+		if w.open == "shop" and w.tab == "packs" then
+			closePop(w)
+			Wallet.render(w)
+		else
+			w.tab = "packs"
+			openPop(w, "shop")
+		end
+	end)
 	local d = v.daily
 	local daily = small(w, layer, "DailyBtn", "🎁", "DAILY", 0, Theme.ORANGE)
 	if d and d.ready then

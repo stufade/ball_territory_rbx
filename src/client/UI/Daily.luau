@@ -436,7 +436,7 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 	}).Position =
 		UDim2.new(0.5, 0, 0, 64)
 	local close =
-		Theme.button(panel, "X", UDim2.fromOffset(56, 56), UDim2.new(1, -10, 0, 10), Theme.BAD, nil, 30, V2(1, 0))
+		Theme.button(panel, "X", UDim2.fromOffset(64, 64), UDim2.new(1, -10, 0, 8), Theme.BAD, nil, 32, V2(1, 0))
 	close.Name = "Close"
 	close.Activated:Connect(ctx.close)
 	local cards = d.cards

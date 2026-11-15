@@ -31,9 +31,11 @@ local TIER_WORD: { [string]: string } = {
 	legendary = "LEGENDARY",
 }
 
+local ROBUX_COL = Color3.fromHex("#1c9e6a")
+
 local Shop = {}
 
-export type Tab = "balls" | "spin" | "skins"
+export type Tab = "balls" | "spin" | "skins" | "packs"
 
 export type Ctx = {
 	canvas: Vector2,
@@ -95,7 +97,7 @@ local function iconFn(parent: Instance, cur: string, d: number, pos: UDim2): Gui
 end
 
 -- Sizes (design px). Header: title, wallet and close in one row; tabs under it; body below.
-local TAB_Y, TAB_H = 88, 54
+local TAB_Y, TAB_H = 88, 62 -- 62 design px = 44 px on a 844x390 phone (scale 0.72)
 local BODY_Y = TAB_Y + TAB_H + 10
 local CARD_NAT = 126 -- natural height of a grid card; rows stretch so only whole rows show
 local GAP = 10
@@ -215,11 +217,18 @@ local function banner(
 	})
 	ends.Name = "Ends"
 
-	local bw = math.floor((w - 24 - 10) / 2)
-	local coins = pay(card, e, "coins", 12, priceY, bw, bh)
-	local gems = pay(card, e, "crystals", 12 + bw + 10, priceY, bw, bh)
+	-- coins, crystals (the deal) and R$ (the full tier price) in one row
+	-- the coin price is the longest number ("8,400"): it gets the widest button
+	local room = w - 24 - 16
+	local cw = math.floor(room * 0.4)
+	local gw = math.floor(room * 0.3)
+	local coins = pay(card, e, "coins", 12, priceY, cw, bh)
+	local gems = pay(card, e, "crystals", 12 + cw + 8, priceY, gw, bh)
+	local rbx = pay(card, e, "robux", 12 + cw + gw + 16, priceY, room - cw - gw, bh)
 	coins.NextSelectionRight = gems
 	gems.NextSelectionLeft = coins
+	gems.NextSelectionRight = rbx
+	rbx.NextSelectionLeft = gems
 
 	if not still then
 		local t = 0
@@ -278,37 +287,324 @@ local function shelfCard(
 	-- tier stripe along the top edge
 	local stripe = Theme.frame(card, UDim2.new(1, 0, 0, 6), nil, tint)
 	stripe.Name = "Stripe"
-	local bh = 46
-	local by = h - 10 - bh
-	local ballD = math.clamp(by - 30, 48, 74)
-	local bx, byc = 12 + ballD / 2 + 4, 10 + (by - 10) / 2
+	-- the price row is 62 design px (44 px on a phone); the ball, name and tier share the space above it
+	local bh = 62
+	local by = h - 8 - bh
+	local topH = by - 6
+	local ballD = math.clamp(topH - 8, 40, 74)
+	local bx, byc = 12 + ballD / 2 + 4, 6 + topH / 2
 	Theme.glow(card, math.floor(ballD * 1.6), el, UDim2.fromOffset(bx, byc), 4, 0.78)
 	Theme.shadow(card, math.floor(ballD * 0.7), UDim2.fromOffset(bx, byc + ballD / 2 + 1))
 	local icon = Theme.ball(card, e, ballD, UDim2.fromOffset(bx, byc - 2), MID)
 	icon.Name = "Icon"
 	local tx = math.floor(bx + ballD / 2 + 12)
 	local tw = w - tx - 10
+	local nh = math.clamp(math.floor(topH * 0.5), 24, 34)
+	local chH = math.clamp(topH - nh - 10, 20, 26)
+	local ny = math.floor(byc - (nh + 4 + chH) / 2)
+	local cy = ny + nh + 4
 	local title = Rules.Config.TITLE[e] or "?"
-	Theme.label(card, title, Theme.fit(title, 30, tw, 34), UDim2.fromOffset(tw, 32), UDim2.fromOffset(tx, byc - 32), {
+	Theme.label(card, title, Theme.fit(title, 30, tw, nh + 2), UDim2.fromOffset(tw, nh), UDim2.fromOffset(tx, ny), {
 		anchor = V2(0, 0),
 		align = Enum.TextXAlignment.Left,
 		color = Theme.nameColor(e),
 		stroke = 3,
 	}).Name =
 		"Name"
-	local chip = Theme.ribbon(card, TIER_WORD[tier] or "COMMON", tint, UDim2.fromOffset(tx, byc + 4), 24)
+	local chip = Theme.ribbon(card, TIER_WORD[tier] or "COMMON", tint, UDim2.fromOffset(tx, cy), chH)
 	chip.Name = "Chip"
 	local tl = chip:FindFirstChild("Text") :: TextLabel
 	tl.Name = "Tier"
 	tl.Parent = card
 	tl.AnchorPoint = V2(0, 0)
-	tl.Position = UDim2.fromOffset(tx + 4, byc + 4)
-	tl.Size = UDim2.fromOffset(chip.Size.X.Offset - 8, 24)
+	tl.Position = UDim2.fromOffset(tx + 4, cy)
+	tl.Size = UDim2.fromOffset(chip.Size.X.Offset - 8, chH)
 	tl.ZIndex = 3
-	local bw = math.floor((w - 20 - 8) / 2)
+	local rw = math.clamp(math.floor(w * 0.24), 96, 130)
+	local bw = math.floor((w - 20 - 16 - rw) / 2)
 	pay(card, e, "coins", 10, by, bw, bh)
 	pay(card, e, "crystals", 10 + bw + 8, by, bw, bh)
+	pay(card, e, "robux", 10 + bw * 2 + 16, by, w - 20 - 16 - bw * 2, bh)
 	return card
+end
+
+-- A pile of crystals that grows with the pack: 1 big crystal for the smallest, a heap for the biggest.
+local PILES: { { { number } } } = {
+	{ { 0, 0, 1 } },
+	{ { -0.22, 0.08, 0.8 }, { 0.2, 0, 0.9 } },
+	{ { -0.28, 0.12, 0.72 }, { 0.28, 0.12, 0.72 }, { 0, -0.08, 0.88 } },
+	{ { -0.34, 0.16, 0.62 }, { 0.34, 0.16, 0.62 }, { -0.12, 0.1, 0.7 }, { 0.14, 0.12, 0.7 }, { 0, -0.14, 0.82 } },
+	{
+		{ -0.4, 0.18, 0.56 },
+		{ 0.4, 0.18, 0.56 },
+		{ -0.18, 0.14, 0.64 },
+		{ 0.18, 0.14, 0.64 },
+		{ -0.2, -0.1, 0.66 },
+		{ 0.2, -0.1, 0.66 },
+		{ 0, -0.24, 0.78 },
+	},
+	{
+		{ -0.44, 0.2, 0.52 },
+		{ 0.44, 0.2, 0.52 },
+		{ -0.24, 0.18, 0.58 },
+		{ 0.24, 0.18, 0.58 },
+		{ 0, 0.16, 0.6 },
+		{ -0.3, -0.06, 0.6 },
+		{ 0.3, -0.06, 0.6 },
+		{ -0.1, -0.12, 0.66 },
+		{ 0.12, -0.14, 0.66 },
+		{ 0, -0.32, 0.76 },
+	},
+}
+
+local starterPick = 0 -- index into the epics the player lacks, for the starter pack
+
+-- One pass or the starter pack in the offers strip: art on the left, two lines, a green R$ button.
+local function offer(
+	strip: Frame,
+	name: string,
+	title: string,
+	line: string,
+	robux: number,
+	color: Color3,
+	x: number,
+	w: number,
+	h: number,
+	onBuy: () -> ()
+): Frame
+	local tile = Theme.card(strip, UDim2.fromOffset(w, h), UDim2.fromOffset(x, 0), color, Theme.BG, 16)
+	tile.Name = name
+	local bw = math.clamp(math.floor(w * 0.26), 80, 110)
+	local tx = 62 -- art (the epic ball, VIP, 2X) is 56 wide on the left
+	local tw = w - tx - bw - 18
+	Theme.label(tile, title, Theme.fit(title, 26, tw, 30), UDim2.fromOffset(tw, 28), UDim2.fromOffset(tx, 8), {
+		anchor = V2(0, 0),
+		align = Enum.TextXAlignment.Left,
+		color = Theme.YELLOW_TXT,
+		stroke = 3,
+	}).Name =
+		"Title"
+	Theme.label(tile, line, Theme.fit(line, 18, tw, 22), UDim2.fromOffset(tw, 22), UDim2.fromOffset(tx, 38), {
+		anchor = V2(0, 0),
+		align = Enum.TextXAlignment.Left,
+		color = Theme.TEXT,
+		bold = true,
+	}).Name =
+		"Line"
+	local buy = Theme.button(
+		tile,
+		`R${robux}`,
+		UDim2.fromOffset(bw, h - 10),
+		UDim2.fromOffset(w - 6 - bw, 5),
+		ROBUX_COL,
+		nil,
+		26
+	)
+	buy.Name = "PayRobux"
+	buy.Activated:Connect(onBuy)
+	return tile
+end
+
+-- CRYSTALS tab: six packs (Economy.CRYSTAL_PACKS) as bright cards with growing piles, the best value marked,
+-- and under them the offers strip: starter pack, VIP, 2x match coins (only what the server still offers).
+function Shop.packs(body: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: number)
+	local packs = Economy.CRYSTAL_PACKS :: { { crystals: number, robux: number, best: boolean? } }
+	local base = packs[1].crystals / packs[1].robux
+	local offers = v.passOffer or {}
+	local owned: { [number]: boolean } = {}
+	for _, e in v.balls do
+		owned[e] = true
+	end
+	local epics: { number } = {}
+	for _, e in (Economy.TIERS :: any).epic do
+		if not owned[e] then
+			table.insert(epics, e)
+		end
+	end
+	local list: { string } = {}
+	if not v.starterBought and #epics > 0 and Economy.STARTER then
+		table.insert(list, "starter")
+	end
+	for _, k in { "vip", "coins2x" } do
+		if offers[k] then
+			table.insert(list, k)
+		end
+	end
+	local stripH = 72
+	local showStrip = #list > 0 and h - stripH - GAP >= 170
+	local packH = if showStrip then h - stripH - GAP else h
+	packH = math.min(packH, 400)
+
+	-- six in a row when each is at least 130 wide, else two rows of three
+	local cols = if (w - GAP * 5) / 6 >= 130 then 6 else 3
+	local rows = math.ceil(#packs / cols)
+	local cw = math.floor((w - GAP * (cols - 1)) / cols)
+	local ch = math.floor((packH - GAP * (rows - 1)) / rows)
+	for i, pk in packs do
+		local c = (i - 1) % cols
+		local r = (i - 1) // cols
+		local best = pk.best == true
+		local tint = Money.GEM:Lerp(Theme.PURPLE, (i - 1) / (#packs - 1) * 0.6)
+		local card = Theme.card(
+			body,
+			UDim2.fromOffset(cw, ch),
+			UDim2.fromOffset(c * (cw + GAP), r * (ch + GAP)),
+			tint,
+			Theme.SLOT:Lerp(tint, 0.25),
+			18
+		)
+		card.Name = `Pack{i}`
+		local edge = card:FindFirstChild("Edge") :: UIStroke
+		if best then
+			edge.Color = Theme.YELLOW
+			edge.Thickness = 5
+		end
+		Theme.pattern(card, Color3.new(1, 1, 1), 0.9, 34)
+		local bh = 62
+		local by = ch - 8 - bh
+		local amountY = by - 4 - 34
+		local topY = if best then 32 else 10
+		local pileH = amountY - topY - 2
+		local d = math.clamp(math.floor(math.min(pileH, cw - 20) * 0.62), 26, 96)
+		local cx, cy = cw / 2, topY + pileH / 2
+		Theme.glow(card, math.floor(d * (1.6 + i * 0.12)), Money.GEM, UDim2.fromOffset(cx, cy), 4, 0.8)
+		if i >= 5 then
+			Theme.rays(card, 10, math.floor(d * 2.6), 20, UDim2.fromOffset(cx, cy), Color3.new(1, 1, 1), Money.GEM, 0.7)
+		end
+		local pileW = cw - 12
+		local pile = Theme.clear(card, UDim2.fromOffset(pileW, pileH), UDim2.fromOffset(cx, cy), MID)
+		pile.Name = "Pile"
+		local spot = PILES[i] or PILES[#PILES]
+		-- the widest heap spans 1.4 crystal sizes each way: keep it inside the pile box
+		local pd = math.floor(math.min(pileW / 1.5, pileH / 1.5, 120))
+		for k, p in spot do
+			local g = Money.icon(
+				pile,
+				"crystals",
+				math.floor(pd * p[3]),
+				UDim2.fromOffset(pileW / 2 + p[1] * pd, pileH / 2 + p[2] * pd)
+			)
+			g.ZIndex = 2 + k
+		end
+		Theme.label(
+			card,
+			Money.fmt(pk.crystals),
+			34,
+			UDim2.fromOffset(cw - 12, 34),
+			UDim2.fromOffset(cw / 2, amountY),
+			{
+				anchor = V2(0.5, 0),
+				color = Money.GEM:Lerp(Color3.new(1, 1, 1), 0.4),
+				stroke = 4,
+			}
+		).Name =
+			"Amount"
+		-- honest bonus: crystals per Robux against the smallest pack
+		local more = math.floor((pk.crystals / pk.robux / base - 1) * 100 + 0.5)
+		if more > 0 then
+			local chip = Theme.ribbon(card, `+{more}%`, Theme.ORANGE, UDim2.fromOffset(cw - 6, topY), 24, V2(1, 0))
+			chip.Name = "More"
+			chip.ZIndex = 6
+		end
+		if best then
+			local rb = Theme.ribbon(card, "BEST VALUE", Theme.BAD, UDim2.fromOffset(cw / 2, 6), 26, V2(0.5, 0))
+			rb.Name = "Best"
+			rb.ZIndex = 7
+			for _, o in rb:GetDescendants() do
+				if o:IsA("GuiObject") then
+					o.ZIndex = 8
+				end
+			end
+		end
+		local buy = Theme.button(
+			card,
+			`R${pk.robux}`,
+			UDim2.fromOffset(cw - 16, bh),
+			UDim2.fromOffset(8, by),
+			ROBUX_COL,
+			nil,
+			28
+		)
+		buy.Name = "PayRobux"
+		buy:SetAttribute("Pack", i)
+		buy.Activated:Connect(function()
+			ctx.act(Net.Action.pay, i, "pack")
+		end)
+		Theme.rise(card, 0.06 + 0.05 * i)
+	end
+
+	if not showStrip then
+		return
+	end
+	local strip = Theme.clear(body, UDim2.fromOffset(w, stripH), UDim2.fromOffset(0, h - stripH))
+	strip.Name = "Offers"
+	local tw = math.floor((w - GAP * (#list - 1)) / #list)
+	for i, k in list do
+		local x = (i - 1) * (tw + GAP)
+		if k == "starter" then
+			local S = Economy.STARTER
+			starterPick = (starterPick % #epics)
+			local e = epics[starterPick + 1]
+			local tile = offer(
+				strip,
+				"OfferStarter",
+				"STARTER",
+				if S.coins % 1000 == 0 then `EPIC +{S.coins // 1000}K +{S.crystals}` else `EPIC +{S.coins}`,
+				S.robux,
+				Theme.ORANGE:Lerp(Theme.BG, 0.25),
+				x,
+				tw,
+				stripH,
+				function()
+					ctx.act(Net.Action.pay, e, "starter")
+				end
+			)
+			-- the epic is the player's choice: tap the ball for the next one
+			local pick = Instance.new("TextButton")
+			pick.Name = "PickEpic"
+			pick.Text = ""
+			pick.BackgroundTransparency = 1
+			pick.Size = UDim2.fromOffset(58, stripH - 6)
+			pick.Position = UDim2.fromOffset(2, 3)
+			pick.Parent = tile
+			Theme.ball(pick, e, 52, UDim2.fromScale(0.5, 0.5), MID).Name = "Icon"
+			pick:SetAttribute("E", e)
+			pick.Activated:Connect(function()
+				starterPick += 1
+				ctx.setTab("packs")
+			end)
+		else
+			local P = (Economy.PASSES :: any)[k]
+			local isVip = k == "vip"
+			local tile = offer(
+				strip,
+				if isVip then "OfferVip" else "OfferCoins2x",
+				if isVip then "VIP" else "2X COINS",
+				if isVip then "+QUEST +PICK" else "IN MATCHES",
+				P.robux,
+				(if isVip then Theme.YELLOW else Theme.GOOD):Lerp(Theme.BG, 0.45),
+				x,
+				tw,
+				stripH,
+				function()
+					ctx.act(Net.Action.pay, nil, `pass_{k}`)
+				end
+			)
+			Theme.label(
+				tile,
+				if isVip then "VIP" else "2X",
+				30,
+				UDim2.fromOffset(56, stripH - 10),
+				UDim2.fromOffset(32, stripH / 2),
+				{
+					anchor = MID,
+					color = Theme.YELLOW,
+					stroke = 4,
+				}
+			).Name =
+				"Art"
+		end
+	end
 end
 
 function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
@@ -372,8 +668,18 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	close.Name = "Close"
 	close.Activated:Connect(ctx.close)
 
+	-- the "+" on the crystal pill opens the crystal packs (62 design px: 44 px on a phone)
+	local addX = pw - 12 - 72 - 12 - 62
+	local add = Theme.button(panel, "+", UDim2.fromOffset(62, 62), UDim2.fromOffset(addX, 13), ROBUX_COL, nil, 40)
+	add.Name = "AddGems"
+	add.ZIndex = 5
+	add.Activated:Connect(function()
+		if tab ~= "packs" then
+			ctx.setTab("packs")
+		end
+	end)
 	local pillW = 168
-	local gemsX = pw - 12 - 72 - 16 - pillW
+	local gemsX = addX - 8 - 18 - pillW
 	local coinsX = gemsX - 26 - pillW
 	Theme.purse(panel, "coins", Money.fmt(v.coins or 0), pillW, UDim2.fromOffset(coinsX + 18, 22), Theme.YELLOW, iconFn)
 	Theme.purse(
@@ -393,10 +699,11 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		table.insert(order, "spin")
 	end
 	table.insert(order, "skins")
+	table.insert(order, "packs")
 	local tabW = math.floor((pw - 32 - tabGap * (#order - 1)) / #order)
-	local tabName = { balls = "TabBalls", spin = "TabSpin", skins = "TabSkins" }
-	local tabWord = { balls = "BALLS", spin = "SPIN", skins = "SKINS" }
-	local tabCol = { balls = Theme.YELLOW, spin = Theme.ORANGE, skins = Theme.PURPLE }
+	local tabName = { balls = "TabBalls", spin = "TabSpin", skins = "TabSkins", packs = "TabPacks" }
+	local tabWord = { balls = "BALLS", spin = "SPIN", skins = "SKINS", packs = "CRYSTALS" }
+	local tabCol = { balls = Theme.YELLOW, spin = Theme.ORANGE, skins = Theme.PURPLE, packs = Money.GEM }
 	for i, id in order do
 		local x = 16 + (i - 1) * (tabW + tabGap)
 		local on = tab == id
@@ -411,7 +718,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 				l.TextColor3 = Theme.DIM
 			end
 		end
-		local target: Tab = if id == "balls" then "balls" elseif id == "spin" then "spin" else "skins"
+		local target: Tab = id
 		b.Activated:Connect(function()
 			if not on then
 				ctx.setTab(target)
@@ -441,6 +748,25 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	end
 
 	local function pay(row: Instance, e: number, cur: string, x: number, y: number, bw: number, bh: number): TextButton
+		if cur == "robux" then
+			-- Robux: the full tier price; the server picks the product and opens the prompt (Logic/Pay "ball")
+			local tier = tierOf(e) or "common"
+			local r = Theme.button(
+				row,
+				`R${Economy.PRICE.robux[tier] or 0}`,
+				UDim2.fromOffset(bw, bh),
+				UDim2.fromOffset(x, y),
+				ROBUX_COL,
+				nil,
+				if bh >= 60 then 28 else 24
+			)
+			r.Name = "PayRobux"
+			r:SetAttribute("E", e)
+			r.Activated:Connect(function()
+				ctx.act(Net.Action.pay, e, "ball")
+			end)
+			return r
+		end
 		local b = Theme.price(
 			row,
 			Money.fmt(priceOf(e, cur)),
@@ -450,6 +776,12 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			iconFn,
 			if bh >= 60 then 30 else 24
 		)
+		-- the number shares the button with the icon: fit it into what is left
+		local l = b:FindFirstChild("Label") :: TextLabel?
+		if l then
+			local d = math.min(34, bh - math.clamp(math.floor(bh * 0.1 + 0.5), 4, 9) - 12)
+			l.TextSize = Theme.fit(l.Text, l.TextSize, bw - d - 24, bh - 12)
+		end
 		b:SetAttribute("E", e)
 		b:SetAttribute("Cur", cur)
 		b.Activated:Connect(function()
@@ -458,7 +790,10 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		return b
 	end
 
-	if tab == "spin" then
+	if tab == "packs" then
+		Shop.packs(body, v, ctx, bodyW, bodyH)
+		GuiService.SelectedObject = close
+	elseif tab == "spin" then
 		Spin.fill(body, v, {
 			canvas = cv,
 			frames = ctx.frames,
@@ -553,7 +888,8 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 
 		-- whole rows only: the card height stretches so the visible rows fill the list exactly
 		local scrollW = 12
-		local cols = math.max(2, math.floor((listW - scrollW + GAP) / (250 + GAP)))
+		-- a card holds three prices (coins, crystals, R$): at least 380 wide
+		local cols = math.max(1, math.floor((listW - scrollW + GAP) / (380 + GAP)))
 		local cardW = math.floor((listW - scrollW - GAP * (cols - 1)) / cols)
 		local fit = math.max(1, math.floor((bodyH + GAP) / (CARD_NAT + GAP)))
 		local cardH = math.floor((bodyH - GAP * (fit - 1)) / fit)

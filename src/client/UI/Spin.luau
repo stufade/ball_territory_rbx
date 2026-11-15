@@ -473,6 +473,14 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	modeGems.Name = "ModeGems"
 	local goX = pad + modeW * 2 + 18
 	local goW = innerW + pad - goX
+	-- Fast Spin pass (server-owned): ten spins for one payment; without it, the pass for R$ in the same place.
+	-- The whole tab is gone under a paid-random ban, so this never shows there.
+	local hasFast = v.passes ~= nil and v.passes.fastSpin == true
+	local offerFast = not hasFast and v.passOffer ~= nil and v.passOffer.fastSpin == true
+	local tenW = if hasFast or offerFast then math.clamp(math.floor(goW * 0.4), 150, 220) else 0
+	if tenW > 0 then
+		goW -= tenW + 8
+	end
 	local go = Theme.button(
 		card,
 		`SPIN {Money.fmt(lines[cur].price)}`,
@@ -483,6 +491,41 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		34
 	)
 	go.Name = "SpinGo"
+	local function price10(c: string): number
+		local sp = (Economy.SPIN :: any)[c]
+		return sp.price10 or lines[c].price * 10
+	end
+	local ten: TextButton? = nil
+	if tenW > 0 then
+		local tx = goX + goW + 8
+		if hasFast then
+			ten = Theme.button(
+				card,
+				`X10 {Money.fmt(price10(cur))}`,
+				UDim2.fromOffset(tenW, btnH),
+				UDim2.fromOffset(tx, btnY),
+				Theme.PRICE_COIN,
+				nil,
+				28
+			);
+			(ten :: TextButton).Name = "Spin10"
+		else
+			ten = Theme.button(
+				card,
+				`X10 R${Economy.PASSES.fastSpin.robux}`,
+				UDim2.fromOffset(tenW, btnH),
+				UDim2.fromOffset(tx, btnY),
+				Color3.fromHex("#1c9e6a"),
+				nil,
+				28
+			);
+			(ten :: TextButton).Name = "BuyFastSpin"
+			(ten :: TextButton).Activated:Connect(function()
+				ctx.act(Net.Action.pay, nil, "pass_fastSpin")
+			end)
+		end
+		go.NextSelectionRight = ten
+	end
 	local goLip = math.clamp(math.floor(btnH * 0.1 + 0.5), 4, 9)
 	local goLabel = go:FindFirstChild("Label") :: TextLabel?
 	modeCoins.NextSelectionRight = modeGems
@@ -544,6 +587,19 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		end
 		go.Active = afford and panel:GetAttribute("SpinPhase") ~= "spinning"
 		go.BackgroundColor3 = if afford then (if coinOn then Theme.PRICE_COIN else Theme.PRICE_GEM) else Theme.PANEL_HI
+		if ten and hasFast then
+			local p10 = price10(c)
+			local ok10 = bal >= p10
+			local l10 = ten:FindFirstChild("Label") :: TextLabel?
+			if l10 then
+				l10.Text = `X10 {Money.fmt(p10)}`
+				l10.TextColor3 = if ok10 then Theme.TEXT else Theme.DIM
+			end
+			ten.Active = ok10 and panel:GetAttribute("SpinPhase") ~= "spinning"
+			ten.BackgroundColor3 = if ok10
+				then (if coinOn then Theme.PRICE_COIN else Theme.PRICE_GEM)
+				else Theme.PANEL_HI
+		end
 	end
 
 	modeCoins.Activated:Connect(function()
@@ -564,6 +620,19 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		hold = true
 		ctx.act(Net.Action.spin, nil, cur)
 	end)
+	if ten and hasFast then
+		ten.Activated:Connect(function()
+			if hold or panel:GetAttribute("SpinPhase") ~= "odds" then
+				return
+			end
+			local now = if cur == "coins" then v.coins or 0 else v.crystals or 0
+			if now < price10(cur) then
+				return
+			end
+			hold = true
+			ctx.act(Net.Action.spin, nil, cur .. "10")
+		end)
+	end
 	paint(cur)
 
 	-- the reveal, stronger with the tier
