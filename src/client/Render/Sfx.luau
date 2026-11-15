@@ -2,7 +2,7 @@
 -- Sounds of docs/audio.md. Cell paint stays silent. "hit" is ball bumps and KOs, at most 4 times a second.
 -- rare / epic / legend reuse power, reaction and win (own Sound, own Volume and PlaybackSpeed).
 -- A seated player hears the match; a plaza viewer does not (Render passes a no-op while view == true).
--- The plaza bed is separate: a viewer still hears it. Id 0 never creates or plays a Sound.
+-- The music bed is separate: a viewer still hears it. Id 0 never creates or plays a Sound.
 local ContentProvider = game:GetService("ContentProvider")
 local SoundService = game:GetService("SoundService")
 
@@ -11,7 +11,6 @@ type Cue = {
 	volume: number,
 	speed: number?,
 	looped: boolean?,
-	battle: number?,
 	limit: number?,
 }
 
@@ -26,8 +25,10 @@ local IDS: { [string]: Cue } = {
 	rare = { id = 126093538007975, volume = 0.42, speed = 1 },
 	epic = { id = 124991616061855, volume = 0.62, speed = 1.15 },
 	legend = { id = 82466908590237, volume = 0.74, speed = 1.2 },
-	-- no track on the account; 0 until a CC0 or own loop is uploaded. Do not borrow another game's id.
-	music = { id = 0, volume = 0.22, battle = 0.07, looped = true },
+	-- Music from the Roblox Creator Store (APMOfficial, free for all experiences), see docs/audio.md.
+	-- Quieter than every effect (lowest effect cue is 0.35). Lobby = plaza track, match = own track.
+	music = { id = 1837768352, volume = 0.2, looped = true },
+	musicMatch = { id = 1837768494, volume = 0.14, looped = true },
 }
 
 local Sfx = {}
@@ -37,7 +38,7 @@ local waiting: { [string]: boolean } = {}
 local recent: { [string]: { number } } = {}
 local folder: Folder? = nil
 local battle = false
-local bedOn = false
+local bed: Sound? = nil
 
 local function emit(s: Sound)
 	s.TimePosition = 0
@@ -104,45 +105,42 @@ function Sfx.stop()
 		folder:Destroy()
 	end
 	folder, sounds, waiting, recent = nil, {}, {}, {}
-	battle, bedOn = false, false
+	battle, bed = false, nil
 end
 
--- Quiet plaza loop, ducked while this client is in its own match. Id 0: no Sound, no play.
+-- Music bed: lobby track on the plaza, match track while this client is in its own match (a viewer of
+-- another match still hears the lobby track). Switching stops the other track. Id 0: no Sound, no play.
 function Sfx.plaza(inBattle: boolean)
 	battle = inBattle
-	local def = IDS.music
+	local name = if inBattle then "musicMatch" else "music"
+	local def = IDS[name]
 	if def.id == 0 then
 		return
 	end
 	if not folder then
 		Sfx.start()
 	end
-	local s = sounds.music
-	if not s then
-		return
-	end
-	local volume = if inBattle then (def.battle or def.volume) else def.volume
-	s.Volume = volume
-	if bedOn then
+	local s = sounds[name]
+	if not s or bed == s then
 		return
 	end
 	local function go()
-		if sounds.music ~= s then
+		if sounds[name] ~= s or battle ~= inBattle or bed == s then
 			return
 		end
-		s.Volume = if battle then (def.battle or def.volume) else def.volume
-		if bedOn then
-			return
+		if bed then
+			bed:Stop()
 		end
-		bedOn = true
+		bed = s
+		s.Volume = def.volume
 		SoundService:PlayLocalSound(s)
 	end
 	if s.IsLoaded then
 		go()
-	elseif not waiting.music then
-		waiting.music = true
+	elseif not waiting[name] then
+		waiting[name] = true
 		s.Loaded:Once(function()
-			waiting["music"] = nil
+			waiting[name] = nil
 			go()
 		end)
 	end
