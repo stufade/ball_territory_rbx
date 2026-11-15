@@ -51,6 +51,7 @@ Tutorial.onDone(function(player, _info)
 		end
 	end
 end)
+Runner.lookOf = Profiles.matchLook
 Session.award = function(player, mode, win, t, afk, friend)
 	if mode == "tutor" then
 		return nil

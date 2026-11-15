@@ -12,6 +12,7 @@ local Art = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Art")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Rules")).Config
 local Look = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Look"))
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
+local PAINT = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Wear"))
 local Screen = require("../Screen")
 local Theme = require("./Theme")
 
@@ -100,7 +101,36 @@ local function nameColor(seat: Net.Seat): Color3
 	return if seat.vip then Theme.YELLOW else seatColor(seat)
 end
 
+-- Worn frame (Net.Seat.look.frame): a ring of the frame material around the portrait, gems for myth/champion.
+local function frameRing(parent: Instance, seat: Net.Seat, d: number, pos: UDim2)
+	local look = seat.look
+	local p = if look then PAINT[look.frame] else nil
+	if not p then
+		return
+	end
+	local ring = Theme.disc(parent, d + 16, p.base, pos)
+	ring.Name = "Frame"
+	Theme.stroke(ring, 3, Theme.INK)
+	local g = Instance.new("UIGradient")
+	g.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, p.base:Lerp(Color3.new(1, 1, 1), 0.35)),
+		ColorSequenceKeypoint.new(0.5, p.base),
+		ColorSequenceKeypoint.new(1, p.accent),
+	})
+	g.Rotation = 60
+	g.Parent = ring
+	if p.pat == "myth" or p.pat == "champion" or p.pat == "gold" then
+		for i = 0, 3 do
+			local a = math.pi / 4 + i * math.pi / 2
+			local r = (d + 16) / 2
+			local gem = Theme.disc(ring, 10, p.accent, UDim2.new(0.5, math.cos(a) * r, 0.5, math.sin(a) * r))
+			Theme.stroke(gem, 2, Theme.INK)
+		end
+	end
+end
+
 local function portrait(parent: Instance, seat: Net.Seat, d: number, pos: UDim2)
+	frameRing(parent, seat, d, pos)
 	local disc = Theme.disc(parent, d, Theme.PANEL, pos)
 	Theme.stroke(disc, 4, seatColor(seat))
 	if seat.userId > 0 then

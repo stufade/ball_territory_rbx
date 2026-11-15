@@ -2,7 +2,7 @@
 -- Cosmetic shelf (docs/economy.md «Косметика»). Pure. Prices are Economy.LOOKS.
 -- A look can be bought for coins, or granted by a developer-product receipt, at any ball count.
 -- Buying the same id again does not spend. The equipped row is one skin, one trail, one force effect, one frame,
--- plus the lobby podium and the KO card. Nothing here is read by the match.
+-- plus the lobby podium and the KO card. The match reads only Looks.match (skin, trail, force, frame).
 local Wallet = require("./Wallet")
 
 local Looks = {}
@@ -199,6 +199,43 @@ function Looks.wear(d: any, id: unknown, ball: unknown, E: any): boolean
 		w[key] = look.id
 	end
 	return true
+end
+
+export type Match = { skin: string, trail: string, force: string, frame: string, ball: number }
+
+-- The worn skin, trail, force effect and frame for the match seat. Only owned, known ids; a skin only with its
+-- owned ball. nil when nothing is worn (bots and players without looks draw the default ball).
+function Looks.match(d: any, E: any): Match?
+	if type(d) ~= "table" or type(d.worn) ~= "table" or type(E) ~= "table" or type(E.LOOKS) ~= "table" then
+		return nil
+	end
+	local w = d.worn
+	local function pick(key: string): string
+		local id = w[key]
+		if type(id) == "string" and byId(E, id) and slot(id) == key and owned(d, id) then
+			return id
+		end
+		return ""
+	end
+	local ball = if type(w.ball) == "number"
+			and type(d.balls) == "table"
+			and table.find(d.balls, w.ball)
+		then w.ball
+		else -1
+	local out: Match = {
+		skin = if ball >= 0 then pick("skin") else "",
+		trail = pick("trail"),
+		force = pick("force"),
+		frame = pick("frame"),
+		ball = ball,
+	}
+	if out.skin == "" then
+		out.ball = -1
+	end
+	if out.skin == "" and out.trail == "" and out.force == "" and out.frame == "" then
+		return nil
+	end
+	return out
 end
 
 -- Profile view. `products.looks` is the asset-id table; only ids above 0 are sent (0 is not for sale).

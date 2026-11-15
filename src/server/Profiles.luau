@@ -455,7 +455,13 @@ function Profiles.buyLook(player: Player, id: any)
 	Profiles.send(player, nil, { gains = gains(player, log) })
 end
 
--- Action wear: equip an owned look. One of each slot. The match does not read this.
+-- Worn skin / trail / force / frame for the match seat rows (Runner.lookOf).
+function Profiles.matchLook(player: Player): Looks.Match?
+	local p = Profiles.get(player)
+	return if p then Looks.match(p.data, Config.ECON) else nil
+end
+
+-- Action wear: equip an owned look. One of each slot. The match reads it at the next match start.
 function Profiles.wearLook(player: Player, id: any, ball: any)
 	local p = Profiles.get(player)
 	if not p then

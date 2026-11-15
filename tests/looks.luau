@@ -6,6 +6,7 @@ local Economy = require("../src/shared/Economy")
 local Looks = require("../src/server/Logic/Looks")
 local Progress = require("../src/server/Logic/Progress")
 local Products = require("../src/server/Products")
+local Seats = require("../src/server/Logic/Seats")
 
 local fails, passed = 0, 0
 local function check(cond: any, msg: string)
@@ -146,6 +147,57 @@ do
 	Progress.repair(d, { ECON = E, BASE_BALLS = {}, TIERS = E.TIERS, XP = {} } :: any, nil)
 	check(#d.looks == 1, "old and new id of one look count once")
 	Looks.RENAMED.frame_old = nil
+end
+
+-- Bug 1 (wave 1116): the worn skin / trail / force / frame reach the match start seat rows; bots get none.
+do
+	local d = balls(3)
+	d.looks = { "skin_ink", "trail_dust", "force_pulse", "frame_wood" }
+	check(Looks.match(d, E) == nil, "nothing worn: no seat look")
+	check(Looks.wear(d, "skin_ink", 1, E), "wear ink on ball 1")
+	Looks.wear(d, "trail_dust", nil, E)
+	Looks.wear(d, "force_pulse", nil, E)
+	Looks.wear(d, "frame_wood", nil, E)
+	local m = Looks.match(d, E)
+	check(
+		m ~= nil
+			and m.skin == "skin_ink"
+			and m.ball == 1
+			and m.trail == "trail_dust"
+			and m.force == "force_pulse"
+			and m.frame == "frame_wood",
+		"Looks.match carries skin, ball, trail, force, frame"
+	)
+	local person = { data = d }
+	local rows = Seats.rows({
+		{ e = 1, name = "Ann", userId = 7, side = 0, rec = person },
+		{ e = 4, name = "BOT", userId = 0, side = 1, rec = nil },
+	}, function()
+		return false
+	end, function(rec)
+		return Looks.match(rec.data, E)
+	end)
+	local a, b = rows[1], rows[2]
+	check(
+		a.look ~= nil
+			and a.look.skin == "skin_ink"
+			and a.look.trail == "trail_dust"
+			and a.look.force == "force_pulse"
+			and a.look.frame == "frame_wood"
+			and a.look.ball == a.e,
+		"the person's seat row carries the worn looks"
+	)
+	check(b.look == nil and b.vip == nil and b.e == 4, "a bot seat has no look (default ball)")
+	-- a worn id that is not owned (a hacked or rolled back profile) is not sent
+	d.looks = { "trail_dust" }
+	m = Looks.match(d, E)
+	check(
+		m ~= nil and m.skin == "" and m.ball == -1 and m.force == "" and m.frame == "" and m.trail == "trail_dust",
+		"only owned looks"
+	)
+	d.looks, d.balls = { "skin_ink" }, { 2 }
+	d.worn = { skin = "skin_ink", trail = "", force = "", frame = "", podium = false, ko = false, ball = 1 }
+	check(Looks.match(d, E) == nil, "a skin on a ball no longer owned is not sent")
 end
 
 print(`{passed} passed, {fails} failed`)

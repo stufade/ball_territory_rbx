@@ -125,8 +125,11 @@ Net.SNAP_MAX = Snap.MAX
 
 export type ModeName = "duel" | "ffa" | "intro" | "tutor"
 
--- vip: owns the VIP pass (gold name and tag on the plate)
-export type Seat = { e: number, name: string, userId: number, side: number, vip: boolean? }
+-- Worn looks of a person (server Looks.match): ids of Economy.LOOKS or "". The skin is drawn only on ball `ball`.
+export type SeatLook = { skin: string, trail: string, force: string, frame: string, ball: number }
+
+-- vip: owns the VIP pass (gold name and tag on the plate). look: nil for bots and people without looks.
+export type Seat = { e: number, name: string, userId: number, side: number, vip: boolean?, look: SeatLook? }
 
 export type MatchStart = {
 	id: number,

@@ -20,6 +20,7 @@ local Sfx = require(script.Sfx)
 local Signs = require(script.Signs)
 local Smooth = require(script.Smooth)
 local Stage = require(script.Stage)
+local Wear = require(script.Wear)
 
 local Snap = require(ReplicatedStorage.Shared.Net.Snap)
 local SMOOTH_DELAY = 0.1
@@ -40,6 +41,7 @@ type Session = {
 	fx: Fx.Fx,
 	cam: Cam.Cam?,
 	stage: Stage.Stage,
+	wear: Wear.Wear,
 	phase: string,
 	frame: Snap.Frame?,
 	hp: { [number]: number },
@@ -145,6 +147,7 @@ local function render(s: Session, dt: number)
 		local a, b, t = s.smooth:sample(head)
 		if a and b then
 			Actors.update(s.actors, a, b, t, s.fx.now, s.phase == "aim")
+			Wear.update(s.wear, s.actors, s.fx, dt)
 		end
 	end
 	Cells.update(s.cells, dt, s.fx.now)
@@ -228,6 +231,7 @@ local function startSession(data: Net.MatchStart)
 		fx = fx,
 		cam = cam,
 		stage = Stage.new(board, data),
+		wear = Wear.new(),
 		phase = "aim",
 		frame = nil,
 		hp = {},
@@ -236,6 +240,7 @@ local function startSession(data: Net.MatchStart)
 		ended = false,
 		view = view,
 	}
+	Wear.set(s.wear, data.seats)
 	session = s
 	if view then
 		Signs.watching(board.model)
@@ -304,6 +309,7 @@ local function restartRound(s: Session, data: Net.MatchStart)
 	Actors.reset(s.actors, data.you, namesOf(data, s.view))
 	s.actors.aim = data.aim
 	Stage.setSeats(s.stage, data.seats)
+	Wear.set(s.wear, data.seats)
 	applyChanges(s, false)
 end
 
@@ -363,6 +369,9 @@ local function onMatch(kind: string, data: any)
 	if kind == Net.MatchKind.ev then
 		for _, e in data.list do
 			Fx.event(s.fx, e.kind, e.d)
+			if e.kind == "power" and type(e.d.e) == "number" and type(e.d.x) == "number" then
+				Wear.power(s.wear, s.fx, e.d.e, e.d.x, e.d.y)
+			end
 		end
 	elseif kind == Net.MatchKind.aim then
 		if type(data.dx) == "number" and type(data.dy) == "number" then

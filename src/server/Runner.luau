@@ -7,6 +7,7 @@ local Analytics = require("./Analytics")
 local Config = require("./Config")
 local Guard = require("./Logic/Guard")
 local Passes = require("./Passes")
+local Seats = require("./Logic/Seats")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Rules = require(ReplicatedStorage.Shared.Rules)
@@ -18,6 +19,11 @@ local SNAP_DT = 1 / Net.SNAP_HZ
 local IN = Net.Input
 
 local Runner = {}
+
+-- Worn looks of a person for the seat row (set by init from Profiles, Looks.match); nil = the default ball.
+Runner.lookOf = function(_player: Player): any?
+	return nil
+end
 
 export type Seat = {
 	side: number,
@@ -85,14 +91,11 @@ local function humans(r: Runner): { Seat }
 end
 
 local function startData(r: Runner, you: number?, key: buffer): { [string]: any }
-	local seats = {}
-	for _, s in r.seats do
-		local vip = s.rec ~= nil and Passes.has(s.rec.player, "vip")
-		table.insert(
-			seats,
-			{ e = s.e, name = s.name, userId = s.userId, side = s.side, vip = if vip then true else nil }
-		)
-	end
+	local seats = Seats.rows(r.seats, function(rec)
+		return Passes.has(rec.player, "vip")
+	end, function(rec)
+		return Runner.lookOf(rec.player)
+	end)
 	local arena = r.session.arena
 	return {
 		arena = arena.name,
