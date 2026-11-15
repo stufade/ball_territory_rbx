@@ -224,7 +224,14 @@ local function spendLooks(p: P, day: number)
 				best = item
 			end
 		end
-		if best == nil or p.coins < best.coins then
+		-- Default player saves for the next ball: a look only from coins above the cheapest missing ball's
+		-- price. `looksGreedy` kinds buy a look whenever they can (worst case for the collection pace).
+		local reserve = 0
+		local t = if p.kind.looksGreedy then nil else cheapestMissing(p)
+		if t then
+			reserve = E.PRICE.coins[t]
+		end
+		if best == nil or p.coins - best.coins < reserve then
 			return
 		end
 		p.coins -= best.coins
@@ -583,6 +590,7 @@ local KINDS = {
 	{ name = "free 10 min/day", minutes = 10, friendShare = 0, buys = {} },
 	{ name = "free 30 min/day", minutes = 30, friendShare = 0, buys = {} },
 	{ name = "policy 30m, no spins", minutes = 30, friendShare = 0, buys = {}, noSpin = true },
+	{ name = "free 30m, looks greedy", minutes = 30, friendShare = 0, buys = {}, looksGreedy = true },
 	{ name = "free 30 min + friend", minutes = 30, friendShare = 0.3, buys = {} },
 	{ name = "free 2 h/day", minutes = 120, friendShare = 0, buys = {} },
 	{ name = "free 30m, crystal spins", minutes = 30, friendShare = 0, buys = {}, crystalsToBalls = true },
@@ -652,6 +660,8 @@ print(
 	"kind                    | 1st coin buy   | 50% day      | 100% day       | coins on hand d1/3/7/14/30   | wk1 days new ball/any | R$"
 )
 for _, kind in KINDS do
+	-- same seed per kind: adding or reordering kinds does not shift the others' numbers
+	rngState = 12345
 	local fb, fbm, d50, d100 = {}, {}, {}, {}
 	local hands = { [1] = {}, [3] = {}, [7] = {}, [14] = {}, [30] = {}, [60] = {}, [120] = {} }
 	local nb, na, rbx, n7, n14, n28 = {}, {}, {}, {}, {}, {}
