@@ -526,4 +526,218 @@ function Theme.heart(parent: Instance, size: number, pos: UDim2?, on: boolean): 
 	return t
 end
 
+-- Shared look of the Daily family (Daily day 7, Shop, Spin, Shelf): scene cards with depth, ribbons, sale badges,
+-- price buttons and wallet pills. Spec: docs/ui.md «Магазин».
+
+-- Vertical (rotation 90) two-colour gradient on a frame; returns it.
+function Theme.gradient(o: Instance, top: Color3, bottom: Color3, rotation: number?): UIGradient
+	local g = Instance.new("UIGradient")
+	g.Rotation = rotation or 90
+	g.Color = ColorSequence.new(top, bottom)
+	g.Parent = o
+	return g
+end
+
+-- Soft glow: stacked translucent discs stand in for a radial gradient (as the VOID hole of day 7).
+function Theme.glow(parent: Instance, d: number, color: Color3, pos: UDim2, layers: number?, alpha: number?): Frame
+	local box = Theme.clear(parent, UDim2.fromOffset(d, d), pos, Vector2.new(0.5, 0.5))
+	box.Name = "Glow"
+	local n = layers or 6
+	for k = 0, n - 1 do
+		Theme.disc(box, d * (1 - k / (n + 1)), color, UDim2.fromScale(0.5, 0.5), alpha or 0.86)
+	end
+	return box
+end
+
+-- Light rays fanning out of a centre: a holder (turn it with .Rotation) with `n` thin bars, every other one tinted.
+function Theme.rays(
+	parent: Instance,
+	n: number,
+	len: number,
+	w: number,
+	pos: UDim2,
+	a: Color3,
+	b: Color3,
+	alpha: number
+): Frame
+	local box = Theme.clear(parent, UDim2.fromOffset(len, len), pos, Vector2.new(0.5, 0.5))
+	box.Name = "Rays"
+	for i = 1, n do
+		local r = Theme.frame(box, UDim2.fromOffset(w, len), UDim2.fromScale(0.5, 0.5), if i % 2 == 0 then a else b)
+		r.AnchorPoint = Vector2.new(0.5, 0.5)
+		r.Rotation = (i - 1) * 180 / n
+		r.BackgroundTransparency = alpha
+		local g = Instance.new("UIGradient")
+		g.Rotation = 90
+		g.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		g.Parent = r
+	end
+	return box
+end
+
+-- Flat ink ellipse under a ball: it stands on the floor of the scene.
+function Theme.shadow(parent: Instance, w: number, pos: UDim2): Frame
+	local s = Theme.frame(parent, UDim2.fromOffset(w, math.max(6, math.floor(w * 0.22))), pos, Theme.INK)
+	s.Name = "Shadow"
+	s.AnchorPoint = Vector2.new(0.5, 0.5)
+	s.BackgroundTransparency = 0.45
+	Theme.round(s, 999)
+	return s
+end
+
+-- Faint diamond pattern over a frame (the shop background, scene floors). Clips to the frame.
+function Theme.pattern(f: Frame, color: Color3, alpha: number, step: number?)
+	local st = step or 46
+	local box = Theme.clear(f, UDim2.fromScale(1, 1))
+	box.Name = "Pattern"
+	box.ClipsDescendants = true
+	-- offsets of the frame (pattern frames have offset sizes); 960x540 if it is sized by scale
+	local w, h = f.Size.X.Offset, f.Size.Y.Offset
+	if w < 1 or h < 1 then
+		w, h = 960, 540
+	end
+	local cols, rows = math.ceil(w / st) + 1, math.ceil(h / st) + 1
+	for r = 0, rows - 1 do
+		for c = 0, cols - 1 do
+			local x = c * st + (if r % 2 == 1 then st / 2 else 0)
+			local d = Theme.frame(box, UDim2.fromOffset(st * 0.22, st * 0.22), UDim2.fromOffset(x, r * st * 0.6), color)
+			d.AnchorPoint = Vector2.new(0.5, 0.5)
+			d.Rotation = 45
+			d.BackgroundTransparency = alpha
+		end
+	end
+	return box
+end
+
+-- Ribbon chip ("BALL OF THE DAY", "LIMITED", tier): coloured pill, ink outline, white heavy text.
+function Theme.ribbon(parent: Instance, text: string, color: Color3, pos: UDim2, h: number?, anchor: Vector2?): Frame
+	local hh = h or 28
+	local size = math.max(Theme.MIN_TEXT, math.floor(hh * 0.72))
+	local w = math.floor(size * 0.62 * (utf8.len(text) or #text) + hh)
+	local r = Theme.frame(parent, UDim2.fromOffset(w, hh), pos, color, anchor)
+	r.Name = "Ribbon"
+	Theme.round(r, 8)
+	Theme.stroke(r, 3, Theme.INK)
+	Theme.gradient(r, Color3.new(1, 1, 1), Color3.fromRGB(200, 200, 200))
+	local t = Theme.label(r, text, size, UDim2.new(1, -8, 1, 0), UDim2.fromScale(0.5, 0.5), {
+		anchor = Vector2.new(0.5, 0.5),
+		stroke = 2,
+	})
+	t.Name = "Text"
+	return r
+end
+
+-- Sale badge: a red star (two turned squares) with white text, tilted.
+function Theme.burst(parent: Instance, text: string, d: number, pos: UDim2, color: Color3?): Frame
+	local box = Theme.clear(parent, UDim2.fromOffset(d, d), pos, Vector2.new(0.5, 0.5))
+	box.Name = "Burst"
+	box.Rotation = -12
+	local col = color or Theme.BAD
+	for k = 0, 1 do
+		local sq = Theme.frame(box, UDim2.fromScale(0.74, 0.74), UDim2.fromScale(0.5, 0.5), col, Vector2.new(0.5, 0.5))
+		sq.Rotation = k * 45
+		Theme.round(sq, 6)
+		Theme.stroke(sq, 3, Theme.INK)
+	end
+	local core = Theme.disc(box, d * 0.7, col, UDim2.fromScale(0.5, 0.5))
+	Theme.gradient(core, col:Lerp(Color3.new(1, 1, 1), 0.25), col)
+	local t = Theme.label(box, text, math.floor(d * 0.32), UDim2.fromScale(0.9, 0.5), UDim2.fromScale(0.5, 0.5), {
+		anchor = Vector2.new(0.5, 0.5),
+		stroke = 3,
+		z = 3,
+	})
+	t.Name = "Text"
+	return box
+end
+
+-- Scene card: rounded, ink outline, a top-to-bottom gradient of `color` (light top, deep bottom) - the day 7 card.
+function Theme.card(parent: Instance, size: UDim2, pos: UDim2?, color: Color3, deep: Color3?, radius: number?): Frame
+	local f = Theme.frame(parent, size, pos, Color3.new(1, 1, 1))
+	f.ClipsDescendants = true
+	Theme.round(f, radius or 18)
+	Theme.gradient(f, color, deep or color:Lerp(Theme.BG, 0.7))
+	Theme.stroke(f, 3, Theme.INK).Name = "Edge"
+	return f
+end
+
+-- Slide up 26 px while it pops (the opening stagger of Daily).
+function Theme.rise(o: GuiObject, delay: number)
+	if Theme.reduced() then
+		return
+	end
+	local p = o.Position
+	o.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 26)
+	TweenService:Create(o, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, delay), {
+		Position = p,
+	}):Play()
+	Theme.pop(o, delay, 0.4)
+end
+
+Theme.PRICE_COIN = hex("#2ed068")
+Theme.PRICE_GEM = hex("#7a3cff")
+
+-- Price button (Ball vs Ball green): coins green, crystals purple; the currency icon on the left, the amount
+-- right of it. `icon` draws the currency (Money.icon) - passed in, Money requires Theme.
+function Theme.price(
+	parent: Instance,
+	text: string,
+	size: UDim2,
+	pos: UDim2?,
+	cur: string,
+	icon: (parent: Instance, cur: string, d: number, pos: UDim2) -> GuiObject,
+	textSize: number?
+): TextButton
+	local h = size.Y.Offset
+	local color = if cur == "coins" then Theme.PRICE_COIN else Theme.PRICE_GEM
+	local b = Theme.button(parent, text, size, pos, color, nil, textSize or 24)
+	b.Name = if cur == "coins" then "PayCoins" else "PayGems"
+	local lip = math.clamp(math.floor(h * 0.1 + 0.5), 4, 9)
+	local d = math.min(34, h - lip - 12)
+	local ic = icon(b, cur, d, UDim2.fromOffset(8 + d / 2, (h - lip) / 2))
+	ic.ZIndex = 4
+	for _, c in ic:GetDescendants() do
+		if c:IsA("GuiObject") then
+			c.ZIndex = 4
+		end
+	end
+	local l = b:FindFirstChild("Label") :: TextLabel?
+	if l then
+		l.Size = UDim2.new(1, -(d + 18), 1, -lip)
+		l.Position = UDim2.new(0, d + 12, 0, 0)
+		l.AnchorPoint = Vector2.new(0, 0)
+	end
+	return b
+end
+
+-- Wallet pill of a window header: dark pill with a big icon sticking out on the left, the amount on the right.
+function Theme.purse(
+	parent: Instance,
+	cur: string,
+	text: string,
+	w: number,
+	pos: UDim2,
+	color: Color3,
+	icon: (parent: Instance, cur: string, d: number, pos: UDim2) -> GuiObject
+): Frame
+	local h = 44
+	local box = Theme.frame(parent, UDim2.fromOffset(w, h), pos, Theme.BG)
+	box.Name = if cur == "coins" then "BalCoins" else "BalGems"
+	Theme.round(box, h / 2)
+	Theme.stroke(box, 3, Theme.INK)
+	Theme.gradient(box, Theme.SLOT, Theme.BG)
+	icon(box, cur, 40, UDim2.fromOffset(6, h / 2))
+	local t = Theme.label(box, text, 26, UDim2.fromOffset(w - 40, 30), UDim2.new(1, -12, 0.5, 0), {
+		anchor = Vector2.new(1, 0.5),
+		align = Enum.TextXAlignment.Right,
+		color = color,
+		stroke = 3,
+	})
+	t.Name = "Value"
+	return box
+end
+
 return Theme

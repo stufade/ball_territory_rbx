@@ -7,6 +7,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
 local Money = require("./Money")
+local Look = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Look"))
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
 local Rules = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Rules"))
 local Shelf = require("./Shelf")
@@ -16,7 +17,6 @@ local Theme = require("./Theme")
 local V2 = Vector2.new
 local MID = V2(0.5, 0.5)
 local NEL = 27
-local GEM = Color3.fromHex("#7a3cff")
 
 local TIER_COL: { [string]: Color3 } = {
 	common = Color3.fromHex("#3d6bff"),
@@ -90,6 +90,228 @@ local function left(s: number): string
 	return string.format("%dm %02ds", s // 60, s % 60)
 end
 
+local function iconFn(parent: Instance, cur: string, d: number, pos: UDim2): GuiObject
+	return Money.icon(parent, cur, d, pos)
+end
+
+-- Sizes (design px). Header: title, wallet and close in one row; tabs under it; body below.
+local HEAD_H = 84
+local TAB_Y, TAB_H = 88, 54
+local BODY_Y = TAB_Y + TAB_H + 10
+local CARD_NAT = 126 -- natural height of a grid card; rows stretch so only whole rows show
+local GAP = 10
+
+-- The ball of the day: a tall scene card (like day 7 of Daily) - deep tier gradient, turning rays, a glow,
+-- the ball standing on its shadow and bobbing, a -30% star, ribbon, timer and two big price buttons.
+local function banner(
+	body: Frame,
+	deal: { e: number, coins: number, crystals: number, endsAt: number },
+	w: number,
+	h: number,
+	ctx: Ctx,
+	pay: (
+		parent: Instance,
+		e: number,
+		cur: string,
+		x: number,
+		y: number,
+		bw: number,
+		bh: number
+	) -> TextButton
+): (Frame, TextButton, TextLabel)
+	local e = deal.e
+	local tier = tierOf(e) or "common"
+	local tint = TIER_COL[tier] or Theme.YELLOW
+	local el = Look.col(e)
+	local card = Theme.card(body, UDim2.fromOffset(w, h), UDim2.fromOffset(0, 0), tint:Lerp(el, 0.35), Theme.BG, 20)
+	card.Name = "Today"
+	local edge = card:FindFirstChild("Edge") :: UIStroke
+	edge.Thickness = 5
+	edge.Color = Theme.YELLOW
+	-- inner floor: darker band at the bottom the ball stands over
+	local floor = Theme.frame(card, UDim2.new(1, 0, 0, math.floor(h * 0.5)), UDim2.new(0, 0, 1, 0), Theme.BG)
+	floor.AnchorPoint = V2(0, 1)
+	floor.Name = "Floor"
+	local fg = Instance.new("UIGradient")
+	fg.Rotation = 90
+	fg.Transparency = NumberSequence.new(1, 0.15)
+	fg.Parent = floor
+	Theme.pattern(card, Color3.new(1, 1, 1), 0.92, 40)
+
+	local bh = 64
+	local priceY = h - 12 - bh
+	local nameH = if h < 290 then 34 else 40
+	local tierY = priceY - 8 - 26
+	local nameY = tierY - 2 - nameH
+	local topY = 34 -- the ribbon overlaps the top of the scene, drawn above it
+	local ballD = math.clamp(nameY - 6 - topY, 64, 150)
+	local cx, cy = w / 2, topY + ballD / 2
+	local still = Theme.reduced()
+
+	local rays =
+		Theme.rays(card, 12, math.floor(w * 1.5), 26, UDim2.fromOffset(cx, cy), Theme.YELLOW, Color3.new(1, 1, 1), 0.55)
+	local glow =
+		Theme.glow(card, math.floor(ballD * 2.1), Theme.YELLOW:Lerp(el, 0.4), UDim2.fromOffset(cx, cy), 6, 0.82)
+	local shadow = Theme.shadow(card, math.floor(ballD * 0.8), UDim2.fromOffset(cx, cy + ballD / 2 + 4))
+	local icon = Theme.ball(card, e, ballD, UDim2.fromOffset(cx, cy), MID)
+	icon.Name = "Icon"
+	-- sparkles around the ball
+	local sparks: { Frame } = {}
+	for k = 1, 6 do
+		local a = k * math.pi / 3 + 0.4
+		local r = ballD * (0.62 + 0.12 * (k % 2))
+		local sp = Theme.frame(
+			card,
+			UDim2.fromOffset(8, 8),
+			UDim2.fromOffset(cx + math.cos(a) * r, cy + math.sin(a) * r * 0.8),
+			Color3.new(1, 1, 1),
+			MID
+		)
+		sp.Rotation = 45
+		sp.Name = "Spark"
+		table.insert(sparks, sp)
+	end
+
+	local ribbon = Theme.ribbon(card, "BALL OF THE DAY", Theme.ORANGE, UDim2.fromOffset(w / 2, 10), 30, V2(0.5, 0))
+	ribbon.ZIndex = 6
+	for _, c in ribbon:GetDescendants() do
+		if c:IsA("GuiObject") then
+			c.ZIndex = 7
+		end
+	end
+	local offD = math.clamp(math.floor(ballD * 0.62), 56, 76)
+	local off = Theme.burst(card, "-30%", offD, UDim2.fromOffset(cx + ballD / 2 + offD * 0.3, cy - ballD * 0.1))
+	off.Name = "Off"
+	off.ZIndex = 5
+	local offText = off:FindFirstChild("Text") :: TextLabel
+	offText.Name = "Deal"
+
+	local title = Rules.Config.TITLE[e] or "?"
+	Theme.label(
+		card,
+		title,
+		Theme.fit(title, 48, w - 24, nameH + 8),
+		UDim2.fromOffset(w - 24, nameH),
+		UDim2.fromOffset(cx, nameY),
+		{
+			anchor = V2(0.5, 0),
+			color = Theme.nameColor(e),
+			stroke = 5,
+		}
+	).Name =
+		"Name"
+	-- tier chip and the honest old price, crossed
+	local chip = Theme.ribbon(card, TIER_WORD[tier] or "COMMON", tint, UDim2.fromOffset(cx - 6, tierY), 26, V2(1, 0))
+	chip.Name = "Tier"
+	-- real timer in a dark pill right of the tier
+	local endsBox =
+		Theme.frame(card, UDim2.fromOffset(math.floor(w / 2 - 18), 26), UDim2.fromOffset(cx + 6, tierY), Theme.INK)
+	endsBox.Name = "EndsBox"
+	endsBox.BackgroundTransparency = 0.3
+	Theme.round(endsBox, 13)
+	local ends = Theme.label(endsBox, "", 20, UDim2.new(1, -10, 1, 0), UDim2.fromScale(0.5, 0.5), {
+		anchor = MID,
+		color = Theme.YELLOW_TXT,
+		stroke = 2,
+	})
+	ends.Name = "Ends"
+
+	local bw = math.floor((w - 24 - 10) / 2)
+	local coins = pay(card, e, "coins", 12, priceY, bw, bh)
+	local gems = pay(card, e, "crystals", 12 + bw + 10, priceY, bw, bh)
+	coins.NextSelectionRight = gems
+	gems.NextSelectionLeft = coins
+
+	if not still then
+		local t = 0
+		local glowS = Theme.scaleOf(glow)
+		local offS = Theme.scaleOf(off)
+		local shadowW = shadow.Size.X.Offset
+		table.insert(ctx.frames, function(dt: number)
+			if not card.Parent then
+				return
+			end
+			t += dt
+			rays.Rotation = t * 9
+			glowS.Scale = 1 + 0.06 * math.sin(t * 2.2)
+			local bob = math.sin(t * 2.4)
+			icon.Position = UDim2.fromOffset(cx, cy - 5 - 5 * bob)
+			local k = 1 - 0.12 * (bob + 1) / 2
+			shadow.Size = UDim2.fromOffset(shadowW * k, math.max(6, math.floor(shadowW * 0.22 * k)))
+			offS.Scale = 1 + 0.07 * math.max(0, math.sin(t * 4))
+			for i, sp in sparks do
+				sp.BackgroundTransparency = 0.2 + 0.8 * (0.5 + 0.5 * math.sin(t * 3 + i * 1.7))
+			end
+		end)
+	end
+	return card, coins, ends
+end
+
+-- A shelf card: element glow behind the ball on the left, name and tier on the right, two prices at the bottom.
+local function shelfCard(
+	list: Instance,
+	e: number,
+	w: number,
+	h: number,
+	x: number,
+	y: number,
+	pay: (
+		parent: Instance,
+		e: number,
+		cur: string,
+		x: number,
+		y: number,
+		bw: number,
+		bh: number
+	) -> TextButton
+): Frame
+	local tier = tierOf(e) or "common"
+	local tint = TIER_COL[tier] or Theme.SLOT
+	local el = Look.col(e)
+	local card =
+		Theme.card(list, UDim2.fromOffset(w, h), UDim2.fromOffset(x, y), Theme.SLOT:Lerp(el, 0.28), Theme.SLOT, 16)
+	card.Name = `Row{e}`
+	if tier == "legendary" or tier == "epic" then
+		local edge = card:FindFirstChild("Edge") :: UIStroke
+		edge.Color = tint
+		edge.Thickness = 4
+	end
+	-- tier stripe along the top edge
+	local stripe = Theme.frame(card, UDim2.new(1, 0, 0, 6), nil, tint)
+	stripe.Name = "Stripe"
+	local bh = 46
+	local by = h - 10 - bh
+	local ballD = math.clamp(by - 30, 48, 74)
+	local bx, byc = 12 + ballD / 2 + 4, 10 + (by - 10) / 2
+	Theme.glow(card, math.floor(ballD * 1.6), el, UDim2.fromOffset(bx, byc), 4, 0.78)
+	Theme.shadow(card, math.floor(ballD * 0.7), UDim2.fromOffset(bx, byc + ballD / 2 + 1))
+	local icon = Theme.ball(card, e, ballD, UDim2.fromOffset(bx, byc - 2), MID)
+	icon.Name = "Icon"
+	local tx = math.floor(bx + ballD / 2 + 12)
+	local tw = w - tx - 10
+	local title = Rules.Config.TITLE[e] or "?"
+	Theme.label(card, title, Theme.fit(title, 30, tw, 34), UDim2.fromOffset(tw, 32), UDim2.fromOffset(tx, byc - 32), {
+		anchor = V2(0, 0),
+		align = Enum.TextXAlignment.Left,
+		color = Theme.nameColor(e),
+		stroke = 3,
+	}).Name =
+		"Name"
+	local chip = Theme.ribbon(card, TIER_WORD[tier] or "COMMON", tint, UDim2.fromOffset(tx, byc + 4), 24)
+	chip.Name = "Chip"
+	local tl = chip:FindFirstChild("Text") :: TextLabel
+	tl.Name = "Tier"
+	tl.Parent = card
+	tl.AnchorPoint = V2(0, 0)
+	tl.Position = UDim2.fromOffset(tx + 4, byc + 4)
+	tl.Size = UDim2.fromOffset(chip.Size.X.Offset - 8, 24)
+	tl.ZIndex = 3
+	local bw = math.floor((w - 20 - 8) / 2)
+	pay(card, e, "coins", 10, by, bw, bh)
+	pay(card, e, "crystals", 10 + bw + 8, by, bw, bh)
+	return card
+end
+
 function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	parent:ClearAllChildren()
 	local cv = ctx.canvas
@@ -115,37 +337,8 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 	panel:SetAttribute("Tab", tab)
 	Theme.round(panel, 22)
 	Theme.stroke(panel, 4, Theme.INK)
+	Theme.gradient(panel, Theme.PANEL_HI:Lerp(Theme.PANEL, 0.55), Theme.PANEL)
 	Theme.pop(panel, 0, 0.92)
-
-	Theme.label(panel, "SHOP", 34, UDim2.fromOffset(150, 36), UDim2.fromOffset(16, 12), {
-		anchor = V2(0, 0),
-		align = Enum.TextXAlignment.Left,
-		color = Theme.YELLOW,
-	}).Name =
-		"Head"
-
-	local close =
-		Theme.button(panel, "X", UDim2.fromOffset(72, 72), UDim2.fromOffset(pw - 16 - 72, 10), Theme.BAD, nil, 34)
-	close.Name = "Close"
-	close.Activated:Connect(ctx.close)
-
-	local pillW = 142
-	local gemsX = pw - 16 - 72 - 12 - pillW
-	local coinsX = gemsX - 8 - pillW
-	local function bal(cur: string, x: number, n: number)
-		local box = Theme.frame(panel, UDim2.fromOffset(pillW, 40), UDim2.fromOffset(x, 26), Theme.BG)
-		box.Name = if cur == "coins" then "BalCoins" else "BalGems"
-		Theme.round(box, 20)
-		Theme.stroke(box, 2, Theme.INK)
-		Money.icon(box, cur, 28, UDim2.fromOffset(18, 20))
-		Theme.label(box, Money.fmt(n), 22, UDim2.fromOffset(pillW - 44, 26), UDim2.new(1, -10, 0.5, 0), {
-			anchor = V2(1, 0.5),
-			align = Enum.TextXAlignment.Right,
-			color = if cur == "coins" then Theme.YELLOW else GEM,
-		})
-	end
-	bal("coins", coinsX, v.coins or 0)
-	bal("crystals", gemsX, v.crystals or 0)
 
 	local missingN = 0
 	for e = 0, NEL - 1 do
@@ -153,35 +346,63 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			missingN += 1
 		end
 	end
-	Theme.label(panel, `{missingN} LEFT`, 20, UDim2.fromOffset(140, 22), UDim2.fromOffset(16, 50), {
+
+	-- header: SHOP (Daily's title size) with the count under it, wallet, close
+	Theme.label(panel, "SHOP", 46, UDim2.fromOffset(170, 50), UDim2.fromOffset(20, 6), {
+		anchor = V2(0, 0),
+		align = Enum.TextXAlignment.Left,
+		color = Theme.YELLOW,
+		stroke = 5,
+	}).Name =
+		"Head"
+	Theme.label(panel, `{missingN} BALLS LEFT`, 20, UDim2.fromOffset(220, 24), UDim2.fromOffset(22, 56), {
 		anchor = V2(0, 0),
 		align = Enum.TextXAlignment.Left,
 		color = Theme.DIM,
+		bold = true,
 	}).Name =
 		"Left"
 
-	local tabY, tabH = 90, 48
-	local tabGap = 8
+	local close =
+		Theme.button(panel, "X", UDim2.fromOffset(72, 72), UDim2.fromOffset(pw - 12 - 72, 8), Theme.BAD, nil, 36)
+	close.Name = "Close"
+	close.Activated:Connect(ctx.close)
+
+	local pillW = 168
+	local gemsX = pw - 12 - 72 - 16 - pillW
+	local coinsX = gemsX - 26 - pillW
+	Theme.purse(panel, "coins", Money.fmt(v.coins or 0), pillW, UDim2.fromOffset(coinsX + 18, 22), Theme.YELLOW, iconFn)
+	Theme.purse(
+		panel,
+		"crystals",
+		Money.fmt(v.crystals or 0),
+		pillW,
+		UDim2.fromOffset(gemsX + 18, 22),
+		Money.GEM,
+		iconFn
+	)
+
+	-- tabs: each in its own colour; the open one is bright, taller, with the yellow edge
+	local tabGap = 10
 	local tabW = math.floor((pw - 32 - tabGap * 2) / 3)
-	local tabs: { { Tab } } = { { "balls" :: Tab }, { "spin" :: Tab }, { "skins" :: Tab } }
+	local order: { Tab } = { "balls", "spin", "skins" }
 	local tabName = { balls = "TabBalls", spin = "TabSpin", skins = "TabSkins" }
 	local tabWord = { balls = "BALLS", spin = "SPIN", skins = "SKINS" }
 	local tabCol = { balls = Theme.YELLOW, spin = Theme.ORANGE, skins = Theme.PURPLE }
-	for i, wrap in tabs do
-		local id = wrap[1]
+	for i, id in order do
 		local x = 16 + (i - 1) * (tabW + tabGap)
 		local on = tab == id
-		local b = Theme.button(
-			panel,
-			tabWord[id],
-			UDim2.fromOffset(tabW, tabH),
-			UDim2.fromOffset(x, tabY),
-			if on then tabCol[id] else Theme.SLOT,
-			nil,
-			22
-		)
+		local col = if on then tabCol[id] else tabCol[id]:Lerp(Theme.SLOT, 0.62)
+		local b =
+			Theme.button(panel, tabWord[id], UDim2.fromOffset(tabW, TAB_H), UDim2.fromOffset(x, TAB_Y), col, nil, 28)
 		b.Name = tabName[id]
 		Theme.select(b, on)
+		if not on then
+			local l = b:FindFirstChild("Label") :: TextLabel?
+			if l then
+				l.TextColor3 = Theme.DIM
+			end
+		end
 		b.Activated:Connect(function()
 			if tab ~= id then
 				ctx.setTab(id)
@@ -189,9 +410,17 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		end)
 	end
 
-	local bodyY = tabY + tabH + 8
-	local bodyW, bodyH = pw - 24, ph - bodyY - 12
-	local body = Theme.clear(panel, UDim2.fromOffset(bodyW, bodyH), UDim2.fromOffset(12, bodyY))
+	local bodyW, bodyH = pw - 24, ph - BODY_Y - 12
+	-- the well: dark inset with a faint pattern, the body sits in it
+	local well = Theme.frame(panel, UDim2.fromOffset(bodyW + 8, bodyH + 8), UDim2.fromOffset(8, BODY_Y - 4), Theme.BG)
+	well.Name = "Well"
+	Theme.round(well, 18)
+	Theme.stroke(well, 3, Theme.INK)
+	Theme.gradient(well, Theme.BG, Theme.GLOW:Lerp(Theme.BG, 0.4))
+	if tab == "balls" then
+		Theme.pattern(well, Theme.GLOW:Lerp(Color3.new(1, 1, 1), 0.2), 0.8, 44)
+	end
+	local body = Theme.clear(panel, UDim2.fromOffset(bodyW, bodyH), UDim2.fromOffset(12, BODY_Y))
 	body.Name = "Body"
 	body.ClipsDescendants = true
 
@@ -202,20 +431,18 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		return fullPrice(e, cur)
 	end
 
-	local function pay(row: Frame, e: number, cur: string, x: number, y: number, bw: number, bh: number): TextButton
-		local n = priceOf(e, cur)
-		local color = if cur == "coins" then Theme.YELLOW else GEM
-		local b = Theme.button(row, Money.fmt(n), UDim2.fromOffset(bw, bh), UDim2.fromOffset(x, y), color, nil, 22)
-		b.Name = if cur == "coins" then "PayCoins" else "PayGems"
-		b.ClipsDescendants = true
+	local function pay(row: Instance, e: number, cur: string, x: number, y: number, bw: number, bh: number): TextButton
+		local b = Theme.price(
+			row,
+			Money.fmt(priceOf(e, cur)),
+			UDim2.fromOffset(bw, bh),
+			UDim2.fromOffset(x, y),
+			cur,
+			iconFn,
+			if bh >= 60 then 30 else 24
+		)
 		b:SetAttribute("E", e)
 		b:SetAttribute("Cur", cur)
-		local icon = Money.icon(b, cur, math.min(28, bh - 28), UDim2.fromOffset(18, bh / 2))
-		icon.ZIndex = 4
-		local label = b:FindFirstChild("Label") :: TextLabel?
-		if label then
-			label.Position = UDim2.new(0.5, 10, 0, 0)
-		end
 		b.Activated:Connect(function()
 			ctx.act(Net.Action.buy, e, cur)
 		end)
@@ -239,136 +466,47 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		}, bodyW, bodyH)
 		GuiService.SelectedObject = close
 	else
-		local listTop = 0
+		local listX = 0
 		local todayCoin: TextButton? = nil
-		local endsParent: Instance = panel
+		local endsLabel: TextLabel? = nil
 		if deal then
-			local tier = tierOf(deal.e) or "common"
-			local tint = TIER_COL[tier] or Theme.YELLOW
-			local cardH = math.clamp(math.floor(bodyH * 0.48), 188, 228)
-			local card = Theme.frame(body, UDim2.fromOffset(bodyW, cardH), UDim2.fromOffset(0, 0), tint)
-			card.Name = "Today"
-			card.ClipsDescendants = true
-			Theme.round(card, 18)
-			Theme.stroke(card, 5, tint:Lerp(Color3.new(1, 1, 1), 0.35))
-			local wash = Instance.new("UIGradient")
-			wash.Rotation = 16
-			wash.Color = ColorSequence.new(tint:Lerp(Color3.new(1, 1, 1), 0.12), tint:Lerp(Theme.BG, 0.55))
-			wash.Parent = card
-			endsParent = card
-			local ballD = math.floor(cardH * 0.74)
-			local span = math.ceil(ballD / 0.88)
-			local bx, byc = 10 + span / 2, cardH / 2
-			local rayLen = math.floor((bodyW - bx) * 2.2)
-			local glowCol = Color3.fromHex("#ffd24a")
-			for i = 1, 14 do
-				local ray = Theme.frame(
-					card,
-					UDim2.fromOffset(18, rayLen),
-					UDim2.fromOffset(bx, byc),
-					if i % 2 == 0 then glowCol else Color3.new(1, 1, 1),
-					MID
-				)
-				ray.Rotation = 8 + (i - 1) * (164 / 13)
-				ray.BackgroundTransparency = 0.22
-				ray.ZIndex = 1
-			end
-			local glow = Theme.disc(card, math.floor(span * 1.45), glowCol, UDim2.fromOffset(bx, byc), 0.28)
-			glow.ZIndex = 2
-			local icon = Theme.ball(card, deal.e, ballD, UDim2.fromOffset(bx, byc), MID)
-			icon.Name = "Icon"
-			icon.ZIndex = 4
-			local bw, bh = 156, 68
-			local gemX = bodyW - 14 - bw
-			local coinX = gemX - 8 - bw
-			local textX = math.floor(10 + span + 14)
-			local textW = math.max(80, coinX - 12 - textX)
-			local title = Rules.Config.TITLE[deal.e] or "?"
-			local metaY = cardH - 30
-			local nameH = metaY - 36
-			local namePx = Theme.fit(title, 96, textW, nameH)
-			Theme.label(card, "BALL OF THE DAY", 22, UDim2.fromOffset(textW, 24), UDim2.fromOffset(textX, 6), {
-				anchor = V2(0, 0),
-				align = Enum.TextXAlignment.Left,
-				color = Theme.YELLOW,
-			})
-			Theme.label(card, title, namePx, UDim2.fromOffset(textW, nameH), UDim2.fromOffset(textX, 30), {
-				anchor = V2(0, 0),
-				align = Enum.TextXAlignment.Left,
-				color = Theme.nameColor(deal.e),
-			}).Name =
-				"Name"
-			local tierW = math.floor(textW * 0.28)
-			Theme.label(
-				card,
-				TIER_WORD[tier] or "COMMON",
-				20,
-				UDim2.fromOffset(tierW, 22),
-				UDim2.fromOffset(textX, metaY),
-				{
-					anchor = V2(0, 0),
-					align = Enum.TextXAlignment.Left,
-					color = tint:Lerp(Color3.new(1, 1, 1), 0.35),
-				}
-			).Name =
-				"Tier"
-			Theme.label(
-				card,
-				"TODAY -30%",
-				20,
-				UDim2.fromOffset(math.floor(textW * 0.34), 22),
-				UDim2.fromOffset(textX + tierW, metaY),
-				{
-					anchor = V2(0, 0),
-					align = Enum.TextXAlignment.Left,
-					color = Theme.YELLOW_TXT,
-				}
-			).Name =
-				"Deal"
-			local by = math.floor((cardH - bh) / 2)
-			local gems = pay(card, deal.e, "crystals", gemX, by, bw, bh)
-			local coins = pay(card, deal.e, "coins", coinX, by, bw, bh)
-			coins.NextSelectionRight = gems
-			gems.NextSelectionLeft = coins
+			local bw = math.clamp(math.floor(bodyW * 0.42), 300, 420)
+			local card, coins, ends = banner(body, deal, bw, bodyH, ctx, pay)
+			Theme.rise(card, 0.08)
 			todayCoin = coins
-			listTop = cardH + 8
-		end
-
-		local ends = Theme.label(endsParent, "", 22, UDim2.fromOffset(220, 24), UDim2.fromOffset(16, 16), {
-			anchor = V2(0, 0),
-			align = Enum.TextXAlignment.Left,
-			color = Theme.YELLOW_TXT,
-		})
-		ends.Name = "Ends"
-		if not deal then
-			ends.Visible = false
-			ends.Position = UDim2.fromOffset(0, 0)
-			ends.Size = UDim2.fromOffset(1, 1)
+			endsLabel = ends
+			listX = bw + GAP
 		else
-			local bannerH = math.clamp(math.floor(bodyH * 0.48), 188, 228)
-			local textX = math.floor(10 + math.ceil(math.floor(bannerH * 0.74) / 0.88) + 14)
-			local coinX = bodyW - 14 - 156 - 8 - 156
-			local textW = math.max(80, coinX - 12 - textX)
-			ends.Position = UDim2.fromOffset(textX + math.floor(textW * 0.62), bannerH - 30)
-			ends.Size = UDim2.fromOffset(math.max(80, math.floor(textW * 0.38)), 22)
+			-- no deal: keep an empty Ends so the old screens find it
+			local ends = Theme.label(body, "", 20, UDim2.fromOffset(1, 1), UDim2.fromOffset(0, 0))
+			ends.Name = "Ends"
+			ends.Visible = false
 		end
-		if deal then
+		if deal and endsLabel then
+			local lab = endsLabel
+			local function upd()
+				if deal then
+					lab.Text = `ENDS {left(deal.endsAt - workspace:GetServerTimeNow())}`
+				end
+			end
+			upd()
 			table.insert(ctx.frames, function()
-				if ends.Parent and deal then
-					ends.Text = `ENDS {left(deal.endsAt - workspace:GetServerTimeNow())}`
+				if lab.Parent then
+					upd()
 				end
 			end)
-			ends.Text = `ENDS {left(deal.endsAt - workspace:GetServerTimeNow())}`
 		end
 
+		local listW = bodyW - listX
 		local list = Instance.new("ScrollingFrame")
 		list.Name = "List"
 		list.BackgroundTransparency = 1
 		list.BorderSizePixel = 0
-		list.Position = UDim2.fromOffset(0, listTop)
-		list.Size = UDim2.fromOffset(bodyW, math.max(40, bodyH - listTop))
+		list.Position = UDim2.fromOffset(listX, 0)
+		list.Size = UDim2.fromOffset(listW, bodyH)
 		list.CanvasSize = UDim2.fromOffset(0, 0)
 		list.ScrollBarThickness = 8
+		list.ScrollBarImageColor3 = Theme.YELLOW
 		list.ScrollingDirection = Enum.ScrollingDirection.Y
 		list.ElasticBehavior = Enum.ElasticBehavior.Never
 		list.Active = true
@@ -389,76 +527,37 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		end)
 
 		if #missing == 0 then
-			Theme.label(list, "ALL YOURS", 28, UDim2.fromOffset(bodyW - 16, 40), UDim2.fromOffset(0, 12), {
-				anchor = V2(0, 0),
-				color = Theme.GOOD_TXT,
-			}).Name =
+			Theme.label(
+				list,
+				"ALL YOURS!",
+				40,
+				UDim2.fromOffset(listW - 16, 50),
+				UDim2.fromOffset(listW / 2, bodyH / 2),
+				{
+					anchor = MID,
+					color = Theme.GOOD_TXT,
+					stroke = 4,
+				}
+			).Name =
 				"Empty"
 		end
 
-		local gap = 8
-		local cols = if bodyW >= 680 then 3 else 2
-		local cardW = math.floor((bodyW - 12 - gap * (cols - 1)) / cols)
-		local room = math.max(40, bodyH - listTop)
-		local natural = 168
-		local fit = math.max(1, math.floor((room + gap) / (natural + gap)))
-		local cardH = math.min(natural, math.floor((room - gap * (fit - 1)) / fit))
-		local shown = fit * cardH + gap * (fit - 1)
-		if shown > room then
-			fit = 1
-			cardH = math.min(natural, room)
-			shown = cardH
-		end
-		list.Size = UDim2.fromOffset(bodyW, shown)
+		-- whole rows only: the card height stretches so the visible rows fill the list exactly
+		local scrollW = 12
+		local cols = math.max(2, math.floor((listW - scrollW + GAP) / (250 + GAP)))
+		local cardW = math.floor((listW - scrollW - GAP * (cols - 1)) / cols)
+		local fit = math.max(1, math.floor((bodyH + GAP) / (CARD_NAT + GAP)))
+		local cardH = math.floor((bodyH - GAP * (fit - 1)) / fit)
 		for i, e in missing do
-			local tier = tierOf(e) or "common"
-			local tint = TIER_COL[tier] or Theme.SLOT
 			local col = (i - 1) % cols
 			local rowI = (i - 1) // cols
-			local row = Theme.frame(
-				list,
-				UDim2.fromOffset(cardW, cardH),
-				UDim2.fromOffset(col * (cardW + gap), rowI * (cardH + gap)),
-				Theme.SLOT:Lerp(tint, 0.5)
-			)
-			row.Name = `Row{e}`
-			row.ClipsDescendants = true
-			Theme.round(row, 16)
-			Theme.stroke(row, if tier == "legendary" then 4 else 3, tint)
-			local ballD = 58
-			Theme.disc(row, ballD + 14, tint, UDim2.fromOffset(cardW / 2, 36), 0.5)
-			local icon = Theme.ball(row, e, ballD, UDim2.fromOffset(cardW / 2, 36), MID)
-			icon.Name = "Icon"
-			Theme.label(
-				row,
-				Rules.Config.TITLE[e] or "?",
-				20,
-				UDim2.fromOffset(cardW - 12, 22),
-				UDim2.fromOffset(6, 66),
-				{
-					color = Theme.nameColor(e),
-				}
-			).Name =
-				"Name"
-			Theme.label(
-				row,
-				TIER_WORD[tier] or "COMMON",
-				20,
-				UDim2.fromOffset(cardW - 12, 20),
-				UDim2.fromOffset(6, 88),
-				{
-					color = tint:Lerp(Color3.new(1, 1, 1), 0.45),
-				}
-			).Name =
-				"Tier"
-			local bh = 44
-			local by = cardH - 8 - bh
-			local bw = math.floor((cardW - 16 - 6) / 2)
-			pay(row, e, "crystals", cardW - 8 - bw, by, bw, bh)
-			pay(row, e, "coins", 8, by, bw, bh)
+			local c = shelfCard(list, e, cardW, cardH, col * (cardW + GAP), rowI * (cardH + GAP), pay)
+			if i <= cols * fit then
+				Theme.rise(c, 0.14 + 0.05 * i)
+			end
 		end
 		local rowsN = math.ceil(#missing / cols)
-		list.CanvasSize = UDim2.fromOffset(0, math.max(rowsN * (cardH + gap), 1))
+		list.CanvasSize = UDim2.fromOffset(0, math.max(rowsN * (cardH + GAP) - GAP, 1))
 		GuiService.SelectedObject = todayCoin or close
 	end
 

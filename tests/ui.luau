@@ -530,11 +530,11 @@ do
 		"shop: owned balls are absent"
 	)
 	local today = find(panel, "Today")
-	check(today and find(today, "Deal").Text == "TODAY -30%", "shop: ball of the day marked")
+	check(today and find(today, "Deal").Text == "-30%", "shop: ball of the day marked")
 	check(find(today, "Name").Text == "WATER", "shop: day ball name")
 	check(find(find(today, "PayCoins"), "Label").Text == "700", "shop: day coin price is the discount")
 	check(find(find(today, "PayGems"), "Label").Text == "35", "shop: day crystal price is the discount")
-	check(rectOf(today)[2] < rectOf(find(panel, "Row5"))[2], "shop: the deal is first")
+	check(rectOf(today)[1] + rectOf(today)[3] <= rectOf(find(panel, "Row5"))[1], "shop: the deal is first (left)")
 	check(rectOf(today)[4] > rectOf(find(panel, "Row5"))[4], "shop: the deal is larger than a shelf row")
 	check(find(find(panel, "Row5"), "Deal") == nil, "shop: a normal ball is not marked")
 	check(
@@ -552,8 +552,8 @@ do
 		"shop: prices inside the panel"
 	)
 	check(
-		coinBtn[1] >= rectOf(find(today, "Name"))[1] + rectOf(find(today, "Name"))[3],
-		"shop: price clear of the name"
+		coinBtn[2] >= rectOf(find(today, "Name"))[2] + rectOf(find(today, "Name"))[4],
+		"shop: price clear of the name (under it)"
 	)
 	check(find(find(panel, "Row5"), "Tier").Text == "COMMON", "shop: common tier is on the card")
 	check(find(find(panel, "Row11"), "Tier").Text == "RARE", "shop: rare tier is on the card")
