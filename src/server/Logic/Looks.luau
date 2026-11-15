@@ -82,7 +82,16 @@ local function owned(d: any, id: string): boolean
 	return type(d.looks) == "table" and table.find(d.looks, id) ~= nil
 end
 
--- Drops ids the catalog no longer has, and a worn row the player does not own.
+-- Old id -> new id. A look renamed in Economy.LOOKS must be listed here, or bought copies keep the old id
+-- (kept on the profile, but not shown). Never remove an entry.
+Looks.RENAMED = {} :: { [string]: string }
+
+function Looks.known(E: any, id: unknown): boolean
+	return byId(E, id) ~= nil
+end
+
+-- Renames old ids and drops a worn row the player does not own. An id the catalog no longer has stays owned
+-- (it may have been bought for Robux): it is only taken off the worn row.
 function Looks.repair(d: any, E: any)
 	if type(d.looks) ~= "table" then
 		d.looks = {}
@@ -96,14 +105,28 @@ function Looks.repair(d: any, E: any)
 			ok[look.id] = true
 		end
 	end
+	local seen: { [string]: boolean } = {}
 	for i = #d.looks, 1, -1 do
-		if not ok[d.looks[i]] then
+		local id = d.looks[i]
+		local to = Looks.RENAMED[id]
+		if to then
+			id = to
+			d.looks[i] = to
+		end
+		if seen[id] then
 			table.remove(d.looks, i)
+		else
+			seen[id] = true
 		end
 	end
 	local w = d.worn
 	for _, key in { "skin", "trail", "force", "frame" } do
-		if type(w[key]) ~= "string" or not owned(d, w[key]) then
+		local id = w[key]
+		if type(id) == "string" and Looks.RENAMED[id] then
+			id = Looks.RENAMED[id]
+			w[key] = id
+		end
+		if type(id) ~= "string" or not ok[id] or not owned(d, id) then
 			w[key] = ""
 		end
 	end
@@ -191,10 +214,19 @@ function Looks.snapshot(d: any, E: any, products: any): Shelf
 		end
 	end
 	local w = if type(d.worn) == "table" then d.worn else blank()
+	-- only ids the shelf can draw; a retired id stays on the profile
+	local have: { string } = {}
+	if type(d.looks) == "table" then
+		for _, id in d.looks do
+			if byId(E, id) then
+				table.insert(have, id)
+			end
+		end
+	end
 	return {
 		n = Looks.count(d),
 		need = NEL,
-		owned = if type(d.looks) == "table" then table.clone(d.looks) else {},
+		owned = have,
 		on = {
 			skin = if type(w.skin) == "string" then w.skin else "",
 			trail = if type(w.trail) == "string" then w.trail else "",

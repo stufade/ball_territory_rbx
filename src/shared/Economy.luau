@@ -72,14 +72,15 @@ return {
 		},
 	},
 
-	-- Crystal packs, developer products [brief]. Bonus grows with size; "best value" badge on 650.
+	-- Crystal packs, developer products [brief]. Bonus grows with size; "best value" badge on the most crystals
+	-- per Robux (3750: 1.50/R$; 650 was 1.30, below 1400 and 3750 — audit 2026-11-16).
 	CRYSTAL_PACKS = {
 		{ crystals = 50, robux = 49 },
 		{ crystals = 110, robux = 99 },
 		{ crystals = 300, robux = 249 },
-		{ crystals = 650, robux = 499, best = true },
+		{ crystals = 650, robux = 499 },
 		{ crystals = 1400, robux = 999 },
-		{ crystals = 3750, robux = 2499 },
+		{ crystals = 3750, robux = 2499, best = true },
 	},
 
 	-- Duel draft actions [brief]. Paid "Any ball" at most 2 per duel; a duel has 3 picks per player.

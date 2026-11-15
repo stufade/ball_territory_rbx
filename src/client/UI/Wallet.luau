@@ -206,6 +206,11 @@ function Wallet.show(w: Wallet, which: string)
 	if not onPlaza(w) or w.st == nil or w.st.ph ~= "lobby" or w.view == nil then
 		return
 	end
+	-- the kiosk opens the last tab; never the spin tab when paid random is restricted
+	local v = w.view :: Net.ProfileView
+	if which == "shop" and w.tab == "spin" and not (v.spin and v.spin.ok) then
+		w.tab = "balls"
+	end
 	if w.open == which then
 		closePop(w)
 		Wallet.render(w)
@@ -280,8 +285,8 @@ function Wallet.render(w: Wallet)
 		btns.spin = spin
 	end
 	for name, b in btns do
-		local on = (name == "shop" and w.open == "shop") or (name == "spin" and w.open == "shop" and w.tab == "spin")
-		Theme.select(b, on or w.open == name)
+		local lit = (name == "shop" and w.open == "shop") or (name == "spin" and w.open == "shop" and w.tab == "spin")
+		Theme.select(b, lit or w.open == name)
 		b.Activated:Connect(function()
 			if name == "spin" then
 				if w.open == "shop" and w.tab == "spin" then

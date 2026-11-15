@@ -132,7 +132,7 @@ function Meta.read(d: any, raw: { [string]: any })
 		local seen = {}
 		for _, k in raw.looks do
 			local s = str(k, 32)
-			if s and string.match(s, "^[%l%d_]+$") and not seen[s] and #d.looks < 40 then
+			if s and string.match(s, "^[%l%d_]+$") and not seen[s] and #d.looks < 64 then
 				seen[s] = true
 				table.insert(d.looks, s)
 			end

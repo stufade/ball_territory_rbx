@@ -648,6 +648,23 @@ do
 		s3.run(0.2)
 		check(#other.prof.balls == 27, "Studio: allowed")
 	end
+	do
+		-- PolicyService unreadable (the mock has none): a live server hides both wheels, Studio shows them
+		local s4 = server()
+		local live = s4.join(703, "Live")
+		s4.run(1)
+		check(live.prof and live.prof.spin and live.prof.spin.ok == false, "live, no policy answer: wheels hidden")
+		local coins = live.prof.coins
+		s4.action(live, "spin", nil)
+		s4.run(0.2)
+		check(live.prof.coins == coins and live.prof.spinResult == nil, "live, no policy answer: spin refused")
+		check(live.prof.passOffer and not live.prof.passOffer.fastSpin, "Fast Spin is not offered when hidden")
+		s4.world.services.RunService.studio = true
+		local dev = s4.join(704, "Dev")
+		s4.run(1)
+		check(dev.prof and dev.prof.spin and dev.prof.spin.ok == true, "Studio, no policy answer: wheels shown")
+		check(live.prof.starterBought == false, "the profile view carries starterBought")
+	end
 	local level, balls = c.prof.level, #c.prof.balls
 	s1.run(cfg.RESULT_TIME + 2)
 	s1.leave(c)

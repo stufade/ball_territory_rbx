@@ -16,6 +16,7 @@ local Lobby = require("@self/Lobby")
 local Modes = require("@self/Modes")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Party = require("@self/Party")
+local Passes = require("@self/Passes")
 local Profiles = require("@self/Profiles")
 local Receipts = require("@self/Receipts")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
@@ -30,6 +31,9 @@ Arenas.init()
 Party.start()
 Profiles.start()
 Receipts.start()
+Passes.start(function(player)
+	Profiles.send(player)
+end)
 
 -- T2.2 wiring: the profile may come after Lobby.join; the won tutorial gives the reward; matches give XP.
 Profiles.onLoaded(function(player)
@@ -60,8 +64,7 @@ Session.award = function(player, mode, win, t, afk, friend)
 		balls = t.balls,
 		afk = afk,
 		friend = friend,
-		-- the coins x2 game pass comes with M3.2
-		pass2x = false,
+		pass2x = Passes.has(player, "coins2x"),
 	})
 	if not res then
 		return nil
@@ -79,6 +82,7 @@ end
 
 local function onPlayer(player: Player)
 	local r = Roster.add(player)
+	Passes.join(player)
 	Profiles.join(player)
 	Friends.joined(player)
 	Avatars.home(player)
@@ -111,6 +115,7 @@ Players.PlayerRemoving:Connect(function(player)
 		Roster.remove(player)
 	end
 	Profiles.leave(player)
+	Passes.leave(player)
 	Friends.left(player)
 	Analytics.forget(player)
 end)

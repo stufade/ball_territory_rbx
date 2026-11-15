@@ -106,12 +106,25 @@ end
 
 do
 	local d = fresh()
-	check(Receipt.apply(d, receipt(9101, "ball-none"), USER, cat, E, {}) == "later", "a ball with no choice is refused")
-	check(#d.balls == 0 and #d.receipts == 0, "a ball with no choice is not acknowledged")
+	check(
+		Receipt.apply(d, receipt(9101, "ball-none"), USER, cat, E, {}) == "granted",
+		"a ball with no choice is acknowledged (never hangs)"
+	)
+	check(
+		#d.balls == 0 and d.crystals == E.PRICE.crystals.common and #d.receipts == 1,
+		"a ball with no choice pays the tier's crystal price"
+	)
 	check(not Receipt.choose(d, "ball", 99, E), "a ball id outside the roster is refused")
 	check(Receipt.choose(d, "ball", 0, E) and d.robuxBall == 0, "the server remembers the chosen ball")
-	check(Receipt.apply(d, receipt(9104, "ball-wrong-tier"), USER, cat, E, {}) == "later", "the wrong tier is refused")
-	check(#d.balls == 0 and d.robuxBall == 0, "the wrong tier keeps the choice")
+	local c0 = d.crystals
+	check(
+		Receipt.apply(d, receipt(9104, "ball-wrong-tier"), USER, cat, E, {}) == "granted",
+		"the wrong tier is acknowledged"
+	)
+	check(
+		#d.balls == 0 and d.robuxBall == 0 and d.crystals == c0 + E.PRICE.crystals.legendary,
+		"the wrong tier pays its crystals and keeps the other tier's choice"
+	)
 	check(
 		Receipt.apply(d, receipt(9101, "ball-1"), USER, cat, E, {}) == "granted" and Progress.owns(d, 0),
 		"the chosen ball is granted"
@@ -125,7 +138,6 @@ end
 
 do
 	local d = fresh()
-	check(Receipt.apply(d, receipt(9201, "st-none"), USER, cat, E, {}) == "later", "a starter with no epic is refused")
 	check(Receipt.choose(d, "epic", 0, E) == false, "a common ball is not a starter epic")
 	check(Receipt.choose(d, "epic", EPIC, E), "the server remembers the starter epic")
 	local coins, crystals = d.coins, d.crystals
@@ -146,7 +158,11 @@ do
 		Receipt.apply(d, receipt(9201, "st-2"), USER, cat, E, {}) == "granted",
 		"a second starter purchase is accepted"
 	)
-	check(d.crystals == after and d.coins == coins + E.STARTER.coins, "a second starter purchase adds nothing")
+	local back = math.floor(E.STARTER.robux * E.CRYSTAL_PACKS[1].crystals / E.CRYSTAL_PACKS[1].robux)
+	check(
+		d.crystals == after + back and d.coins == coins + E.STARTER.coins and #d.balls == 1,
+		"a second starter purchase gives its Robux back as crystals, not a second pack"
+	)
 end
 
 do
@@ -162,9 +178,38 @@ do
 		Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "already",
 		"the same cosmetic receipt adds nothing"
 	)
+	local c1 = d.crystals
 	check(
 		Receipt.apply(d, receipt(9301, "look-2"), USER, cat, E, {}) == "granted" and #d.looks == 1,
 		"a second purchase of an owned look is acknowledged once"
+	)
+	check(d.crystals == c1 + 50, "an owned look's Robux (49) come back as 50 crystals")
+end
+
+-- The chosen ball came meanwhile (spin, level, VOID): crystals of the tier, the receipt is granted once.
+do
+	local d = fresh()
+	local RARE = E.TIERS.rare[1]
+	check(Receipt.choose(d, "ball", RARE, E), "rare chosen")
+	table.insert(d.balls, RARE)
+	local r = Receipt.apply(d, receipt(9102, "late-1"), USER, cat, E, {})
+	check(r == "granted" and d.crystals == E.PRICE.crystals.rare and d.robuxBall == -1, "owned ball -> rare crystals")
+	check(#d.balls == 1, "no second copy of the ball")
+	check(
+		Receipt.apply(d, receipt(9102, "late-1"), USER, cat, E, {}) == "already" and d.crystals == E.PRICE.crystals.rare,
+		"the retried receipt pays nothing more"
+	)
+end
+
+-- Starter whose chosen epic came meanwhile: the pack is paid, the epic as its crystal price.
+do
+	local d = fresh()
+	check(Receipt.choose(d, "epic", EPIC, E), "epic chosen")
+	table.insert(d.balls, EPIC)
+	check(Receipt.apply(d, receipt(9201, "st-late"), USER, cat, E, {}) == "granted", "late starter granted")
+	check(
+		d.starterBought and d.crystals == E.STARTER.crystals + E.PRICE.crystals.epic and #d.balls == 1,
+		"late starter: pack crystals plus the epic's crystal price"
 	)
 end
 

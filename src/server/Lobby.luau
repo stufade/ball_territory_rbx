@@ -207,6 +207,11 @@ function Lobby.action(r: Roster.Rec, verb: string, arg: number?, now: number, cu
 		Profiles.wearLook(r.player, cur, arg)
 		return
 	end
+	-- Robux prompt: key in the third argument (Logic/Pay); the server opens it or answers `refused`
+	if verb == A.pay then
+		Profiles.pay(r.player, cur, arg)
+		return
+	end
 	-- currency only; the server rolls the ball and refuses a short balance or a paid-random ban
 	if verb == A.spin then
 		Profiles.spin(r.player, cur)

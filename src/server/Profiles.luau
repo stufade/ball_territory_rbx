@@ -14,9 +14,10 @@ local Config = require("./Config")
 local Daily = require("./Logic/Daily")
 local Looks = require("./Logic/Looks")
 local Net = require(ReplicatedStorage.Shared.Net)
+local Passes = require("./Passes")
+local Pay = require("./Logic/Pay")
 local Products = require("./Products")
 local Progress = require("./Logic/Progress")
-local Receipt = require("./Logic/Receipt")
 local Shop = require("./Logic/Shop")
 local Spin = require("./Logic/Spin")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
@@ -82,24 +83,40 @@ function Profiles.isDev(player: Player): boolean
 	return (game.CreatorType.Name == "User" and id == game.CreatorId) or table.find(Config.DEV_USERS, id) ~= nil
 end
 
--- PolicyService. A failed or missing read does not hide the wheels (Studio can still spin). A true
--- ArePaidRandomItemsRestricted hides both and Spin.roll refuses. Cached for the session.
+-- PolicyService, read once on join (yields, retried). A true ArePaidRandomItemsRestricted hides both wheels and
+-- Spin.roll refuses. A read that keeps failing fails closed (hidden) in a live server and open in Studio.
+-- Cached for the session; nothing is stored for a player who already left.
 local function paidRandom(player: Player): boolean
 	local known = paidRandomBlocked[player]
 	if known ~= nil then
 		return known
 	end
-	local ok, info = pcall(function()
-		local PolicyService = game:GetService("PolicyService")
-		return PolicyService:GetPolicyInfoForPlayerAsync(player)
+	local flag = not RunService:IsStudio()
+	local found, PolicyService = pcall(function()
+		return game:GetService("PolicyService")
 	end)
-	local flag = false
-	if ok and type(info) == "table" then
-		flag = info.ArePaidRandomItemsRestricted == true
-		Analytics.paidRandom(player, flag)
+	for try = 1, if found then 3 else 0 do
+		local ok, info = pcall(function()
+			return PolicyService:GetPolicyInfoForPlayerAsync(player)
+		end)
+		if ok and type(info) == "table" then
+			flag = info.ArePaidRandomItemsRestricted == true
+			Analytics.paidRandom(player, flag)
+			break
+		end
+		if try < 3 then
+			task.wait(try)
+		end
 	end
-	paidRandomBlocked[player] = flag
+	if profiles[player] then
+		paidRandomBlocked[player] = flag
+	end
 	return flag
+end
+
+-- Never yields: a profile view before the PolicyService answer hides the wheels.
+local function spinsAllowed(player: Player): boolean
+	return paidRandomBlocked[player] == false
 end
 
 -- The client's view: level bar, boost badge, collection; `news` = level ups to show now; `extra` = one-off fields
@@ -127,8 +144,13 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [st
 	for k, v in Award.view(d, clock(), serverNow(), Config, #NAMES) do
 		(view :: any)[k] = v
 	end
-	view.spin = Spin.board(d, Config.ECON, not paidRandom(player))
+	local allowed = spinsAllowed(player)
+	view.spin = Spin.board(d, Config.ECON, allowed)
 	view.shelf = Looks.snapshot(d, Config.ECON, Products)
+	local owned = Passes.owned(player)
+	view.passes = table.clone(owned)
+	view.passOffer = Pay.passOffers(Config.ECON, Products, not allowed, owned)
+	view.starterBought = d.starterBought
 	if extra then
 		for k, v in extra do
 			(view :: any)[k] = v
@@ -258,13 +280,17 @@ function Profiles.join(player: Player)
 				if p.temp then " (not saved)" else ""
 			)
 		)
-		local blocked = paidRandom(player)
-		if p.gone then
-			return
-		end
-		if blocked then
-			print(`[BT] paid random restricted for {player.Name}: coin and crystal spins hidden`)
-		end
+		-- PolicyService may retry for seconds: the profile goes out now with the wheels hidden, then again
+		task.spawn(function()
+			local blocked = paidRandom(player)
+			if p.gone then
+				return
+			end
+			if blocked then
+				print(`[BT] paid random restricted for {player.Name}: coin and crystal spins hidden`)
+			end
+			Profiles.send(player)
+		end)
 		Profiles.send(player)
 		Analytics.collection(player, #p.data.balls, Daily.day(now) - p.data.born, #p.data.book)
 		for _, fn in table.clone(loadedFns) do
@@ -442,12 +468,11 @@ end
 
 -- Action spin: currency only. The ball is chosen here, then the profile carries it in spinResult for the reel.
 function Profiles.spin(player: Player, cur: any)
-	local blocked = paidRandom(player)
 	local p = Profiles.get(player)
 	if not p then
 		return
 	end
-	if blocked then
+	if not spinsAllowed(player) then
 		Profiles.send(player)
 		return
 	end
@@ -518,21 +543,37 @@ end
 -- ProcessReceipt must answer NotProcessedYet in that case.
 function Profiles.commit(player: Player): boolean
 	local p = profiles[player]
-	if not p or not p.ready or p.temp or p.saving then
+	-- an autosave already holds the per-key slot: wait for it rather than send the receipt back to Roblox
+	local t0 = os.clock()
+	while p and p.saving and os.clock() - t0 < 10 do
+		task.wait(0.2)
+	end
+	if not p or not p.ready or p.temp or p.saving or profiles[player] ~= p then
 		return false
 	end
 	save(p, false)
 	return not p.dirty and not p.temp
 end
 
--- The ball (slot "ball") or the starter epic (slot "epic") chosen before the purchase prompt.
-function Profiles.chooseRobux(player: Player, slot: string, e: number): boolean
+-- Action pay: the client asks for a Robux prompt (key and arg as in Logic/Pay). The server opens it only for
+-- something that can still be delivered; otherwise the client gets `refused` and no prompt. The ball and the
+-- starter epic are remembered here for the receipt.
+function Profiles.pay(player: Player, key: any, arg: any)
 	local p = Profiles.get(player)
-	if not p or not Receipt.choose(p.data, slot, e, Config.ECON) then
-		return false
+	if not p then
+		return
 	end
-	saveSoon(p)
-	return true
+	local offer, why =
+		Pay.offer(p.data, key, arg, Config.ECON, Products, not spinsAllowed(player), Passes.owned(player))
+	if not offer then
+		local k = if type(key) == "string" then string.sub(key, 1, 32) else ""
+		Profiles.send(player, nil, { refused = { key = k, why = why or "bad" } })
+		return
+	end
+	if key == "ball" or key == "starter" then
+		saveSoon(p)
+	end
+	Passes.prompt(player, offer)
 end
 
 -- A Robux grant is in memory: refresh the next level ball, the attributes, and the client.

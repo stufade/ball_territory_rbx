@@ -62,6 +62,10 @@ Net.Action = {
 	-- Cosmetics: "look" buys the id in the third argument for coins. "wear" equips it (arg = ball for a skin).
 	look = "look",
 	wear = "wear",
+	-- Robux: ("pay", arg, key). key "pack" (arg = pack index), "ball" (arg = ball), "starter" (arg = epic),
+	-- "pass_coins2x" | "pass_vip" | "pass_fastSpin", or a look id. The server opens the prompt, or sends
+	-- `refused` (owned, policy, off, bad) and opens nothing. The client never calls PromptProductPurchase.
+	pay = "pay",
 }
 
 -- Action "queue" argument.
@@ -228,6 +232,14 @@ export type ProfileView = {
 	-- Paid spins (M3.2). Personal odds and the pity counter, before the tap. ok = false hides both wheels
 	-- (ArePaidRandomItemsRestricted). The client does not compute the chances.
 	spin: SpinView?,
+	-- Game passes owned (coins2x, vip, fastSpin), and the ones the client may still offer: not owned, and
+	-- fastSpin never when paid random is restricted.
+	passes: { [string]: boolean }?,
+	passOffer: { [string]: boolean }?,
+	-- the starter pack was bought: hide its offer
+	starterBought: boolean?,
+	-- one-off: a "pay" the server did not open (why = owned | policy | off | bad)
+	refused: { key: string, why: string }?,
 	-- Set on the snapshot that paid for a spin. The reel only displays it.
 	spinResult: SpinHit?,
 	-- Cosmetic shelf. n/need is the collection size, not a lock. robux lists asset ids that are actually for sale.

@@ -123,8 +123,29 @@ do
 	)
 	check(d.worn.frame == "frame_wood" and d.worn.skin == "skin_ink", "the equipped row survives a save")
 	Progress.repair(d, { ECON = E, BASE_BALLS = {}, TIERS = E.TIERS, XP = {} } :: any, nil)
-	check(#d.looks == 1 and d.worn.frame == "frame_wood" and d.worn.skin == "", "unknown and unowned looks are cleared")
+	check(
+		#d.looks == 2 and d.looks[2] == "not_a_look" and d.worn.frame == "frame_wood" and d.worn.skin == "",
+		"a retired id stays owned (maybe bought for Robux); an unowned worn look is cleared"
+	)
 	check(not d.worn.podium, "an unowned podium is cleared")
+	local shelf = Looks.snapshot(d, E, {})
+	check(#shelf.owned == 1 and shelf.owned[1] == "frame_wood", "the shelf only lists ids of the catalog")
+end
+
+-- A renamed look keeps its owner and its worn slot.
+do
+	Looks.RENAMED.frame_old = "frame_wood"
+	local saved = balls(27)
+	saved.looks = { "frame_old" }
+	saved.worn = { skin = "", trail = "", force = "", frame = "frame_old", podium = false, ko = false, ball = -1 }
+	local d = Progress.migrate(saved)
+	Progress.repair(d, { ECON = E, BASE_BALLS = {}, TIERS = E.TIERS, XP = {} } :: any, nil)
+	check(d.looks[1] == "frame_wood" and #d.looks == 1 and d.worn.frame == "frame_wood", "a renamed id migrates")
+	saved.looks = { "frame_old", "frame_wood" }
+	d = Progress.migrate(saved)
+	Progress.repair(d, { ECON = E, BASE_BALLS = {}, TIERS = E.TIERS, XP = {} } :: any, nil)
+	check(#d.looks == 1, "old and new id of one look count once")
+	Looks.RENAMED.frame_old = nil
 end
 
 print(`{passed} passed, {fails} failed`)

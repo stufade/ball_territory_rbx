@@ -1,8 +1,10 @@
 --!strict
 -- Developer-product grants (docs/economy.md «Монетизация»). Pure: no MarketplaceService, so tests/receipt
 -- runs without the network. "granted" is a new PurchaseId, "already" is the same id again (nothing is added).
--- "later" is NotProcessedYet: the wrong player, an unknown product, or a tier or starter purchase with no valid
--- choice. "later" does not store the PurchaseId and does not change the wallet, so a retry can still grant.
+-- "later" is NotProcessedYet: the wrong player or an unknown product. "later" does not store the PurchaseId and
+-- does not change the wallet, so a retry can still grant. A purchase that cannot be delivered as bought (the ball
+-- or the look is owned already, a second starter pack) is still "granted": the Robux come back as crystals, so a
+-- receipt never hangs as NotProcessedYet.
 -- A cosmetic with a live product id is granted by Looks.grant at any ball count (the same call a coin purchase
 -- uses after it has spent). Crystals go through Wallet.add, the ball
 -- and the starter epic through Progress.give, starter coins through Wallet.gift.
@@ -114,6 +116,30 @@ local function chosenTier(E: any, e: number): string?
 	return tierOf(E, e)
 end
 
+local function lookOf(E: any, id: string?): any
+	for _, look in E.LOOKS do
+		if look.id == id then
+			return look
+		end
+	end
+	return nil
+end
+
+-- Robux of a purchase that cannot be delivered, as crystals at the smallest pack's rate (49 R$ -> 50).
+local function back(E: any, robux: number): number
+	local pack = E.CRYSTAL_PACKS[1]
+	if type(robux) ~= "number" or robux <= 0 or not pack then
+		return 0
+	end
+	return math.floor(robux * pack.crystals / pack.robux)
+end
+
+local function compensate(d: Progress.Data, n: number, why: string, log: { Wallet.Flow }?)
+	if n > 0 then
+		Wallet.add(d, "crystals", n, why, "IAP", log)
+	end
+end
+
 -- userId is the profile being paid. A receipt for someone else is refused.
 function Receipt.apply(
 	d: Progress.Data,
@@ -139,7 +165,11 @@ function Receipt.apply(
 	end
 	if spec.kind == "look" then
 		local how = Looks.grant(d, spec.id, E)
-		if how ~= "ok" and how ~= "have" then
+		if how == "have" then
+			-- already owned (bought for coins while the prompt was open): the Robux come back as crystals
+			local look = lookOf(E, spec.id)
+			compensate(d, back(E, if look then look.robux else 0), `comp_{spec.why}`, log)
+		elseif how ~= "ok" then
 			return "later"
 		end
 	elseif spec.kind == "crystals" then
@@ -149,15 +179,24 @@ function Receipt.apply(
 		end
 	elseif spec.kind == "ball" then
 		local e = d.robuxBall
-		if chosenTier(E, e) ~= spec.tier or Progress.owns(d, e) or not Progress.give(d, e) then
-			return "later"
+		local tier = spec.tier :: string
+		if chosenTier(E, e) == tier and not Progress.owns(d, e) and Progress.give(d, e) then
+			d.robuxBall = -1
+		else
+			-- no valid choice, or the ball came meanwhile (spin, level, VOID): the tier's crystal price instead.
+			-- A choice of another tier stays for its own receipt.
+			if chosenTier(E, e) == tier then
+				d.robuxBall = -1
+			end
+			compensate(d, E.PRICE.crystals[tier] or 0, `comp_{spec.why}`, log)
 		end
-		d.robuxBall = -1
 	elseif spec.kind == "starter" then
-		if not d.starterBought then
+		if d.starterBought then
+			compensate(d, back(E, E.STARTER.robux), "comp_starter", log)
+		else
 			local e = d.robuxEpic
-			if chosenTier(E, e) ~= "epic" or Progress.owns(d, e) or not Progress.give(d, e) then
-				return "later"
+			if not (chosenTier(E, e) == "epic" and not Progress.owns(d, e) and Progress.give(d, e)) then
+				compensate(d, E.PRICE.crystals.epic or 0, "comp_starter_epic", log)
 			end
 			Wallet.gift(d, { coins = E.STARTER.coins, crystals = E.STARTER.crystals }, spec.why, "IAP", log)
 			d.starterBought = true
