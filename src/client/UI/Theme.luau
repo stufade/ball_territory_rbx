@@ -397,6 +397,8 @@ end
 --   bottom middle, between the stick and the jump button: level, XP bar, next ball; the 2x XP icon right of it
 export type PlazaLayout = {
 	right: number,
+	-- right edge of the coin / crystal pills: left of the Roblox player list
+	walletX: number,
 	playW: number,
 	playY: number,
 	playH: number,
@@ -414,6 +416,10 @@ export type PlazaLayout = {
 	barX: number,
 	barY: number,
 }
+
+-- Roblox player list (top right, real px incl. margin) and the UI scale (real px per design px, set by UI/init).
+Theme.LIST_PX = 190
+Theme.scale = 1
 
 function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	local barW = 430
@@ -433,6 +439,7 @@ function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	end
 	return {
 		right = cv.X - 14,
+		walletX = cv.X - 14 - math.ceil(Theme.LIST_PX / math.max(Theme.scale, 0.1)),
 		playW = 230,
 		playY = playY,
 		playH = 104,

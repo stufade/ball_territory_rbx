@@ -12,6 +12,7 @@ local Analytics = require("./Analytics")
 local Award = require("./Logic/Award")
 local Config = require("./Config")
 local Daily = require("./Logic/Daily")
+local Debug = require("./Debug")
 local Looks = require("./Logic/Looks")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Passes = require("./Passes")
@@ -116,6 +117,9 @@ end
 
 -- Never yields: a profile view before the PolicyService answer hides the wheels.
 local function spinsAllowed(player: Player): boolean
+	if Debug.paidRandomRestricted() then -- TODO(REMOVE BEFORE LAUNCH)
+		return false
+	end
 	return paidRandomBlocked[player] == false
 end
 

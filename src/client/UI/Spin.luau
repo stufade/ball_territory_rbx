@@ -96,7 +96,7 @@ export type Ctx = {
 function Spin.iconPos(L: Theme.PlazaLayout, shop: UDim2): UDim2
 	local step = L.icon + L.gap
 	local function free(px: number, py: number): boolean
-		if py == L.rowY and px + L.icon > L.right - L.moneyW - L.gap then
+		if py == L.rowY and px + L.icon > L.walletX - L.moneyW - L.gap then
 			return false
 		end
 		if px + L.icon > L.right - L.playW - 8 and py + L.icon > L.playY then

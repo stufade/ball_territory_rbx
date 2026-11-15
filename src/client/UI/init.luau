@@ -201,6 +201,7 @@ function UI.start()
 		band.Size = UDim2.fromOffset(size.X, size.Y)
 		local s = math.min(size.X / Screen.DESIGN_W, size.Y / Screen.DESIGN_H)
 		scale.Scale = s
+		Theme.scale = s
 		ctx.canvas = Vector2.new(size.X / s, size.Y / s)
 		canvas.Size = UDim2.fromOffset(ctx.canvas.X, ctx.canvas.Y)
 		-- topbar in design px; with safe insets the canvas may start right of the screen edge

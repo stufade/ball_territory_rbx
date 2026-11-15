@@ -23,6 +23,7 @@ local Wallet = load("src/client/UI/Wallet.luau")
 local Money = load("src/client/UI/Money.luau")
 local Plaza = load("src/client/UI/Plaza.luau")
 local Level = load("src/client/UI/Level.luau")
+local Theme = load("src/client/UI/Theme.luau")
 local Rules = load("src/shared/Rules/init.luau")
 local Economy = load("src/shared/Economy.luau")
 local Art = load("src/shared/Art.luau")
@@ -156,7 +157,10 @@ local function make(cv: any): (any, any, { any }, { busy: boolean })
 	return Wallet.new(canvas, ctx), canvas, acts, flags
 end
 
-for _, cv in { V2(1168, 540), V2(960, 540) } do
+-- canvas, UI scale (real px per design px) of 844x390 and 1280x720
+for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
+	local cv = case[1]
+	Theme.scale = case[2]
 	local tag = `{cv.X}x{cv.Y}`
 	local w, canvas, acts, flags = make(cv)
 	-- during the tutorial's reward screen: no login popup (U2: it opens on the plaza right after it)
@@ -197,12 +201,20 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	end
 	local shopR = rectOf(find(w.root, "ShopBtn"))
 	-- fifth icon when it clears the coin pills; otherwise the rightmost wrap that stays clear of PLAY
-	local wantX = if cv.X >= 1100 then 360 + 4 * 90 else 360 + 2 * 90
-	local wantY = if cv.X >= 1100 then 16 else 16 + 80 + 10
+	local fits = 360 + 4 * 90 + 80 <= cv.X - 14 - math.ceil(190 / case[2]) - 180 - 10
+	local wantX = if fits then 360 + 4 * 90 elseif cv.X >= 1100 then 360 + 3 * 90 else 360 + 2 * 90
+	local wantY = if fits then 16 else 16 + 80 + 10
 	check(shopR[1] == wantX and shopR[2] == wantY and shopR[3] == 80, `{tag}: SHOP at {shopR[1]},{shopR[2]}`)
 	check(find(find(w.root, "ShopBtn"), "Caption").Text == "SHOP", `{tag}: SHOP caption`)
 	check(find(find(w.root, "ShopBtn"), "Sub").Text == "22", `{tag}: SHOP missing count`)
 	check(not overlap(shopR, coinR) and not overlap(shopR, gemR), `{tag}: SHOP clear of the counters`)
+	-- bug A: the Roblox player list (190 real px, full height, top right) must not cover the pills or the "+"
+	local list = { cv.X - 190 / case[2], 0, 190 / case[2], cv.Y }
+	local addR = rectOf(find(w.root, "AddGems"))
+	for name, r in { Coins = coinR, Crystals = gemR, AddGems = addR } do
+		check(not overlap(r, list), `{tag}: {name} clear of the player list ({r[1] + r[3]} vs {list[1]})`)
+	end
+	check(addR[4] * case[2] >= 44, `{tag}: + still 44 real px`)
 	-- NEW BALL! on screen: the login screen waits
 	Wallet.setState(w, { ph = "result", win = true })
 	Wallet.setState(w, { ph = "lobby", glow = "play" })
@@ -731,6 +743,7 @@ local function spinBoard(pityCoins: number): any
 end
 
 for _, cv in { V2(1168, 540), V2(960, 540) } do
+	Theme.scale = if cv.X >= 1100 then 390 / 540 else 720 / 540
 	local tag = `{cv.X} spin`
 	local w = make(cv)
 	Wallet.setState(w, { ph = "lobby" })
@@ -738,8 +751,8 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	v.spin = spinBoard(3)
 	Wallet.setProfile(w, v)
 	local btn = find(w.root, "SpinBtn")
-	local wantX = if cv.X >= 1100 then 360 + 5 * 90 else 360
-	local wantY = if cv.X >= 1100 then 16 else 16 + 90
+	local wantX = 360
+	local wantY = 16 + 90
 	local r = rectOf(btn)
 	check(r[1] == wantX and r[2] == wantY and r[3] == 80, `{tag}: button at {r[1]},{r[2]}`)
 	check(find(btn, "Caption").Text == "SPIN", `{tag}: caption`)

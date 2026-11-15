@@ -70,7 +70,7 @@ end
 local function pill(w: Wallet, layer: Frame, cur: string, y: number, roll: Money.Roll)
 	local L = layout(w)
 	local box =
-		Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.right, y), Theme.PANEL, RIGHT)
+		Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.walletX, y), Theme.PANEL, RIGHT)
 	box.Name = if cur == "coins" then "Coins" else "Crystals"
 	box.BackgroundTransparency = 0.1
 	Theme.round(box, L.moneyH / 2)
@@ -121,7 +121,7 @@ end
 local function shopPos(L: Theme.PlazaLayout): UDim2
 	local step = L.icon + L.gap
 	local x = L.rowX + 4 * step
-	if x + L.icon <= L.right - L.moneyW - L.gap then
+	if x + L.icon <= L.walletX - L.moneyW - L.gap then
 		return UDim2.fromOffset(x, L.rowY)
 	end
 	local y = L.rowY + L.icon + L.gap
@@ -262,7 +262,7 @@ function Wallet.render(w: Wallet)
 	add.BackgroundTransparency = 1
 	add.Size = UDim2.fromOffset(62, 62)
 	add.AnchorPoint = V2(1, 0.5)
-	add.Position = UDim2.fromOffset(L.right, L.moneyY[2] + L.moneyH / 2 - 2)
+	add.Position = UDim2.fromOffset(L.walletX, L.moneyY[2] + L.moneyH / 2 - 2)
 	add.ZIndex = 5
 	add.Parent = layer
 	local disc = Theme.frame(add, UDim2.fromOffset(36, 36), UDim2.new(1, -4, 0.5, 2), ROBUX_COL, V2(1, 0.5))
@@ -371,7 +371,7 @@ end
 -- "+25" rising from a counter.
 local function float(w: Wallet, cur: string, n: number)
 	local L = layout(w)
-	local x = L.right - L.moneyW
+	local x = L.walletX - L.moneyW
 	local y = if cur == "coins" then L.moneyY[1] else L.moneyY[2]
 	local f = Theme.label(w.pop.Parent :: Instance, `+{Money.fmt(n)}`, 28, UDim2.fromOffset(120, 32), nil, {
 		anchor = V2(1, 0),

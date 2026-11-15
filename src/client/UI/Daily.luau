@@ -343,7 +343,8 @@ local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: numb
 		k += 1
 		local y = L.moneyY[k]
 		local total = ((v :: any)[cur] or n) :: number
-		local box = Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.right, y), Theme.PANEL)
+		local box =
+			Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.walletX, y), Theme.PANEL)
 		box.AnchorPoint = V2(1, 0)
 		box.Name = if cur == "coins" then "FlyCoins" else "FlyCrystals"
 		box.ZIndex = 30
@@ -360,7 +361,7 @@ local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: numb
 			})
 		t.Name = "Value"
 		roll.label, roll.box = t, box
-		local tx, ty = L.right - L.moneyW + 20, y + L.moneyH / 2
+		local tx, ty = L.walletX - L.moneyW + 20, y + L.moneyH / 2
 		if Theme.reduced() then
 			t.Text = Money.fmt(total)
 			continue

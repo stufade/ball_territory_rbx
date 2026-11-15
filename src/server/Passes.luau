@@ -2,6 +2,7 @@
 -- Game passes (Products.passes, docs/products.md) and the Robux prompts the server allows (Logic/Pay).
 -- Ownership: UserOwnsGamePassAsync on join (retried), then PromptGamePassPurchaseFinished for an in-session buy.
 -- A failed read counts as not owned for now and is tried again on the next join.
+local Debug = require("./Debug")
 local Products = require("./Products")
 
 local Passes = {}
@@ -27,10 +28,16 @@ local function keyOf(passId: number): string?
 end
 
 function Passes.owned(player: Player): { [string]: boolean }
+	if Debug.noPasses() then -- TODO(REMOVE BEFORE LAUNCH)
+		return {}
+	end
 	return owned[player] or {}
 end
 
 function Passes.has(player: Player, key: string): boolean
+	if Debug.noPasses() then -- TODO(REMOVE BEFORE LAUNCH)
+		return false
+	end
 	local o = owned[player]
 	return o ~= nil and o[key] == true
 end
