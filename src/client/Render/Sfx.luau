@@ -5,6 +5,7 @@
 -- The music bed is separate: a viewer still hears it. Id 0 never creates or plays a Sound.
 local ContentProvider = game:GetService("ContentProvider")
 local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
 
 type Cue = {
 	id: number,
@@ -39,6 +40,8 @@ local recent: { [string]: { number } } = {}
 local folder: Folder? = nil
 local battle = false
 local bed: Sound? = nil
+local musicGroup: SoundGroup? = nil
+local fades: { [Sound]: Tween } = {}
 
 local function emit(s: Sound)
 	s.TimePosition = 0
@@ -78,12 +81,19 @@ function Sfx.start()
 	f.Name = "BTSfx"
 	f.Parent = SoundService
 	folder = f
+	local g = Instance.new("SoundGroup")
+	g.Name = "Music"
+	g.Parent = SoundService
+	musicGroup = g
 	local list = {}
 	for name, def in IDS do
 		if def.id == 0 then
 			continue
 		end
 		local s = Instance.new("Sound")
+		if def.looped then
+			s.SoundGroup = musicGroup
+		end
 		s.Name = name
 		s.Volume = def.volume
 		s.PlaybackSpeed = def.speed or 1
@@ -104,12 +114,40 @@ function Sfx.stop()
 	if folder then
 		folder:Destroy()
 	end
+	if musicGroup then
+		musicGroup:Destroy()
+	end
+	for _, tw in fades do
+		tw:Cancel()
+	end
+	table.clear(fades)
+	musicGroup = nil
 	folder, sounds, waiting, recent = nil, {}, {}, {}
 	battle, bed = false, nil
 end
 
 -- Music bed: lobby track on the plaza, match track while this client is in its own match (a viewer of
--- another match still hears the lobby track). Switching stops the other track. Id 0: no Sound, no play.
+-- another match still hears the lobby track). The tracks are real Sounds in the Music SoundGroup, driven with
+-- Play / Stop (IsPlaying tells the truth), one at a time: the old one fades out while the new one fades in.
+local FADE = 0.5
+local function fadeTo(s: Sound, volume: number, stopAfter: boolean)
+	local old = fades[s]
+	if old then
+		old:Cancel()
+	end
+	local tw = TweenService:Create(s, TweenInfo.new(FADE, Enum.EasingStyle.Linear), { Volume = volume })
+	fades[s] = tw
+	tw.Completed:Once(function(state)
+		if fades[s] == tw then
+			fades[s] = nil
+		end
+		if stopAfter and state == Enum.PlaybackState.Completed then
+			s:Stop()
+		end
+	end)
+	tw:Play()
+end
+
 function Sfx.plaza(inBattle: boolean)
 	battle = inBattle
 	local name = if inBattle then "musicMatch" else "music"
@@ -124,25 +162,42 @@ function Sfx.plaza(inBattle: boolean)
 	if not s or bed == s then
 		return
 	end
-	local function go()
-		if sounds[name] ~= s or battle ~= inBattle or bed == s then
-			return
+	local prev = bed
+	-- a track still fading out from an earlier switch must not overlap a third one
+	for other, def2 in IDS do
+		local o = sounds[other]
+		if def2.looped and o and o ~= s and o ~= prev and o.IsPlaying then
+			local tw = fades[o]
+			if tw then
+				tw:Cancel()
+				fades[o] = nil
+			end
+			o:Stop()
 		end
-		if bed then
-			bed:Stop()
-		end
-		bed = s
-		s.Volume = def.volume
-		SoundService:PlayLocalSound(s)
 	end
-	if s.IsLoaded then
-		go()
-	elseif not waiting[name] then
-		waiting[name] = true
-		s.Loaded:Once(function()
-			waiting[name] = nil
-			go()
-		end)
+	bed = s
+	if prev then
+		fadeTo(prev, 0, true)
+	end
+	local tw = fades[s]
+	if tw then
+		tw:Cancel()
+		fades[s] = nil
+	end
+	if not s.IsPlaying then
+		s.Volume = 0
+		s.TimePosition = 0
+		s:Play()
+	end
+	fadeTo(s, def.volume, false)
+end
+
+-- Silences the music bed (fade out, then Stop). Plaza() starts it again.
+function Sfx.silence()
+	local prev = bed
+	bed = nil
+	if prev then
+		fadeTo(prev, 0, true)
 	end
 end
 

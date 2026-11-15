@@ -16,6 +16,27 @@ local MID = Vector2.new(0.5, 0.5)
 
 local CONFETTI = { "#ff3c46", "#ffd63c", "#40baff", "#5af096", "#ff78d2", "#ffffff", "#b04cff" }
 
+-- The wallet makes each "Toast" label at a fixed spot, so two can land on one another when an older one leaves.
+-- Called every frame: lines the toasts of `parent` up in a column in the order they were made (the first on top).
+local TOAST_STEP = 34
+
+function Cheer.stackToasts(parent: Instance)
+	local list: { GuiObject } = {}
+	local top = math.huge
+	for _, f in parent:GetChildren() do
+		if f.Name == "Toast" and f:IsA("GuiObject") then
+			table.insert(list, f)
+			top = math.min(top, f.Position.Y.Offset)
+		end
+	end
+	for i, f in list do
+		local want = top + (i - 1) * TOAST_STEP
+		if f.Position.Y.Offset ~= want then
+			f.Position = UDim2.new(f.Position.X, UDim.new(0, want))
+		end
+	end
+end
+
 function Cheer.rays(parent: Instance, ctx: Ctx, e: number, cx: number, cy: number, len: number): Frame
 	local box = Theme.clear(parent, UDim2.fromOffset(len, len), UDim2.fromOffset(cx, cy), MID)
 	local bars: { Frame } = {}

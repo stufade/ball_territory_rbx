@@ -62,3 +62,12 @@ Studio b6b33902…, три сессии Play. Shelf pay, скрытие SPIN, п
 ## Итог
 Магазин BALLS, SPIN (деньги, гарантия, серверный исход), DataStore и киоски работают. Принимать волну нельзя: облик не виден
 в матче, на телефоне JUMP закрывает кнопку силы и портрет не годится, музыку нельзя проверить, и её переключение, вероятно, сломано.
+
+## Фикс багов 2–5, 7
+
+- **Баг 3 (музыка).** `Render/Sfx.luau`: треки `music` / `musicMatch` теперь настоящие `Sound` в `SoundGroup` «Music» (SoundService), играют через `:Play()` / `:Stop()`, `IsPlaying` честный. Переключение лобби↔матч — кроссфейд 0.5 с, одновременно играет один трек (третий, застрявший в затухании, гасится сразу). Эффекты по-прежнему через `PlayLocalSound`. Добавлен `Sfx.silence()`. Не проверено ушами.
+- **Баг 4 (STICK/JUMP).** Новый `UI/Controls.luau`: `GuiService.TouchControlsEnabled` + `PlayerModule:GetControls():Enable/Disable()`. Управление включено только на площадке (lobby/queue) без окон; драфт, матч, результат и любое открытое окно (`wallet.open`, NEW BALL) — выключено. Вызов из Heartbeat в `UI/init.luau`, действует только при смене состояния. Проверить на устройстве/в эмуляторе.
+- **Баг 5 (PlayerList).** `Controls.playerList`: `SetCoreGuiEnabled(PlayerList, false)` пока открыто окно магазина/награды/книги/заданий, после закрытия возвращается.
+- **Баг 2 (тосты).** Тосты рисует `UI/Wallet.luau` (дизайнер, не трогал). Добавлен `Cheer.stackToasts(canvas)` — каждый кадр выстраивает `Toast` столбцом (шаг 34 px, по порядку создания, первый сверху); вызов из `UI/init.luau`. Когда дизайнер закончит с Wallet, лучше перенести очередь туда и убрать этот костыль.
+- **Баг 7 (ориентация).** `default.project.json`: `StarterGui.ScreenOrientation = LandscapeSensor` (`$ignoreUnknownInstances`, чтобы Rojo не стирал GUI дизайнера).
+- Проверки: `stylua src` чисто; `lune run tests/*` без FAIL; `luau-lsp analyze` без sourcemap шумит на require (как и раньше), новых ошибок по моим файлам нет.

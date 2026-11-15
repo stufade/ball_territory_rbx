@@ -33,6 +33,13 @@
 				"$path": "scene/Lobby.model.json"
 			}
 		},
+		"StarterGui": {
+			"$className": "StarterGui",
+			"$ignoreUnknownInstances": true,
+			"$properties": {
+				"ScreenOrientation": "LandscapeSensor"
+			}
+		},
 		"Lighting": {
 			"$className": "Lighting",
 			"$ignoreUnknownInstances": true,
