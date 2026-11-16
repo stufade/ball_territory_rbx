@@ -16,6 +16,7 @@ local Cheer = require("@self/Cheer")
 local Level = require("@self/Level")
 local Menus = require("@self/Menus")
 local Plaza = require("@self/Plaza")
+local SaveFail = require("@self/SaveFail")
 local Theme = require("@self/Theme")
 local Tutor = require("@self/Tutor")
 local Wallet = require("@self/Wallet")
@@ -302,6 +303,7 @@ function UI.start()
 	end
 	Remotes.State.OnClientEvent:Connect(onState)
 	-- debug: BallUI.Inject:Fire(st) shows a made-up State locally (screenshots of every screen, docs/ui.md)
+	local saveFail = SaveFail.new(canvas)
 	local inject = Instance.new("BindableEvent")
 	inject.Name = "Inject"
 	inject.Parent = gui
@@ -415,6 +417,7 @@ function UI.start()
 			Level.setProfile(level, v)
 			Wallet.setProfile(wallet, v)
 			Plaza.setDev(plaza, v.dev == true)
+			SaveFail.setProfile(saveFail, v)
 		end
 	end
 	Remotes.Profile.OnClientEvent:Connect(function(v: Net.ProfileView)

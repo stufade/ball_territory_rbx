@@ -39,6 +39,8 @@ export type Profile = {
 	ready: boolean,
 	-- never written (DataStore failed on load, or DebugFreshProfile): saving it could wipe the real record
 	temp: boolean,
+	-- the load failed or timed out: a temp profile that must not take Robux; a background retry may still replace it
+	loadFailed: boolean,
 	dirty: boolean,
 	savedAt: number,
 	-- a write is due as soon as the per-key gap allows
@@ -52,6 +54,9 @@ export type Profile = {
 local profiles: { [Player]: Profile } = {}
 local loadedFns: { (Player) -> () } = {}
 local LOAD_GIVE_UP = 45
+-- background loads after a failed one: how many, and the pause before each (s)
+local RETRY_TRIES = 4
+local RETRY_GAP = 30
 local store: Store.Store
 -- true when PolicyService said paid random is restricted. Nil until the first answer (a failed read stays allowed).
 local paidRandomBlocked: { [Player]: boolean } = {}
@@ -144,6 +149,7 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [st
 		levelBalls = Config.LEVEL_BALLS,
 		nextBall = d.nextBall,
 		dev = if Profiles.isDev(player) then true else nil,
+		saveFail = if p.loadFailed then true else nil,
 		news = news,
 	}
 	-- VIP pass: a fourth quest a day (the pass may arrive after the day's draw)
@@ -227,6 +233,67 @@ local function fresh(): boolean
 	return ServerScriptService:GetAttribute("DebugFreshProfile") == true
 end
 
+-- The data steps after a record is known (new, loaded, or loaded by a retry): migrate, repair, today's quests.
+local function install(p: Profile, raw: any)
+	local player = p.player
+	p.savedAt = clock()
+	-- E4: a record from before one currency turns its crystals into coins once (flow migrate_crystals)
+	local mlog = {}
+	p.data = Progress.migrate(raw, Config.ECON.CRYSTAL_TO_COINS, mlog)
+	if #mlog > 0 then
+		Analytics.flows(player, mlog)
+		print(`[BT] profiles: {player.Name} crystals migrated, +{mlog[1].n} coins`)
+	end
+	Progress.repair(p.data, Config :: any, NAMES)
+	local now = clock()
+	if p.data.born < 0 then
+		p.data.born = Daily.day(now)
+	end
+	p.day = Daily.day(now)
+	Daily.quests(p.data, now, Config.ECON, rand)
+	Progress.plan(p.data, Config :: any, rand)
+end
+
+-- A failed load answered after all (late or by a retry): quietly take the real record over the temporary one.
+local function recover(p: Profile, raw: any)
+	local player = p.player
+	install(p, raw)
+	p.temp = false
+	p.loadFailed = false
+	p.dirty = false
+	if p.data.tut then
+		Tutorial.setDone(player, true)
+	end
+	attrs(p)
+	print(`[BT] profiles: {player.Name} real profile loaded after a failed load, saving is on`)
+	Profiles.send(player)
+end
+
+-- After a failed load: try again in the background; the first answer that comes replaces the temporary profile.
+local function retryLoad(p: Profile)
+	for _ = 1, RETRY_TRIES do
+		task.wait(RETRY_GAP)
+		if p.gone or not p.loadFailed then
+			return
+		end
+		local ok, raw = Store.load(store, p.key)
+		if p.gone then
+			if ok then
+				Store.save(store, p.key, raw, true)
+			end
+			return
+		end
+		if not p.loadFailed then
+			return
+		end
+		if ok then
+			recover(p, raw)
+			return
+		end
+		warn(`[BT] profiles: {p.player.Name} background load failed again`)
+	end
+end
+
 function Profiles.join(player: Player)
 	local p: Profile = {
 		player = player,
@@ -234,6 +301,7 @@ function Profiles.join(player: Player)
 		data = Progress.new(),
 		ready = false,
 		temp = false,
+		loadFailed = false,
 		dirty = false,
 		savedAt = 0,
 		soon = false,
@@ -287,24 +355,11 @@ function Profiles.join(player: Player)
 		end
 		if not ok then
 			p.temp = true
+			p.loadFailed = true
 			warn(`[BT] profiles: {player.Name} could not be loaded, playing on a new profile that will not be saved`)
 		end
-		p.savedAt = clock()
-		-- E4: a record from before one currency turns its crystals into coins once (flow migrate_crystals)
-		local mlog = {}
-		p.data = Progress.migrate(raw, Config.ECON.CRYSTAL_TO_COINS, mlog)
-		if #mlog > 0 then
-			Analytics.flows(player, mlog)
-			print(`[BT] profiles: {player.Name} crystals migrated, +{mlog[1].n} coins`)
-		end
-		Progress.repair(p.data, Config :: any, NAMES)
+		install(p, raw)
 		local now = clock()
-		if p.data.born < 0 then
-			p.data.born = Daily.day(now)
-		end
-		p.day = Daily.day(now)
-		Daily.quests(p.data, now, Config.ECON, rand)
-		Progress.plan(p.data, Config :: any, rand)
 		p.ready = true
 		if p.data.tut then
 			Tutorial.setDone(player, true)
@@ -337,6 +392,9 @@ function Profiles.join(player: Player)
 		for _, fn in table.clone(loadedFns) do
 			task.spawn(fn, player)
 		end
+		if p.loadFailed then
+			task.spawn(retryLoad, p)
+		end
 	end)
 end
 
@@ -351,6 +409,12 @@ function Profiles.leave(player: Player)
 	if p.ready then
 		task.spawn(save, p, true)
 	end
+end
+
+-- True while the player is on a temporary profile after a failed load: no Robux prompt, no receipt.
+function Profiles.saveFailed(player: Player): boolean
+	local p = profiles[player]
+	return p ~= nil and p.loadFailed
 end
 
 function Profiles.onLoaded(fn: (Player) -> ())
@@ -623,6 +687,11 @@ end
 function Profiles.pay(player: Player, key: any, arg: any)
 	local p = Profiles.get(player)
 	if not p then
+		return
+	end
+	if p.loadFailed then
+		local k = if type(key) == "string" then string.sub(key, 1, 32) else ""
+		Profiles.send(player, nil, { refused = { key = k, why = "nosave" } })
 		return
 	end
 	local offer, why =

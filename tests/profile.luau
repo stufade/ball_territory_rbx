@@ -421,9 +421,9 @@ local function server(stores: any?)
 	local Remotes = load("src/shared/Net/Remotes.luau")
 	local clients: { Client } = {}
 	local DT = 1 / 30
-	local function action(c: Client, verb: any, arg: any)
+	local function action(c: Client, verb: any, arg: any, cur: any?)
 		for _, fn in Remotes.Action.OnServerEvent.fns do
-			fn(c.p, verb, arg)
+			fn(c.p, verb, arg, cur)
 		end
 	end
 	local function input(c: Client, kind: any, dx: any, dy: any)
@@ -502,6 +502,7 @@ local function server(stores: any?)
 		warns = warns,
 		join = join,
 		leave = leave,
+		load = load,
 		run = run,
 		action = action,
 	}
@@ -664,6 +665,51 @@ do
 		s4.run(1)
 		check(dev.prof and dev.prof.spin and dev.prof.spin.ok == true, "Studio, no policy answer: wheels shown")
 		check(live.prof.starterBought == false, "the profile view carries starterBought")
+	end
+	do
+		-- a load that fails: no Robux on the temporary profile, the client gets the flag, a retry picks the real one up
+		local sf = server()
+		local mp = { ProcessReceipt = nil :: any }
+		sf.world.services.MarketplaceService = mp
+		rawset(sf.world.services.Players, "GetPlayerByUserId", nil)
+		sf.world.services.Players.GetPlayerByUserId = function(self: any, id: number)
+			for _, p in self:GetChildren() do
+				if p.UserId == id then
+					return p
+				end
+			end
+			return nil
+		end
+		sf.load("src/server/Receipts.luau").start()
+		local dsf = sf.world.stores[cfg.PROFILE.store]
+		dsf.failNext = 1000
+		local c3 = sf.join(710, "Fail")
+		sf.run(1)
+		check(c3.prof and c3.prof.saveFail == true, "failed load: the client gets saveFail")
+		local coins = c3.prof.coins or 0
+		sf.action(c3, "pay", 1, "pack")
+		sf.run(0.2)
+		check(c3.prof.refused and c3.prof.refused.why == "nosave", "failed load: pay is refused")
+		local decision = mp.ProcessReceipt({ PlayerId = 710, ProductId = 3732004217, PurchaseId = "fail-1" })
+		check(decision and decision.Name == "NotProcessedYet", "failed load: receipt is NotProcessedYet")
+		check((c3.prof.coins or 0) == coins, "failed load: nothing granted")
+		check(dsf.writes == 0, "failed load: nothing written")
+		sf.leave(c3)
+		sf.run(0.5)
+	end
+	do
+		-- the first load fails after its retries, the background try answers: the real profile is picked up quietly
+		local sr = server()
+		local dsr = sr.world.stores[cfg.PROFILE.store]
+		dsr.data.u711 = { data = { v = 3, tut = true, level = 4, coins = 123 }, saved = 0 }
+		dsr.failNext = cfg.PROFILE.retries + 1
+		local c4 = sr.join(711, "Late")
+		sr.run(1)
+		check(c4.prof and c4.prof.saveFail == nil and c4.prof.level == 4, "background retry: real profile, flag gone")
+		check(c4.prof and c4.prof.coins == 123, "background retry: the saved coins are back")
+		sr.leave(c4)
+		sr.run(0.5)
+		check(dsr.data.u711.lock == nil and dsr.data.u711.data.level == 4, "background retry: saved and released")
 	end
 	local level, balls = c.prof.level, #c.prof.balls
 	s1.run(cfg.RESULT_TIME + 2)

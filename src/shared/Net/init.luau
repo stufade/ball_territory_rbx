@@ -202,6 +202,8 @@ export type ProfileView = {
 	nextBall: number?,
 	-- true: this person may use the developer buttons (TODO(REMOVE BEFORE LAUNCH): dev button)
 	dev: boolean?,
+	-- true: the save did not load, this profile is not kept and cannot pay (the client shows REJOIN)
+	saveFail: boolean?,
 	-- level ups of this change, to show as NEW BALL! (e = the ball, nil = no ball at that level)
 	news: { LevelUp }?,
 	-- M3.1 economy (all optional: an older server leaves them out)

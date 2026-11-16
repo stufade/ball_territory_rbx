@@ -23,13 +23,17 @@ local function handle(receipt: any): string
 	if not player then
 		return "NotProcessedYet"
 	end
+	-- a profile that failed to load is not saved: a purchase on it would be lost, so Roblox keeps the receipt
+	if Profiles.saveFailed(player) then
+		return "NotProcessedYet"
+	end
 	local deadline = os.clock() + WAIT
 	local profile = Profiles.get(player)
 	while not profile and player.Parent == Players and os.clock() < deadline do
 		task.wait(0.5)
 		profile = Profiles.get(player)
 	end
-	if not profile then
+	if not profile or Profiles.saveFailed(player) then
 		return "NotProcessedYet"
 	end
 	local log = {}
