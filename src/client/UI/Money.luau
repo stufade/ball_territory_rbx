@@ -1,5 +1,5 @@
 --!strict
--- M3.1 coin art in the V2 style (flat shapes with an ink outline and a shine, no image assets) and the
+-- M3.1 coin art in the V2 style (flat shapes with an ink outline and a shine), the plaza coin counter and the
 -- rolling number of a counter. Rolls run from step(dt) on Heartbeat, not TweenService.
 local Theme = require("./Theme")
 
@@ -21,6 +21,71 @@ function Money.icon(parent: Instance, cur: string, d: number, pos: UDim2?): Fram
 	local s = Theme.disc(o, d * 0.22, Color3.new(1, 1, 1), UDim2.fromScale(0.36, 0.34), 0.25)
 	s.ZIndex = o.ZIndex + 2
 	return box
+end
+
+-- Text size of the counter digits that fits `text` into w x h (digits ~0.62 em, separators ~0.3 em).
+local function digitSize(text: string, w: number, h: number): number
+	local em = 0
+	for _, ch in string.split(text, "") do
+		em += if ch == "," or ch == "." then 0.3 else 0.62
+	end
+	return math.max(Theme.MIN_TEXT, math.floor(math.min(h * 0.8, w / math.max(em, 1))))
+end
+
+-- The plaza coin counter (P-1, docs/ui.md): a big pill at the bottom left (Theme.plaza), a coin pile picture sticking
+-- out of its left end, big yellow digits. `plus` keeps room for the "+" disc on the right end (Wallet draws it).
+-- Returns the box ("Coins", with a UIScale for the roll pulse) and its "Value" label.
+function Money.counter(
+	parent: Instance,
+	L: Theme.PlazaLayout,
+	value: number,
+	plus: boolean,
+	z: number?
+): (Frame, TextLabel)
+	local z0 = z or 1
+	local h = L.moneyH
+	local box = Theme.frame(
+		parent,
+		UDim2.fromOffset(L.moneyW, h),
+		UDim2.fromOffset(L.walletX, L.moneyY[1]),
+		Color3.new(1, 1, 1),
+		Vector2.new(1, 0)
+	)
+	box.Name = "Coins"
+	box.ZIndex = z0
+	Theme.round(box, h / 2)
+	Theme.gradient(box, Theme.PANEL_HI, Theme.BG)
+	Theme.stroke(box, 4, Theme.INK)
+	Instance.new("UIScale").Parent = box
+	local pile = Instance.new("ImageLabel")
+	pile.Name = "Pile"
+	pile.BackgroundTransparency = 1
+	pile.Image = Theme.HUD_ICON.coins
+	pile.ScaleType = Enum.ScaleType.Fit
+	pile.AnchorPoint = MID
+	pile.Size = UDim2.fromOffset(h + 22, h + 22)
+	pile.Position = UDim2.fromOffset(h / 2 - 2, h / 2 - 8)
+	pile.ZIndex = z0 + 2
+	pile.Parent = box
+	local x0 = h + 6
+	local w = L.moneyW - x0 - (if plus then 58 else 16)
+	local text = Money.pill(value)
+	local t = Theme.label(
+		box,
+		text,
+		digitSize(Money.pill(math.max(value, 99999)), w, h - 8),
+		UDim2.fromOffset(w, h - 8),
+		UDim2.new(0, x0, 0.5, 0),
+		{
+			anchor = Vector2.new(0, 0.5),
+			align = Enum.TextXAlignment.Left,
+			color = Money.COIN,
+			stroke = 3,
+			z = z0 + 2,
+		}
+	)
+	t.Name = "Value"
+	return box, t
 end
 
 -- 12345 -> "12,345"
@@ -78,7 +143,7 @@ function Money.step(r: Roll, dt: number): boolean
 	if b and b.Parent then
 		local s = b:FindFirstChildOfClass("UIScale")
 		if s then
-			s.Scale = if moving and not Theme.reduced() then 1 + 0.12 * math.sin(math.pi * r.t / DUR) else 1
+			s.Scale = if moving and not Theme.reduced() then 1 + 0.05 * math.sin(math.pi * r.t / DUR) else 1
 		end
 	end
 	return moving

@@ -154,9 +154,9 @@ local function banner(
 		Color3.new(1, 1, 1),
 		0.55
 	)
-	local glow =
+	local _glow =
 		Theme.glow(card, math.floor(ballD * 1.9), Theme.YELLOW:Lerp(el, 0.4), UDim2.fromOffset(cx, cy), 6, 0.82)
-	local shadow = Theme.shadow(card, math.floor(ballD * 0.8), UDim2.fromOffset(cx, cy + ballD / 2 + 4))
+	local _shadow = Theme.shadow(card, math.floor(ballD * 0.8), UDim2.fromOffset(cx, cy + ballD / 2 + 4))
 	local icon = Theme.ball(card, e, ballD, UDim2.fromOffset(cx, cy), MID)
 	icon.Name = "Icon"
 	local offD = 62
@@ -207,21 +207,12 @@ local function banner(
 
 	if not still then
 		local t = 0
-		local glowS = Theme.scaleOf(glow)
-		local offS = Theme.scaleOf(off)
-		local shadowW = shadow.Size.X.Offset
 		table.insert(ctx.frames, function(dt: number)
 			if not card.Parent then
 				return
 			end
 			t += dt
 			rays.Rotation = t * 9
-			glowS.Scale = 1 + 0.06 * math.sin(t * 2.2)
-			local bob = math.sin(t * 2.4)
-			icon.Position = UDim2.fromOffset(cx, cy - 3 - 3 * bob)
-			local k = 1 - 0.12 * (bob + 1) / 2
-			shadow.Size = UDim2.fromOffset(shadowW * k, math.max(6, math.floor(shadowW * 0.22 * k)))
-			offS.Scale = 1 + 0.07 * math.max(0, math.sin(t * 4))
 		end)
 	end
 	return card, coins, ends

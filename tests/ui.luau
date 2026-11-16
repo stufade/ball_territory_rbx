@@ -167,6 +167,12 @@ local function make(cv: any): (any, any, { any }, { busy: boolean })
 	return Wallet.new(canvas, ctx), canvas, acts, flags
 end
 
+-- the spin tab of the shop (no HUD button since P-1)
+local function openSpin(w: any)
+	w.tab = "spin"
+	Wallet.show(w, "shop")
+end
+
 -- canvas, UI scale (real px per design px) of 844x390 and 1280x720
 for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	local cv = case[1]
@@ -188,34 +194,41 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	check(w.root.Visible and not w.pop.Visible, `{tag}: counters on the plaza`)
 	local coins = find(w.root, "Coins")
 	check(coins and find(w.root, "Crystals") == nil and find(coins, "Value").Text == "0", `{tag}: one coin pill`)
-	-- topbar.Y 86 is the phone safe area (taller than the slot above PLAY). Applying it
-	-- again would open a hole on the right; the compact y 12 / 60 stays.
+	-- P-1: the coin counter is the big pill at the bottom left, under the stick, left of the level bar
 	local coinR = rectOf(coins)
-	check(coinR[2] == 12, `{tag}: tall topbar does not drop the pill ({coinR[2]})`)
+	check(
+		coinR[1] == 14 and coinR[2] + coinR[4] == cv.Y - 12,
+		`{tag}: coins at the bottom left ({coinR[1]},{coinR[2]})`
+	)
+	check(coinR[3] >= 220 and coinR[4] >= 60, `{tag}: coins are big ({coinR[3]}x{coinR[4]})`)
+	check(coinR[1] + coinR[3] <= cv.X / 2 - 215, `{tag}: coins clear of the level bar`)
+	check(find(coins, "Pile") ~= nil and find(coins, "Pile").Image ~= "", `{tag}: coin pile picture`)
 	local dailyBtn = find(w.root, "DailyBtn")
 	check(dailyBtn and find(dailyBtn, "Dot") and find(dailyBtn, "Caption").Text == "DAILY", `{tag}: DAILY with "!"`)
 	check(find(find(w.root, "QuestsBtn"), "Sub").Text == "1/3", `{tag}: QUESTS 1/3`)
 	check(find(find(w.root, "BookBtn"), "Sub").Text == "3", `{tag}: BOOK 3`)
-	check(find(w.root, "SpinBtn") == nil, `{tag}: spin hidden until the server allows it`)
+	check(find(w.root, "SpinBtn") == nil and find(w.root, "HowTo") == nil, `{tag}: no SPIN, no HELP on the HUD`)
 	-- layout (U1): inside the canvas, clear of PLAY + PARTY (right edge), the stick, the jump button and the
 	-- Roblox buttons (top left, up to x 354 / y 86)
 	local play = { cv.X - 14 - 230, 138, 230, 182 }
 	local roblox = { 0, 0, 354, 86 }
 	local stick = { 83, 298, 166, 166 }
 	local jump = { cv.X - 131, 415, 97, 97 }
-	for _, name in { "Coins", "DailyBtn", "QuestsBtn", "BookBtn", "ShopBtn" } do
+	for _, name in { "Coins", "AddCoins", "DailyBtn", "QuestsBtn", "BookBtn", "ShopBtn" } do
 		local r = rectOf(find(w.root, name))
 		check(r[1] >= 0 and r[2] >= 0 and r[1] + r[3] <= cv.X and r[2] + r[4] <= cv.Y, `{tag}: {name} on screen`)
 		check(not overlap(r, play), `{tag}: {name} clear of PLAY/PARTY/HOW TO PLAY`)
 		check(not overlap(r, stick) and not overlap(r, jump), `{tag}: {name} clear of the stick and jump`)
 		check(not overlap(r, roblox), `{tag}: {name} clear of the Roblox buttons`)
 	end
+	-- one row of four picture icons right of the Roblox buttons (it fits on both canvases now: no pill up there)
+	for i, name in { "DailyBtn", "QuestsBtn", "BookBtn", "ShopBtn" } do
+		local r = rectOf(find(w.root, name))
+		check(r[1] == 360 + (i - 1) * 96 and r[2] == 18 and r[3] == 88, `{tag}: {name} in the row at {r[1]},{r[2]}`)
+		local icon = find(find(w.root, name), "Icon")
+		check(icon and icon._p.ClassName == "ImageLabel" and icon.Image ~= "", `{tag}: {name} is a picture`)
+	end
 	local shopR = rectOf(find(w.root, "ShopBtn"))
-	-- fifth icon when it clears the coin pills; otherwise the rightmost wrap that stays clear of PLAY
-	-- a phone has the row beside the Roblox buttons; a PC (player list on the right) one row under them
-	local wantX = if cv.X > 1000 then 360 + 4 * 90 else 14 + 4 * 90
-	local wantY = if cv.X > 1000 then 16 else 86 + 8
-	check(shopR[1] == wantX and shopR[2] == wantY and shopR[3] == 80, `{tag}: SHOP at {shopR[1]},{shopR[2]}`)
 	check(find(find(w.root, "ShopBtn"), "Caption").Text == "SHOP", `{tag}: SHOP caption`)
 	check(find(find(w.root, "ShopBtn"), "Sub").Text == "22", `{tag}: SHOP missing count`)
 	check(not overlap(shopR, coinR), `{tag}: SHOP clear of the counter`)
@@ -272,7 +285,8 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	v.gains = { { cur = "coins", n = 50, why = "login_d1" } }
 	Wallet.setProfile(w, v)
 	check(find(w.pop, "Taken") ~= nil and find(find(w.pop, "Day1"), "Got") ~= nil, `{tag}: TAKEN!, day 1 ticked`)
-	check(find(w.pop, "FlyCoins") ~= nil and find(w.pop, "Flying") ~= nil, `{tag}: coins fly into the counter`)
+	-- P-1: an ordinary day rolls the counter without a coin flight (flights are for rare rewards)
+	check(find(w.pop, "FlyCoins") ~= nil and find(w.pop, "Flying") == nil, `{tag}: counter rolls, no flight`)
 	check(find(w.pop, "Next") ~= nil and find(w.pop, "Ok") ~= nil, `{tag}: next reward timer`)
 	step(w, 0.3)
 	local mid = tonumber((find(w.root, "Coins"):FindFirstChild("Value", true).Text:gsub(",", "")))
@@ -369,10 +383,11 @@ for _, spec in { { 1920, 1080, 58 }, { 1280, 720, 58 }, { 2560, 1440, 36 } } do
 	local coinR = rectOf(find(w.root, "Coins"))
 	local addR = rectOf(find(w.root, "AddCoins"))
 	local play = { cv.X - 14 - 230, 138, 230, 104 }
-	check(coinR[2] * s >= 48, `{tag}: coins clear the top 48px ({coinR[2] * s})`)
-	check(coinR[2] <= topbar.Y + 0.01, `{tag}: one topbar inset, not two ({coinR[2]} vs {topbar.Y})`)
+	check(coinR[2] > topbar.Y and coinR[2] + coinR[4] <= cv.Y, `{tag}: coins at the bottom ({coinR[2]})`)
 	check(not overlap(coinR, play) and not overlap(addR, play), `{tag}: pill and + clear of PLAY`)
-	check(coinR[1] + coinR[3] <= cv.X and coinR[2] + coinR[4] < 138, `{tag}: pill on screen above PLAY`)
+	check(coinR[1] >= 0 and coinR[1] + coinR[3] <= cv.X / 2 - 215, `{tag}: pill left of the level bar`)
+	local shopR = rectOf(find(w.root, "ShopBtn"))
+	check(shopR[1] + shopR[3] <= cv.X - 190 / s, `{tag}: icon row clear of the player list`)
 end
 
 -- level 10: a toast with its coins (150 + the every-5th 300)
@@ -446,30 +461,13 @@ do
 	local p = Plaza.new(canvas, ctx)
 	Plaza.setState(p, { ph = "lobby" })
 	check(find(p.root, "TutorConfirm") == nil and find(p.root, "DevBalls") == nil, "plaza: no dialog, no dev button")
-	local how = find(p.root, "HowTo")
-	check(how ~= nil, "plaza: HOW TO PLAY button")
-	how.Activated:Fire()
-	check(#acts == 0, "HOW TO PLAY alone sends nothing")
-	local box = find(p.root, "TutorConfirm")
-	check(
-		box ~= nil and table.find(Gui.texts(box), "PLAY TUTORIAL AGAIN?") ~= nil,
-		"HOW TO PLAY asks PLAY TUTORIAL AGAIN?"
-	)
-	find(p.root, "No").Activated:Fire()
-	check(#acts == 0 and find(p.root, "TutorConfirm") == nil, "NO: closed, nothing sent")
-	find(p.root, "HowTo").Activated:Fire()
-	find(p.root, "Yes").Activated:Fire()
-	check(#acts == 1 and acts[1][1] == "tutor", "YES: the tutor action goes out once")
-	find(p.root, "HowTo").Activated:Fire()
-	Plaza.setState(p, { ph = "match" })
-	Plaza.setState(p, { ph = "lobby" })
-	check(find(p.root, "TutorConfirm") == nil, "a match closes the dialog")
+	check(find(p.root, "HowTo") == nil, "plaza: no HELP button (P-1)")
 	Plaza.setDev(p, true)
 	local dev = find(p.root, "DevBalls")
 	check(dev ~= nil, "dev flag: DEV: ALL BALLS shown")
 	dev.Activated:Fire()
 	check(acts[#acts][1] == "devballs", "dev button sends devballs")
-	-- U1 layout on the phone canvas: PLAY and PARTY at the right edge, HELP and DEV clear of the stick, the jump
+	-- U1 layout on the phone canvas: PLAY and PARTY at the right edge, DEV (small, under PARTY) clear of the stick, the jump
 	-- button and the Roblox buttons; every plaza text has a fixed size (nothing re-fits while a button scales)
 	local stick, jump, roblox = { 83, 298, 166, 166 }, { cv.X - 131, 415, 97, 97 }, { 0, 0, 354, 86 }
 	local function clear(name: string, o: any)
@@ -481,10 +479,10 @@ do
 	end
 	local pr = clear("PLAY", find(p.root, "Play"))
 	local yr = clear("PARTY", find(p.root, "PartyBtn"))
-	clear("HELP", find(p.root, "HowTo"))
-	clear("DEV", dev)
+	local dr = clear("DEV", dev)
 	check(pr[3] >= 220 and pr[4] >= 100 and pr[3] * pr[4] > yr[3] * yr[4], "plaza: PLAY is the biggest")
 	check(pr[1] + pr[3] >= cv.X - 20 and yr[2] >= pr[2] + pr[4], "plaza: PARTY under PLAY at the right edge")
+	check(dr[2] >= yr[2] + yr[4] and dr[4] <= 40 and dr[1] > cv.X / 2, "plaza: DEV small, under PARTY")
 	local scaled = 0
 	for _, d in p.root:GetDescendants() do
 		if d._p.ClassName == "TextLabel" and d._p.TextScaled then
@@ -643,12 +641,12 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	local gr = rectOf(find(w.root, "Coins"))
 	local cx, cy = ar[1] + ar[3] / 2, ar[2] + ar[4] / 2
 	check(cx > gr[1] and cx < gr[1] + gr[3] and cy > gr[2] and cy < gr[2] + gr[4], `{tag}: HUD + on the coin counter`)
-	check(ar[2] + ar[4] <= 138, `{tag}: HUD + above PLAY (playY 138)`)
+	check(ar[2] > 138 + 182 and ar[1] < cv.X / 2, `{tag}: HUD + at the bottom left, clear of PLAY/PARTY`)
 	check(
 		not overlap(rectOf(find(find(w.root, "Coins"), "Value")), rectOf(find(w.root, "Disc"))),
 		`{tag}: + clear of the number`
 	)
-	for _, b in { "ShopBtn", "DailyBtn", "QuestsBtn", "BookBtn", "SpinBtn" } do
+	for _, b in { "ShopBtn", "DailyBtn", "QuestsBtn", "BookBtn" } do
 		check(not overlap(ar, rectOf(find(w.root, b))), `{tag}: HUD + clear of {b}`)
 	end
 	check(ar[1] >= 0 and ar[2] >= 0 and ar[1] + ar[3] <= cv.X, `{tag}: HUD + on screen`)
@@ -748,26 +746,16 @@ local function spinBoard(pityCoins: number): any
 	return { ok = true, coins = line("coins", pityCoins) }
 end
 
+-- P-1: no SPIN button on the HUD even when paid random is allowed (the spin is a shop tab)
 for _, cv in { V2(1168, 540), V2(960, 540) } do
 	Theme.scale = if cv.X >= 1100 then 390 / 540 else 720 / 540
 	Theme.setPhone(cv.X > 1000)
-	local tag = `{cv.X} spin`
 	local w = make(cv)
 	Wallet.setState(w, { ph = "lobby" })
 	local v = view(5000, 49, false, 1)
 	v.spin = spinBoard(3)
 	Wallet.setProfile(w, v)
-	local btn = find(w.root, "SpinBtn")
-	-- phone: the sixth cell of the top row; PC: of its one row under the Roblox buttons
-	local wantX = if cv.X > 1000 then 360 + 5 * 90 else 14 + 5 * 90
-	local wantY = if cv.X > 1000 then 16 else 94
-	local r = rectOf(btn)
-	check(r[1] == wantX and r[2] == wantY and r[3] == 80, `{tag}: button at {r[1]},{r[2]}`)
-	check(find(btn, "Caption").Text == "SPIN", `{tag}: caption`)
-	check(not overlap(r, rectOf(find(w.root, "ShopBtn"))), `{tag}: clear of SHOP`)
-	check(not overlap(r, rectOf(find(w.root, "Coins"))), `{tag}: clear of the coins`)
-	local play = { cv.X - 14 - 230, 138, 230, 182 }
-	check(not overlap(r, play), `{tag}: clear of PLAY`)
+	check(find(w.root, "SpinBtn") == nil, `{cv.X} spin: no HUD button`)
 end
 
 do
@@ -777,7 +765,7 @@ do
 	local v = view(5000, 49, false, 1)
 	v.spin = spinBoard(3)
 	Wallet.setProfile(w, v)
-	find(w.root, "SpinBtn").Activated:Fire()
+	openSpin(w)
 	local panel = find(w.pop, "ShopPanel")
 	check(
 		panel ~= nil and w.open == "shop" and panel:GetAttribute("Tab") == "spin",
@@ -852,10 +840,7 @@ do
 
 	poor.spin.ok = false
 	Wallet.setProfile(w, poor)
-	check(
-		find(w.root, "SpinBtn") == nil and not w.pop.Visible,
-		"spin: restricted policy hides the button and the screen"
-	)
+	check(find(w.root, "SpinBtn") == nil and not w.pop.Visible, "spin: restricted policy hides the screen")
 end
 
 -- Spin on 1280x720 (canvas 960x540) and on a 844x390 phone (canvas 1168x540, scale 0.72): every button
@@ -867,7 +852,7 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	local v = view(5000, 49, false, 1)
 	v.spin = spinBoard(3)
 	Wallet.setProfile(w, v)
-	find(w.root, "SpinBtn").Activated:Fire()
+	openSpin(w)
 	local panel = find(w.pop, "ShopPanel")
 	buttonsFit(panel, cv, tag)
 	local cardR = rectOf(find(panel, "SpinCard"))
@@ -942,7 +927,7 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 			v.passOffer = { fastSpin = true }
 		end
 		Wallet.setProfile(w, v)
-		find(w.root, "SpinBtn").Activated:Fire()
+		openSpin(w)
 		local panel = find(w.pop, "ShopPanel")
 		buttonsFit(panel, cv, `{tag} {mode}`)
 		local ten, buy = find(panel, "Spin10"), find(panel, "BuyFastSpin")
@@ -1161,7 +1146,7 @@ for _, vp in { { 390, 844 }, { 1280, 720 } } do
 		on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
 	}
 	Wallet.setProfile(w, v)
-	find(w.root, "SpinBtn").Activated:Fire()
+	openSpin(w)
 	local spinPage = find(w.pop, "ShopPanel")
 	check(spinPage:GetAttribute("Tab") == "spin", `{tag}: SPIN opens the spin tab`)
 	buttonsFit(spinPage, cv, `{tag} spin`)

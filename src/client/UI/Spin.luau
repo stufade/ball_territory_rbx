@@ -91,36 +91,6 @@ export type Ctx = {
 	panel: Frame,
 }
 
--- Sixth icon of the plaza row. Same row when it clears the coin pills; otherwise the first free cell under the row.
-function Spin.iconPos(L: Theme.PlazaLayout, shop: UDim2): UDim2
-	local step = L.icon + L.gap
-	local function free(px: number, py: number): boolean
-		if py == L.rowY and px + L.icon > L.walletX - L.moneyW - L.gap then
-			return false
-		end
-		if px + L.icon > L.right - L.playW - 8 and py + L.icon > L.playY then
-			return false
-		end
-		local sx, sy = shop.X.Offset, shop.Y.Offset
-		if px < sx + L.icon and sx < px + L.icon and py < sy + L.icon and sy < py + L.icon then
-			return false
-		end
-		return px >= 0 and py >= 0
-	end
-	local x = L.rowX + 5 * step
-	if free(x, L.rowY) then
-		return UDim2.fromOffset(x, L.rowY)
-	end
-	local y = L.rowY + step
-	for slot = 0, 5 do
-		local sx = L.rowX + slot * step
-		if free(sx, y) then
-			return UDim2.fromOffset(sx, y)
-		end
-	end
-	return UDim2.fromOffset(L.rowX, y + step)
-end
-
 local function prize(hit: Net.SpinHit): string
 	if hit.tier == "refund" then
 		return `REFUND +{Money.fmt(hit.back)}`
@@ -801,32 +771,14 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		if not still then
 			local age = 0
 			local span = slotW * #CYCLE
-			local ms = Theme.scaleOf(marker)
 			table.insert(ctx.frames, function(dt)
 				if not strip.Parent or panel:GetAttribute("SpinPhase") == "spinning" then
 					return
 				end
 				age += dt
 				strip.Position = UDim2.fromOffset(at(3) - (age * 34) % span, 0)
-				ms.Scale = 1 + 0.02 * math.sin(age * 3)
 			end)
 		end
-	end
-
-	if not still then
-		local sc = Theme.scaleOf(go)
-		local age = 0
-		table.insert(ctx.frames, function(dt)
-			if not go.Parent then
-				return
-			end
-			if panel:GetAttribute("SpinPhase") == "spinning" or not go.Active then
-				sc.Scale = 1
-				return
-			end
-			age += dt
-			sc.Scale = 1 + 0.025 * math.sin(age * 3)
-		end)
 	end
 
 	if go.Active then

@@ -390,7 +390,9 @@ local function buildPower(self: Hud, gui: Frame, e: number)
 		p.pressedAt = os.clock()
 		if not reduced() then
 			scale.Scale = 0.92
-			TweenService:Create(scale, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+			TweenService
+				:Create(scale, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = 1 })
+				:Play()
 		end
 	end)
 end

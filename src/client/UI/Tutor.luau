@@ -319,7 +319,7 @@ function Tutor.step(o: Overlay, _dt: number)
 	local t = os.clock()
 	local c = o.cue
 	local nudge = c ~= nil and c.wait == true and t - o.cueAt > NUDGE
-	local amp, speed = if nudge then 0.22 else 0.09, if nudge then 11 else 6
+	local amp, speed = if nudge then 0.12 else 0.05, if nudge then 7 else 4
 	local beat = if Theme.reduced() then 0 else math.sin(t * speed)
 	o.handScale.Scale = 1 + amp * beat
 	o.ringScale.Scale = 1.04 + amp * 0.5 * beat

@@ -240,8 +240,8 @@ function Theme.fit(text: string, size: number, w: number, h: number): number
 	return math.max(Theme.MIN_TEXT, math.floor(math.min(size, w / (n * 0.7), h * 0.72)))
 end
 
--- Soft pop of a window, card or badge: UIScale `from` (0.85) -> 1, 0.28 s, small overshoot, after `delay` seconds.
--- One curve for every popup; big rewards pass a lower `from` for a stronger pop.
+-- Soft pop of a window, card or badge: UIScale `from` (0.85) -> 1, 0.2 s, Quint Out (no overshoot, no bounce: P-1),
+-- after `delay` seconds. One curve for every popup; big rewards pass a lower `from` for a stronger pop.
 function Theme.pop(o: GuiObject, delay: number?, from: number?)
 	if Theme.reduced() then
 		return
@@ -250,7 +250,7 @@ function Theme.pop(o: GuiObject, delay: number?, from: number?)
 	s.Scale = from or 0.85
 	local tw = TweenService:Create(
 		s,
-		TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, delay or 0),
+		TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, delay or 0),
 		{ Scale = 1 }
 	)
 	tw:Play()
@@ -400,6 +400,10 @@ function Theme.select(b: TextButton, on: boolean)
 		edge.Color = if on then Theme.YELLOW else Theme.INK
 		edge.Thickness = if on then 4 else 3
 	end
+	local cap = b:FindFirstChild("Caption") :: TextLabel?
+	if cap and not body then
+		cap.TextColor3 = if on then Theme.YELLOW_TXT else Theme.TEXT
+	end
 end
 
 -- Small count or "!" pill on the top right corner of a button or icon.
@@ -421,14 +425,19 @@ function Theme.badge(parent: GuiObject, text: string, color: Color3?, name: stri
 	return d
 end
 
--- Plaza layout (docs/ui.md «Площадка»), design px of the canvas; shared by Plaza, Wallet and Level.
---   top left, right of the Roblox buttons: icon row DAILY / QUESTS / BOOK / HELP / SHOP (secondary, opened now and then)
---   top right: coins
---   right edge, above the jump button: PLAY (biggest) and PARTY under it - the only main actions
+-- Plaza layout (docs/ui.md «Площадка»), design px of the canvas; shared by Plaza, Wallet and Level (P-1):
+--   top left, right of the Roblox buttons: one row of four picture icons DAILY / QUESTS / BOOK / SHOP (a PC, where the
+--   Roblox player list covers the top right, puts the row under the Roblox buttons); no HELP, no SPIN (the spin is a
+--   shop tab)
+--   bottom left, under the stick: the big coin counter with "+" (coin packs)
+--   right edge, above the jump button: PLAY (biggest) and PARTY under it - the only main actions; the dev button small
+--   under PARTY
 --   bottom middle, between the stick and the jump button: level, XP bar, next ball; the 2x XP icon right of it
 export type PlazaLayout = {
 	right: number,
-	-- right edge of the coin pill: left of the Roblox player list
+	-- right edge of what the top of the screen may use: left of the Roblox player list on a PC
+	listX: number,
+	-- right edge of the coin counter (its left edge is walletX - moneyW)
 	walletX: number,
 	playW: number,
 	playY: number,
@@ -452,46 +461,42 @@ export type PlazaLayout = {
 Theme.LIST_PX = 190
 Theme.scale = 1
 
+-- HUD pictures (own SVG art, tools/art/hud; docs/licenses/assets.md).
+Theme.HUD_ICON = {
+	daily = "rbxassetid://79399567920096",
+	quests = "rbxassetid://134446016241479",
+	book = "rbxassetid://107518731338758",
+	shop = "rbxassetid://115317288173478",
+	coins = "rbxassetid://96009887810654",
+}
+
 function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	local barW = 430
-	local playY = 138
-	local moneyH = 42
-	local moneyGap = 6
-	-- Coins stay on the right, above PLAY. On a wide screen the Roblox
-	-- player list covers that corner, so drop the stack under the top bar. topbar.Y
-	-- is already the GuiInset in design px (one pad included). Use it once. A phone
-	-- safe area is much taller than the gap above PLAY; applying it would open a hole
-	-- on the right and cover PLAY, so that case keeps the compact top.
-	local playGap = 8
-	local maxTop = playY - playGap - moneyH * 2 - moneyGap
-	local moneyTop = 12
-	if topbar.Y > moneyTop and topbar.Y <= maxTop + 16 then
-		moneyTop = math.min(topbar.Y, maxTop)
+	local icon, gap = 88, 8
+	local listX = if Theme.phone then cv.X - 14 else cv.X - 14 - math.ceil(Theme.LIST_PX / math.max(Theme.scale, 0.1))
+	local rowX, rowY = topbar.X + 6, 18
+	if rowX + 4 * (icon + gap) - gap > listX - 10 then
+		rowX, rowY = 14, topbar.Y + 6
 	end
-	-- the icon row (5 icons) goes beside the Roblox buttons when it clears the coin pill; otherwise (a PC, where the
-	-- player list squeezes the pill in) the whole row moves under them, still one row
-	local walletX = if Theme.phone then cv.X - 14 else cv.X - 14 - math.ceil(Theme.LIST_PX / math.max(Theme.scale, 0.1))
-	local moneyW = 230
-	local rowX, rowY = topbar.X + 6, 16
-	if rowX + 5 * 90 - 10 > walletX - moneyW - 10 then
-		rowX, rowY = 14, topbar.Y + 8
-	end
+	-- the coin counter fills the free corner under the stick, up to the level bar
+	local moneyH = 60
+	local moneyW = math.clamp(math.floor(cv.X / 2 - barW / 2 - 14 - 16), 220, 330)
 	return {
 		right = cv.X - 14,
-		-- a phone shows no player list in the corner: the coins take it and the icons fit one row
-		walletX = walletX,
+		listX = listX,
+		walletX = 14 + moneyW,
 		playW = 230,
-		playY = playY,
+		playY = 138,
 		playH = 104,
 		partyY = 254,
 		partyH = 66,
 		rowX = rowX,
 		rowY = rowY,
-		icon = 80,
-		gap = 10,
+		icon = icon,
+		gap = gap,
 		moneyW = moneyW,
 		moneyH = moneyH,
-		moneyY = { moneyTop, moneyTop + moneyH + moneyGap },
+		moneyY = { cv.Y - 12 - moneyH },
 		barW = barW,
 		barH = 64,
 		barX = cv.X / 2,
@@ -499,29 +504,33 @@ function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	}
 end
 
--- Square icon button of the plaza row: an emoji icon, a caption under it, room for a badge on the corner.
-function Theme.iconButton(
-	parent: Instance,
-	icon: string,
-	caption: string,
-	size: number,
-	pos: UDim2,
-	color: Color3
-): TextButton
-	local b = Theme.button(parent, "", UDim2.fromOffset(size, size), pos, color)
-	Theme.label(b, icon, 38, UDim2.fromOffset(size, 42), UDim2.new(0.5, 0, 0, 7), {
-		anchor = Vector2.new(0.5, 0),
-		stroke = 0,
-		z = 3,
-	}).Name =
-		"Icon"
-	local c = Theme.label(b, caption, 20, UDim2.fromOffset(size, 22), UDim2.new(0.5, 0, 0, 48), {
-		anchor = Vector2.new(0.5, 0),
-		bold = true,
-		stroke = 2,
+-- Picture icon of the plaza row (P-1): the picture fills the button, the caption sits on its lower edge, a badge
+-- fits on the corner. No frame: the picture carries its own ink outline. Theme.select turns the caption yellow.
+function Theme.hudIcon(parent: Instance, image: string, caption: string, size: number, pos: UDim2): TextButton
+	local b = Instance.new("TextButton")
+	b.AutoButtonColor = false
+	b.Text = ""
+	b.BackgroundTransparency = 1
+	b.Size = UDim2.fromOffset(size, size)
+	b.Position = pos
+	local i = Instance.new("ImageLabel")
+	i.Name = "Icon"
+	i.BackgroundTransparency = 1
+	i.Image = image
+	i.ScaleType = Enum.ScaleType.Fit
+	i.AnchorPoint = Vector2.new(0.5, 0)
+	i.Size = UDim2.fromOffset(size - 8, size - 8)
+	i.Position = UDim2.fromScale(0.5, 0)
+	i.ZIndex = 2
+	i.Parent = b
+	local c = Theme.label(b, caption, 22, UDim2.fromOffset(size + 16, 26), UDim2.new(0.5, 0, 1, 2), {
+		anchor = Vector2.new(0.5, 1),
+		stroke = 3,
 		z = 3,
 	})
 	c.Name = "Caption"
+	b.Parent = parent
+	Theme.press(b)
 	return b
 end
 
@@ -718,10 +727,10 @@ function Theme.rise(o: GuiObject, delay: number)
 	end
 	local p = o.Position
 	o.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 26)
-	TweenService:Create(o, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, delay), {
+	TweenService:Create(o, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, delay), {
 		Position = p,
 	}):Play()
-	Theme.pop(o, delay, 0.4)
+	Theme.pop(o, delay, 0.9)
 end
 
 Theme.PRICE_COIN = hex("#2ed068")

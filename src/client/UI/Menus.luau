@@ -79,17 +79,6 @@ local function dots(ctx: Ctx, l: TextLabel, base: string)
 	end)
 end
 
-local function pulse(ctx: Ctx, o: GuiObject, amount: number, speed: number)
-	if Theme.reduced() then
-		return
-	end
-	local s = Instance.new("UIScale")
-	s.Parent = o
-	table.insert(ctx.frames, function()
-		s.Scale = 1 + amount * math.sin(os.clock() * speed)
-	end)
-end
-
 local function names(list: { number }?): string
 	if not list or #list == 0 then
 		return "nobody"
@@ -701,9 +690,6 @@ local function draft(root: Frame, st: Net.State, ctx: Ctx)
 		anchor = TOP_MID,
 		color = if myTurn then Theme.YELLOW_TXT else Theme.TEXT,
 	})
-	if myTurn then
-		pulse(ctx, status, 0.05, 8)
-	end
 	local fill = Theme.timeBar(root, math.min(420, w - 40), 8, UDim2.fromOffset(x + w / 2, 96), TOP_MID)
 	local base = if myTurn then "YOUR PICK!" else sideName(ctx, 1 - me) .. " IS PICKING"
 	countdown(ctx, st.endsAt, 15, function(left, k)
@@ -826,7 +812,6 @@ local function keepScreen(root: Frame, st: Net.State, ctx: Ctx, keep: number)
 	Theme.disc(root, 196, Theme.YELLOW, UDim2.fromOffset(cv.X / 2, cy), 0.8)
 	local art = Theme.ball(root, keep, 170, UDim2.fromOffset(cv.X / 2, cy))
 	Theme.pop(art, 0.1, 0.4)
-	pulse(ctx, art, 0.04, 4)
 	local wait = Theme.text(root, "", 32, UDim2.fromOffset(700, 40), UDim2.new(0.5, 0, 0, cy + 110), {
 		anchor = TOP_MID,
 		color = Theme.TEXT,
@@ -967,7 +952,7 @@ local function result(root: Frame, st: Net.State, ctx: Ctx)
 	local crown = Theme.crown(root, 150, UDim2.fromOffset(cx, -120))
 	TweenService:Create(
 		crown,
-		TweenInfo.new(0.7, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out, 0, false, 1.0),
+		TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 1.0),
 		{ Position = UDim2.fromOffset(cx, cy - 150) }
 	):Play()
 	-- headline

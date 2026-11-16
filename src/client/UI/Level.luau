@@ -346,11 +346,6 @@ function Level.step(l: Level, dt: number)
 			return
 		end
 		t.Text = fmt(left)
-		local b = l.badge
-		local s = if b then b:FindFirstChildOfClass("UIScale") else nil
-		if s and not Theme.reduced() then
-			s.Scale = 1 + 0.04 * math.sin(os.clock() * 3)
-		end
 	end
 end
 

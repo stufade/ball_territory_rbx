@@ -270,7 +270,6 @@ local function spin(root: Frame, ctx: Ctx, pool: { number }, legend: number, don
 		TOP_MID
 	)
 	Theme.pop(btn, 0.2, 0.5)
-	local bs = btn:FindFirstChildOfClass("UIScale")
 	local started = false
 	local t = 0
 	local lastTile = 3
@@ -291,9 +290,6 @@ local function spin(root: Frame, ctx: Ctx, pool: { number }, legend: number, don
 	local stopped = false
 	table.insert(ctx.frames, function(dt)
 		if not started then
-			if bs and not Theme.reduced() then
-				bs.Scale = 1 + 0.06 * math.sin(os.clock() * 7)
-			end
 			return
 		end
 		if stopped then
@@ -322,7 +318,7 @@ local function spin(root: Frame, ctx: Ctx, pool: { number }, legend: number, don
 			local s = Instance.new("UIScale")
 			s.Parent = wt
 			if not Theme.reduced() then
-				tween(s, 0.3, { Scale = 1.12 }, Enum.EasingStyle.Back)
+				tween(s, 0.2, { Scale = 1.08 }, Enum.EasingStyle.Quint)
 			end
 			done()
 		end
@@ -403,11 +399,6 @@ function Reward.build(parent: Frame, st: Net.State, ctx: Ctx)
 		)
 		btn.Name = "Claim"
 		Theme.pop(btn, 0.6, 0.5)
-		table.insert(ctx.frames, function()
-			if not Theme.reduced() then
-				bs.Scale = 1 + 0.04 * math.sin(os.clock() * 5)
-			end
-		end)
 		local sent = false
 		local function press()
 			if sent then

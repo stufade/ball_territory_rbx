@@ -100,15 +100,6 @@ function Book.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, fresh: { [strin
 				z = 4,
 			})
 			tag.Name = "New"
-			local s = Instance.new("UIScale")
-			s.Parent = cell
-			if not Theme.reduced() then
-				table.insert(ctx.frames, function()
-					if cell.Parent then
-						s.Scale = 1 + 0.05 * math.sin(os.clock() * 6)
-					end
-				end)
-			end
 		end
 	end
 end

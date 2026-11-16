@@ -32,7 +32,7 @@ export type Plaza = {
 	noteUntil: number,
 	-- T2.2: PLAY was pressed once: no more glow on this client
 	pressed: boolean,
-	-- HOW TO PLAY asks "PLAY TUTORIAL AGAIN?" first
+	-- "PLAY TUTORIAL AGAIN?" is open (no HUD button since P-1; kept for a later entry point)
 	confirm: boolean,
 	-- the server says this person may use the developer button (TODO(REMOVE BEFORE LAUNCH): dev button)
 	dev: boolean,
@@ -50,8 +50,8 @@ local function isHost(p: Plaza): boolean
 	return v ~= nil and v.id ~= nil and v.host == game:GetService("Players").LocalPlayer.UserId
 end
 
--- After the tutorial (State lobby glow = "play"): PLAY pulses inside a yellow ring and a hand points at it.
--- The pulse scales the wrapper, the press scales the button: they multiply and never fight over one UIScale.
+-- After the tutorial (State lobby glow = "play"): PLAY sits inside a yellow ring and a hand points at it. Both stay
+-- still (P-1: no constant bobbing); the ring fades in once.
 local function glow(layer: Frame, wrap: Frame, L: Theme.PlazaLayout)
 	local ring = Theme.frame(wrap, UDim2.new(1, 18, 1, 18), UDim2.fromScale(0.5, 0.5), Theme.YELLOW, MID)
 	ring.Name = "Ring"
@@ -67,13 +67,16 @@ local function glow(layer: Frame, wrap: Frame, L: Theme.PlazaLayout)
 	if Theme.reduced() then
 		return
 	end
-	local info = TweenInfo.new(0.55, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-	TweenService:Create(Theme.scaleOf(wrap), info, { Scale = 1.06 }):Play()
-	TweenService:Create(hand, info, { Position = UDim2.fromOffset(hx + 14, cy) }):Play()
+	local edge = ring:FindFirstChildOfClass("UIStroke") :: UIStroke
+	edge.Transparency = 1
+	hand.TextTransparency = 1
+	local info = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(edge, info, { Transparency = 0 }):Play()
+	TweenService:Create(hand, info, { TextTransparency = 0 }):Play()
 end
 
 -- PLAY (the biggest, green) and PARTY under it at the right edge, above the jump button; PLAY opens its choices
--- to the left. The help button ("?") sits in the icon row at the top left (Wallet draws DAILY / QUESTS / BOOK).
+-- to the left. No help button (P-1): the tutorial replay is not on the HUD.
 local function buttons(p: Plaza, layer: Frame)
 	local act = p.ctx.act
 	local L = Theme.plaza(p.ctx.canvas, p.ctx.topbar)
@@ -163,21 +166,6 @@ local function buttons(p: Plaza, layer: Frame)
 	)
 	partyBtn.Name = "PartyBtn"
 	Theme.select(partyBtn, p.panel.open)
-	-- 4th icon of the top-left row: HOW TO PLAY
-	local how = Theme.iconButton(
-		layer,
-		"❓",
-		"HELP",
-		L.icon,
-		UDim2.fromOffset(L.rowX + 3 * (L.icon + L.gap), L.rowY),
-		Theme.SLOT
-	)
-	how.Name = "HowTo"
-	how.Activated:Connect(function()
-		p.playOpen = false
-		p.confirm = true
-		Plaza.render(p)
-	end)
 	partyBtn.Activated:Connect(function()
 		if n == 0 then
 			act(Net.Action.pcreate)
@@ -225,19 +213,21 @@ local function confirmBox(p: Plaza, layer: Frame)
 	Theme.pop(box)
 end
 
--- TODO(REMOVE BEFORE LAUNCH): dev button. Small, in the bottom left corner under the stick (clear of the stick, the
--- jump button and the Roblox buttons); the server decides who gets it and who may use it.
+-- TODO(REMOVE BEFORE LAUNCH): dev button. Small and plain, under PARTY at the right edge (clear of the jump
+-- button); the server decides who gets it and who may use it.
 local function devButton(p: Plaza, layer: Frame)
+	local L = Theme.plaza(p.ctx.canvas, p.ctx.topbar)
 	local b = Theme.button(
 		layer,
-		"DEV: ALL BALLS",
-		UDim2.fromOffset(196, 36),
-		UDim2.fromOffset(8, p.ctx.canvas.Y - 6),
+		"DEV BALLS",
+		UDim2.fromOffset(180, 36),
+		UDim2.fromOffset(L.right, L.partyY + L.partyH + 10),
 		Theme.SLOT,
 		nil,
 		20,
-		V2(0, 1)
+		RIGHT
 	)
+	b.BackgroundTransparency = 1
 	b.Name = "DevBalls"
 	b.Activated:Connect(function()
 		p.ctx.act(Net.Action.devballs)
@@ -247,9 +237,9 @@ end
 -- "SEARCHING... 2 PLAYERS · BOTS IN 4s  [CANCEL]" at the top middle.
 local function pill(p: Plaza, layer: Frame, st: Net.State)
 	local cv = p.ctx.canvas
-	-- between the Roblox buttons (top left) and the coins (top right)
+	-- right of the Roblox buttons, left of the player list
 	local L = Theme.plaza(cv, p.ctx.topbar)
-	local x0, x1 = p.ctx.topbar.X + 6, L.walletX - L.moneyW - 10
+	local x0, x1 = p.ctx.topbar.X + 6, L.listX - 10
 	local bw = math.min(470, x1 - x0)
 	local box = Theme.frame(layer, UDim2.fromOffset(bw, 64), UDim2.fromOffset((x0 + x1) / 2, 12), Theme.PANEL, TOP_MID)
 	box.BackgroundTransparency = 0.1

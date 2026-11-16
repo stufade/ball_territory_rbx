@@ -1,0 +1,64 @@
+<!doctype html><html><body style="margin:0;background:transparent">
+<!-- Plaza HUD icons (own art, CC0 by this project). 256x256 each; ink outline #1a1530, sticker style. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute">
+<defs>
+ <linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6a7a"/><stop offset="1" stop-color="#d41c3a"/></linearGradient>
+ <linearGradient id="redlid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a96"/><stop offset="1" stop-color="#ee3550"/></linearGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff07a"/><stop offset="1" stop-color="#f5a91c"/></linearGradient>
+ <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6dc"/><stop offset="1" stop-color="#f1d79a"/></linearGradient>
+ <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d98a4a"/><stop offset="1" stop-color="#9a5226"/></linearGradient>
+ <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5fb2ff"/><stop offset="1" stop-color="#2a5ee8"/></linearGradient>
+ <linearGradient id="green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cf08e"/><stop offset="1" stop-color="#1fae55"/></linearGradient>
+ <linearGradient id="coin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff27a"/><stop offset="1" stop-color="#f7b21e"/></linearGradient>
+ <radialGradient id="ballg" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffb4f0"/><stop offset="1" stop-color="#c22ee0"/></radialGradient>
+</defs></svg>
+<style>svg.i{display:block;width:256px;height:256px} g{stroke:#1a1530;stroke-linejoin:round;stroke-linecap:round}</style>
+
+<!-- DAILY: gift box -->
+<svg class="i" id="daily" viewBox="0 0 256 256"><g stroke-width="12">
+ <path d="M128 74 C 92 20, 46 40, 70 74 Z" fill="url(#gold)"/>
+ <path d="M128 74 C 164 20, 210 40, 186 74 Z" fill="url(#gold)"/>
+ <rect x="50" y="118" width="156" height="112" rx="14" fill="url(#red)"/>
+ <rect x="36" y="74" width="184" height="52" rx="14" fill="url(#redlid)"/>
+ <rect x="110" y="74" width="36" height="156" fill="url(#gold)"/>
+</g><path d="M50 88 h40" stroke="#fff" stroke-opacity=".7" stroke-width="10" stroke-linecap="round"/><path d="M64 140 v40" stroke="#fff" stroke-opacity=".45" stroke-width="10" stroke-linecap="round"/></svg>
+
+<!-- QUESTS: scroll with checks -->
+<svg class="i" id="quests" viewBox="0 0 256 256"><g stroke-width="12">
+ <rect x="58" y="40" width="148" height="176" rx="10" fill="url(#paper)"/>
+ <rect x="40" y="26" width="176" height="34" rx="17" fill="url(#wood)"/>
+ <rect x="40" y="200" width="176" height="34" rx="17" fill="url(#wood)"/>
+ <path d="M80 98 l14 14 l24 -28" fill="none" stroke="#1fae55" stroke-width="16"/>
+ <path d="M80 150 l14 14 l24 -28" fill="none" stroke="#1fae55" stroke-width="16"/>
+ <path d="M134 104 h46 M134 156 h46" fill="none" stroke="#a6844a" stroke-width="12"/>
+</g><path d="M58 36 h60" stroke="#fff" stroke-opacity=".55" stroke-width="8" stroke-linecap="round"/></svg>
+
+<!-- BOOK: blue book with a ball on the cover -->
+<svg class="i" id="book" viewBox="0 0 256 256"><g stroke-width="12">
+ <path d="M58 46 h132 a14 14 0 0 1 14 14 v170 h-146 a20 20 0 0 1 -20 -20 v-144 a20 20 0 0 1 20 -20 z" fill="url(#blue)"/>
+ <path d="M38 206 a20 20 0 0 1 20 -20 h146 v44 h-146 a20 20 0 0 1 -20 -20 z" fill="url(#paper)"/>
+ <circle cx="130" cy="112" r="40" fill="url(#ballg)"/>
+ <path d="M70 46 v140" fill="none" stroke-width="10"/>
+</g><circle cx="116" cy="98" r="10" fill="#fff" fill-opacity=".8"/><path d="M84 64 v100" stroke="#fff" stroke-opacity=".35" stroke-width="8" stroke-linecap="round"/></svg>
+
+<!-- SHOP: market stall with a striped awning -->
+<svg class="i" id="shop" viewBox="0 0 256 256"><g stroke-width="12">
+ <rect x="48" y="112" width="160" height="116" rx="10" fill="url(#wood)"/>
+ <rect x="84" y="150" width="88" height="78" rx="8" fill="#5a2e14"/>
+ <path d="M30 70 L50 30 H206 L226 70 V96 a24 24 0 0 1 -48 0 a25 25 0 0 1 -50 0 a25 25 0 0 1 -50 0 a24 24 0 0 1 -48 0 Z" fill="#fff"/>
+ <path d="M78 96 a25 25 0 0 0 50 0 V70 H78 Z M178 96 a24 24 0 0 0 48 0 V70 H178 Z M30 96 V70 H78 V96 a24 24 0 0 1 -48 0Z" fill="#ff3c56" stroke="none"/>
+ <path d="M30 70 L50 30 H206 L226 70 V96 a24 24 0 0 1 -48 0 a25 25 0 0 1 -50 0 a25 25 0 0 1 -50 0 a24 24 0 0 1 -48 0 Z" fill="none"/>
+ <path d="M30 70 H226" fill="none"/>
+ <circle cx="128" cy="184" r="22" fill="url(#coin)"/>
+</g><path d="M60 42 h50" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linecap="round"/></svg>
+
+<!-- COINS: pile of coins -->
+<svg class="i" id="coins" viewBox="0 0 256 256"><g stroke-width="11">
+ <ellipse cx="86" cy="196" rx="56" ry="26" fill="#d98a14"/><ellipse cx="86" cy="184" rx="56" ry="26" fill="url(#coin)"/>
+ <ellipse cx="170" cy="200" rx="56" ry="26" fill="#d98a14"/><ellipse cx="170" cy="188" rx="56" ry="26" fill="url(#coin)"/>
+ <ellipse cx="130" cy="160" rx="56" ry="26" fill="#d98a14"/><ellipse cx="130" cy="148" rx="56" ry="26" fill="url(#coin)"/>
+ <ellipse cx="130" cy="124" rx="56" ry="26" fill="#d98a14"/><ellipse cx="130" cy="112" rx="56" ry="26" fill="url(#coin)"/>
+ <circle cx="150" cy="70" r="46" fill="url(#coin)"/>
+ <circle cx="150" cy="70" r="28" fill="none" stroke="#d98a14" stroke-width="9"/>
+</g><ellipse cx="112" cy="106" rx="18" ry="6" fill="#fff" fill-opacity=".7"/><circle cx="132" cy="52" r="9" fill="#fff" fill-opacity=".8"/></svg>
+</body></html>

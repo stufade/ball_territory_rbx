@@ -62,18 +62,6 @@ local function cardAt(i: number): (number, number)
 	return GX + col * (CW + GAP) + CW / 2, GY + row * (CH + GAP) + CH / 2
 end
 
-local function pulse(fx: Cheer.Ctx, o: GuiObject, amp: number, speed: number)
-	if Theme.reduced() then
-		return
-	end
-	local s = Theme.scaleOf(o)
-	table.insert(fx.frames, function()
-		if o.Parent then
-			s.Scale = 1 + amp * math.sin(os.clock() * speed)
-		end
-	end)
-end
-
 -- slide up 26 px while it pops (the stagger of the opening)
 local function rise(o: GuiObject, delay: number)
 	if Theme.reduced() then
@@ -81,10 +69,10 @@ local function rise(o: GuiObject, delay: number)
 	end
 	local p = o.Position
 	o.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 26)
-	TweenService:Create(o, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, delay), {
+	TweenService:Create(o, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, delay), {
 		Position = p,
 	}):Play()
-	Theme.pop(o, delay, 0.4)
+	Theme.pop(o, delay, 0.9)
 end
 
 local function tick(f: GuiObject, d: number, z: number): Frame
@@ -125,7 +113,7 @@ local function goods(f: Frame, c: Net.DayCard, w: number, cy: number, icon: numb
 end
 
 -- a small card of days 1-6
-local function card(panel: Frame, c: Net.DayCard, i: number, fx: Cheer.Ctx): Frame
+local function card(panel: Frame, c: Net.DayCard, i: number): Frame
 	local x, y = cardAt(i)
 	local f = Theme.frame(panel, UDim2.fromOffset(CW, CH), UDim2.fromOffset(x, y), Theme.SLOT, MID)
 	f.Name = `Day{i}`
@@ -152,8 +140,6 @@ local function card(panel: Frame, c: Net.DayCard, i: number, fx: Cheer.Ctx): Fra
 	if c.got then
 		shade(f, 16)
 		tick(f, 50, 6)
-	elseif c.today then
-		pulse(fx, f, 0.045, 5)
 	end
 	return f
 end
@@ -235,16 +221,13 @@ local function hole(parent: Frame, cx: number, cy: number, fx: Cheer.Ctx): Frame
 		end
 		return box
 	end
-	local glowScale = Theme.scaleOf(glow)
-	local haloStroke = halo:FindFirstChildOfClass("UIStroke") :: UIStroke
+	(halo:FindFirstChildOfClass("UIStroke") :: UIStroke).Transparency = 0.45
 	local t = 0
 	table.insert(fx.frames, function(dt: number)
 		if not box.Parent then
 			return
 		end
 		t += dt
-		glowScale.Scale = 1 + 0.06 * math.sin(t * 2.4)
-		haloStroke.Transparency = 0.35 + 0.3 * math.sin(t * 3.1)
 		for _, a in arcs do
 			a.f.Rotation += a.w * dt
 		end
@@ -324,8 +307,6 @@ local function big(panel: Frame, c: Net.DayCard, pos: number, fx: Cheer.Ctx): Fr
 	l.Name = "Left"
 	if c.got then
 		tick(f, 54, 11).Position = UDim2.new(1, -40, 0, 84)
-	elseif c.today then
-		pulse(fx, f, 0.025, 4)
 	end
 	return f
 end
@@ -335,8 +316,9 @@ local function fmtLeft(s: number): string
 	return string.format("%d:%02d:%02d", s // 3600, s // 60 % 60, s % 60)
 end
 
--- Claim: coins fly from the card (px, py) into a copy of the plaza counter, which rolls up as they land.
-local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: number, py: number, ctx: Ctx)
+-- Claim: a copy of the plaza counter rolls up. Only a rare gift (day 7, VOID) sends coins flying from the card
+-- (px, py) into it (P-1: flights only for rare rewards); an ordinary day rolls the counter straight away.
+local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: number, py: number, ctx: Ctx, rare: boolean)
 	local cv = ctx.canvas
 	local L = Theme.plaza(cv, ctx.topbar or V2(0, 0))
 	local k = 0
@@ -348,32 +330,22 @@ local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: numb
 		k += 1
 		local y = L.moneyY[k]
 		local total = ((v :: any)[cur] or n) :: number
-		local box =
-			Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.walletX, y), Theme.PANEL)
-		box.AnchorPoint = V2(1, 0)
+		local box, t = Money.counter(layer, L, total, false, 30)
 		box.Name = "FlyCoins"
-		box.ZIndex = 30
-		Theme.round(box, L.moneyH / 2)
-		Theme.stroke(box, 3, Theme.INK)
-		Money.icon(box, cur, 40, UDim2.fromOffset(20, L.moneyH / 2)).ZIndex = 31
+		t.Text = Money.pill(total - n)
 		local roll = Money.roll(total - n)
-		local t =
-			Theme.label(box, Money.fmt(total - n), 28, UDim2.fromOffset(L.moneyW - 54, 30), UDim2.new(1, -14, 0.5, 0), {
-				anchor = V2(1, 0.5),
-				align = Enum.TextXAlignment.Right,
-				color = Money.COIN,
-				z = 31,
-			})
-		t.Name = "Value"
 		roll.label, roll.box = t, box
-		local tx, ty = L.walletX - L.moneyW + 20, y + L.moneyH / 2
+		local tx, ty = L.walletX - L.moneyW + L.moneyH / 2, y + L.moneyH / 2
 		if Theme.reduced() then
 			t.Text = Money.fmt(total)
 			continue
 		end
-		Theme.pop(box, 0, 0.6)
-		local count = 8
+		Theme.pop(box, 0, 0.85)
+		local count = if rare then 8 else 0
 		local landed = 0
+		if count == 0 then
+			Money.target(roll, total)
+		end
 		for j = 1, count do
 			local ic = Money.icon(layer, cur, 34, UDim2.fromOffset(px, py))
 			ic.Name = "Flying"
@@ -455,7 +427,7 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 	local cards = d.cards
 	local today: Frame? = nil
 	for i, c in cards do
-		local f = if i == 7 then big(panel, c, d.pos, ctx.fx) else card(panel, c, i, ctx.fx)
+		local f = if i == 7 then big(panel, c, d.pos, ctx.fx) else card(panel, c, i)
 		if intro then
 			if i == 7 then
 				rise(f, 0.62)
@@ -494,15 +466,6 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 		b.Name = "Claim"
 		if intro then
 			Theme.pop(wrap, 0.95, 0.4)
-		end
-		if not Theme.reduced() then
-			local s = Theme.scaleOf(wrap)
-			local t0 = os.clock() + 1.3
-			table.insert(ctx.fx.frames, function()
-				if b.Parent and os.clock() > t0 and not b:GetAttribute("Pressed") then
-					s.Scale = 1 + 0.05 * math.sin((os.clock() - t0) * 6)
-				end
-			end)
 		end
 		local sent = false
 		b.Activated:Connect(function()
@@ -551,7 +514,7 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 		layer.ZIndex = 20
 		if not Theme.reduced() then
 			local s = Theme.scaleOf(f)
-			local amp = if isVoid then 0.12 else 0.25
+			local amp = if isVoid then 0.06 else 0.08
 			local t = 0
 			table.insert(ctx.fx.frames, function(dt: number)
 				t += dt
@@ -567,7 +530,7 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 				table.insert(ctx.fx.frames, function(dt: number)
 					th += dt
 					if hb.Parent and th < 1.2 then
-						hs.Scale = 1 + 0.35 * math.sin(math.pi * th / 1.2)
+						hs.Scale = 1 + 0.15 * math.sin(math.pi * th / 1.2)
 					end
 				end)
 			end
@@ -591,7 +554,7 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 		taken.Name = "Taken"
 		taken.ZIndex = 25
 		Theme.pop(taken, 0, 0.4)
-		fly(layer, v, gift, px, py, ctx)
+		fly(layer, v, gift, px, py, ctx, isVoid or claim.pos == 7)
 	end
 end
 

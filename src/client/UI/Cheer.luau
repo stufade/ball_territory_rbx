@@ -65,7 +65,7 @@ function Cheer.rays(parent: Instance, ctx: Ctx, e: number, cx: number, cy: numbe
 	s.Scale = 0
 	s.Parent = box
 	TweenService
-		:Create(s, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0.4), { Scale = 1 })
+		:Create(s, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0.4), { Scale = 1 })
 		:Play()
 	table.insert(ctx.frames, function()
 		local t = if Theme.reduced() then 0 else os.clock() * 14
