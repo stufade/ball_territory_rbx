@@ -7,7 +7,8 @@ local Wallet = require("./Wallet")
 
 local Progress = {}
 
-Progress.VERSION = 2
+-- v3 (E4): crystals are gone, a v2 record's crystals become coins once (Progress.migrate)
+Progress.VERSION = 3
 
 export type Data = {
 	-- schema version
@@ -32,13 +33,12 @@ export type Data = {
 	wins: number,
 	-- v2 (Logic/Meta)
 	coins: number,
-	crystals: number,
 	born: number,
 	loginDays: number,
 	dailyClaimed: number,
 	quests: Meta.Quests,
 	book: { string },
-	pity: { coins: number, crystals: number },
+	pity: { coins: number },
 	streak: number,
 	starterSeen: number,
 	starterUntil: number,
@@ -85,8 +85,7 @@ export type Cfg = {
 	ECON: {
 		XP_CAP: number,
 		LEVEL_COINS: number,
-		LEVEL_CRYSTALS_EVERY: number,
-		LEVEL_CRYSTALS: number,
+		LEVEL_BONUS: { every: number, coins: number },
 		FRIEND: { xp: number, coins: number, daily: number },
 		[string]: any,
 	},
@@ -94,8 +93,8 @@ export type Cfg = {
 
 -- afk: no aim or power in some round (no XP, no coins); friend: the friend bonus applies to this match
 export type Stats = { win: boolean, kills: number, rx: number, afk: boolean?, friend: boolean? }
--- e: the ball of levels 2..LEVEL_BALLS; coins / crystals: the pay of levels after them
-export type LevelUp = { level: number, e: number?, coins: number?, crystals: number? }
+-- e: the ball of levels 2..LEVEL_BALLS; coins: the pay of levels after them
+export type LevelUp = { level: number, e: number?, coins: number? }
 export type Gain = { xp: number, base: number, mult: number, ups: { LevelUp } }
 
 local NEL = 27
@@ -119,7 +118,9 @@ local int = Meta.int
 
 -- Any stored value (nil, an older schema, junk) -> a valid Data of the current schema. Unknown keys are dropped,
 -- a newer schema than this server knows is read field by field (what it understands is kept).
-function Progress.migrate(raw: any): Data
+-- rate: Economy.CRYSTAL_TO_COINS. A record before v3 gets coins += crystals * rate once (the flow lands in `log`);
+-- the crystals and pity.crystals are dropped, and the record saves as v3 so it never happens again.
+function Progress.migrate(raw: any, rate: number?, log: { Wallet.Flow }?): Data
 	local d = Progress.new()
 	if type(raw) ~= "table" then
 		return d
@@ -156,6 +157,10 @@ function Progress.migrate(raw: any): Data
 	d.wins = int(raw.wins, 0, 1e9, 0)
 	-- v1 -> v2: a v1 record has none of the M3 fields, they start at the defaults
 	Meta.read(d, raw)
+	if v < 3 then
+		local n = int(raw.crystals, 0, 1e9, 0) * (rate or 20)
+		Wallet.add(d, "coins", n, "migrate_crystals", "Gameplay", log)
+	end
 	return d
 end
 
@@ -241,7 +246,7 @@ function Progress.plan(d: Data, cfg: Cfg, rand: () -> number, forLevel: number?)
 end
 
 -- Adds XP (already multiplied), levels up as far as it reaches. Levels 2..LEVEL_BALLS give a random ball of the pool,
--- later levels LEVEL_COINS coins and every LEVEL_CRYSTALS_EVERY-th also crystals (flows in `log`).
+-- later levels LEVEL_COINS coins and every LEVEL_BONUS.every-th LEVEL_BONUS.coins more (flows in `log`).
 function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number, log: { Wallet.Flow }?): { LevelUp }
 	local ups = {}
 	d.xp += math.max(0, math.floor(amount))
@@ -260,8 +265,8 @@ function Progress.addXp(d: Data, amount: number, cfg: Cfg, rand: () -> number, l
 			local E = cfg.ECON
 			local why = `level_{d.level}`
 			up.coins = Wallet.add(d, "coins", E.LEVEL_COINS, why, "Gameplay", log)
-			if d.level % E.LEVEL_CRYSTALS_EVERY == 0 then
-				up.crystals = Wallet.add(d, "crystals", E.LEVEL_CRYSTALS, why, "Gameplay", log)
+			if d.level % E.LEVEL_BONUS.every == 0 then
+				up.coins = (up.coins :: number) + Wallet.add(d, "coins", E.LEVEL_BONUS.coins, why, "Gameplay", log)
 			end
 		end
 		Progress.plan(d, cfg, rand, d.level + 1)

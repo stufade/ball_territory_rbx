@@ -5,7 +5,6 @@ local process = require("@lune/process")
 local Economy = require("../src/shared/Economy")
 local Looks = require("../src/server/Logic/Looks")
 local Progress = require("../src/server/Logic/Progress")
-local Products = require("../src/server/Products")
 local Seats = require("../src/server/Logic/Seats")
 
 local fails, passed = 0, 0
@@ -104,11 +103,9 @@ do
 	)
 	check(not Looks.wear(d, "trail_dust", nil, E), "an unowned look does not equip")
 	check(table.concat(d.balls, ",") == table.concat(ballsBefore, ","), "equipping does not change the balls")
-	local view = Looks.snapshot(d, E, Products)
+	local view = Looks.snapshot(d, E)
 	check(view.n == 27 and view.need == 27 and view.owned[1] == CHEAP.id, "the shelf view lists the owned look")
-	check(view.robux[CHEAP.id] == Products.looks[CHEAP.id], "a live product id is offered")
-	local priced = Looks.snapshot(d, E, { looks = { frame_wood = 9301, skin_ink = 0 } })
-	check(priced.robux.frame_wood == 9301 and priced.robux.skin_ink == nil, "only a live product id is sent")
+	check((view :: any).robux == nil, "E4: looks are coins only, no product ids are sent")
 end
 
 do
@@ -129,7 +126,7 @@ do
 		"a retired id stays owned (maybe bought for Robux); an unowned worn look is cleared"
 	)
 	check(not d.worn.podium, "an unowned podium is cleared")
-	local shelf = Looks.snapshot(d, E, {})
+	local shelf = Looks.snapshot(d, E)
 	check(#shelf.owned == 1 and shelf.owned[1] == "frame_wood", "the shelf only lists ids of the catalog")
 end
 

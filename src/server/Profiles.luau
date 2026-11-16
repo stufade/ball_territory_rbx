@@ -2,7 +2,7 @@
 -- Player profiles of T2.2: load with a session lock (Store), the tutorial flag and reward, collection, level, XP,
 -- the 2x boost; saves on leave, every PROFILE.autosave s, soon after a reward, and at BindToClose.
 -- The client gets its view by the Profile remote (docs/net.md). Pure rules: Logic/Progress.
--- M3.1: coins and crystals, match coins, login reward, daily quests, reaction book (Logic/Award, Daily), analytics.
+-- M3.1: coins (E4: the only currency), match coins, login reward, daily quests, reaction book (Logic/Award, Daily), analytics.
 local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -152,7 +152,7 @@ function Profiles.send(player: Player, news: { Progress.LevelUp }?, extra: { [st
 	end
 	local allowed = spinsAllowed(player)
 	view.spin = Spin.board(d, Config.ECON, allowed)
-	view.shelf = Looks.snapshot(d, Config.ECON, Products)
+	view.shelf = Looks.snapshot(d, Config.ECON)
 	local owned = Passes.owned(player)
 	view.passes = table.clone(owned)
 	view.passOffer = Pay.passOffers(Config.ECON, Products, not allowed, owned)
@@ -170,7 +170,6 @@ local function attrs(p: Profile)
 	p.player:SetAttribute("Level", d.level)
 	p.player:SetAttribute("Balls", #d.balls)
 	p.player:SetAttribute("Coins", d.coins)
-	p.player:SetAttribute("Crystals", d.crystals)
 end
 
 local function deep(t: any): any
@@ -261,7 +260,13 @@ function Profiles.join(player: Player)
 			warn(`[BT] profiles: {player.Name} could not be loaded, playing on a new profile that will not be saved`)
 		end
 		p.savedAt = clock()
-		p.data = Progress.migrate(raw)
+		-- E4: a record from before one currency turns its crystals into coins once (flow migrate_crystals)
+		local mlog = {}
+		p.data = Progress.migrate(raw, Config.ECON.CRYSTAL_TO_COINS, mlog)
+		if #mlog > 0 then
+			Analytics.flows(player, mlog)
+			print(`[BT] profiles: {player.Name} crystals migrated, +{mlog[1].n} coins`)
+		end
 		Progress.repair(p.data, Config :: any, NAMES)
 		local now = clock()
 		if p.data.born < 0 then
@@ -293,7 +298,7 @@ function Profiles.join(player: Player)
 				return
 			end
 			if blocked then
-				print(`[BT] paid random restricted for {player.Name}: coin and crystal spins hidden`)
+				print(`[BT] paid random restricted for {player.Name}: roulette hidden`)
 			end
 			Profiles.send(player)
 		end)
@@ -418,9 +423,9 @@ function Profiles.claimDaily(player: Player)
 	Profiles.send(player, nil, { gains = gains(player, log), claim = c })
 end
 
--- Action buy: ball `e` for "coins" or "crystals". The price comes from the tier. A refusal spends nothing
+-- Action buy: ball `e` for "coins". The price comes from the tier. A refusal spends nothing
 -- and sends nothing. A purchase is in the same profile snapshot as the other rewards: `balls`, `coins`,
--- `crystals`, and the ball-of-the-day prices on `dailyBall`. The spend is a Shop sink in the economy log.
+-- and the ball-of-the-day price on `dailyBall`. The spend is a Shop sink in the economy log.
 function Profiles.buyBall(player: Player, e: any, cur: any)
 	local p = Profiles.get(player)
 	if not p then
@@ -489,8 +494,8 @@ function Profiles.spin(player: Player, cur: any)
 		return
 	end
 	local log = {}
-	-- Fast Spin pass: "coins10" / "crystals10" is ten spins for one payment (server-checked ownership)
-	local ten = cur == "coins10" or cur == "crystals10"
+	-- Fast Spin pass: "coins10" is ten spins for one payment (server-checked ownership)
+	local ten = cur == "coins10"
 	if ten and not Passes.has(player, "fastSpin") then
 		Profiles.send(player)
 		return
@@ -583,8 +588,8 @@ function Profiles.commit(player: Player): boolean
 end
 
 -- Action pay: the client asks for a Robux prompt (key and arg as in Logic/Pay). The server opens it only for
--- something that can still be delivered; otherwise the client gets `refused` and no prompt. The ball and the
--- starter epic are remembered here for the receipt.
+-- something that can still be delivered; otherwise the client gets `refused` and no prompt. The starter epic
+-- is remembered here for the receipt.
 function Profiles.pay(player: Player, key: any, arg: any)
 	local p = Profiles.get(player)
 	if not p then
@@ -597,7 +602,7 @@ function Profiles.pay(player: Player, key: any, arg: any)
 		Profiles.send(player, nil, { refused = { key = k, why = why or "bad" } })
 		return
 	end
-	if key == "ball" or key == "starter" then
+	if key == "starter" then
 		saveSoon(p)
 	end
 	Passes.prompt(player, offer)

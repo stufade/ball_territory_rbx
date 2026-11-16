@@ -15,7 +15,7 @@ Net.Remote = {
 	Match = "Match", -- RemoteEvent S->C (kind: string, data: table)
 	State = "State", -- RemoteEvent S->C (st: State)
 	Input = "Input", -- RemoteEvent C->S (kind: number, dx: number?, dy: number?)
-	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?). buy: ("buy", e, "coins"|"crystals"); spin: ("spin", nil, "coins"|"crystals")
+	Action = "Action", -- RemoteEvent C->S (verb: string, arg: number?). buy: ("buy", e, "coins"); spin: ("spin", nil, "coins"|"coins10")
 	Party = "Party", -- RemoteEvent S->C (view: PartyView), M1.6
 	Profile = "Profile", -- RemoteEvent S->C (view: ProfileView), T2.2
 }
@@ -55,15 +55,15 @@ Net.Action = {
 	devballs = "devballs",
 	-- M3.1: take today's login reward (once per UTC day, the server decides)
 	daily = "daily",
-	-- M3.2: buy ball e for the currency in the third argument ("coins" | "crystals"). The server prices it.
+	-- M3.2: buy ball e; the third argument is "coins" (E4: the only currency). The server prices it.
 	buy = "buy",
-	-- M3.2: one spin. The third argument is "coins" or "crystals". The client does not send the result.
+	-- M3.2: one spin. The third argument is "coins" ("coins10" with Fast Spin). The client does not send the result.
 	spin = "spin",
 	-- Cosmetics: "look" buys the id in the third argument for coins. "wear" equips it (arg = ball for a skin).
 	look = "look",
 	wear = "wear",
-	-- Robux: ("pay", arg, key). key "pack" (arg = pack index), "ball" (arg = ball), "starter" (arg = epic),
-	-- "pass_coins2x" | "pass_vip" | "pass_fastSpin", or a look id. The server opens the prompt, or sends
+	-- Robux: ("pay", arg, key). key "pack" (arg = coin pack index), "starter" (arg = epic),
+	-- "pass_coins2x" | "pass_vip" | "pass_fastSpin" (E4: balls and looks are coins only). The server opens the prompt, or sends
 	-- `refused` (owned, policy, off, bad) and opens nothing. The client never calls PromptProductPurchase.
 	pay = "pay",
 }
@@ -183,8 +183,8 @@ export type Place = { e: number, pct: number, kills: number, powers: number }
 export type MatchEnd = { id: number, mode: ModeName, winner: number, places: { Place } }
 
 -- Profile remote (T2.2): level bar, 2x XP badge and collection of one player, sent on every change.
--- e: the ball of levels 2..9; coins / crystals: the pay of later levels (M3.1)
-export type LevelUp = { level: number, e: number?, coins: number?, crystals: number? }
+-- e: the ball of levels 2..9; coins: the pay of later levels (M3.1)
+export type LevelUp = { level: number, e: number?, coins: number? }
 export type ProfileView = {
 	level: number,
 	-- XP inside the level and XP the level needs
@@ -206,7 +206,6 @@ export type ProfileView = {
 	news: { LevelUp }?,
 	-- M3.1 economy (all optional: an older server leaves them out)
 	coins: number?,
-	crystals: number?,
 	-- login reward: claims so far, day of the cycle (1..7) of the next claim (today's once taken), can claim now,
 	-- the 7 cards of that cycle
 	daily: { n: number, pos: number, ready: boolean, cards: { DayCard } }?,
@@ -217,23 +216,23 @@ export type ProfileView = {
 	bookTotal: number?,
 	-- duel wins in a row
 	streak: number?,
-	-- ball of the day (M3.2): the ball, both prices after the 30% floor, ends at the next 00:00 UTC.
+	-- ball of the day (M3.2): the ball, the price after the 30% floor, ends at the next 00:00 UTC.
 	-- nil when that ball is already owned or nothing is missing. The client does not choose the ball.
-	dailyBall: { e: number, coins: number, crystals: number, endsAt: number }?,
+	dailyBall: { e: number, coins: number, endsAt: number }?,
 	-- one-off fields of this change: wallet gains, new book reactions, quests just done, the login claim
 	gains: { { cur: string, n: number, why: string } }?,
 	found: { string }?,
 	done: { { id: string, text: string, coins: number } }?,
-	-- mile: set when this claim is the first time loginDays hits an Economy.MILE day. The coins and crystals
+	-- mile: set when this claim is the first time loginDays hits an Economy.MILE day. The coins
 	-- are also in `gains` (why = "mile_dN"), so the plaza counters float "+n". No separate screen.
 	claim: {
 		n: number,
 		pos: number,
 		cycle: number,
 		gift: DayCard,
-		mile: { day: number, coins: number, crystals: number? }?,
+		mile: { day: number, coins: number }?,
 	}?,
-	-- Paid spins (M3.2). Personal odds and the pity counter, before the tap. ok = false hides both wheels
+	-- Paid spins (M3.2). Personal odds and the pity counter, before the tap. ok = false hides the roulette
 	-- (ArePaidRandomItemsRestricted). The client does not compute the chances.
 	spin: SpinView?,
 	-- Game passes owned (coins2x, vip, fastSpin), and the ones the client may still offer: not owned, and
@@ -246,9 +245,9 @@ export type ProfileView = {
 	refused: { key: string, why: string }?,
 	-- Set on the snapshot that paid for a spin. The reel only displays it.
 	spinResult: SpinHit?,
-	-- Fast Spin x10 ("coins10" / "crystals10"): all ten hits in order; spinResult is the last one
+	-- Fast Spin x10 ("coins10"): all ten hits in order; spinResult is the last one
 	spinHits: { SpinHit }?,
-	-- Cosmetic shelf. n/need is the collection size, not a lock. robux lists asset ids that are actually for sale.
+	-- Cosmetic shelf. n/need is the collection size, not a lock (E4: coins only).
 	shelf: {
 		n: number,
 		need: number,
@@ -262,7 +261,6 @@ export type ProfileView = {
 			ko: boolean,
 			ball: number,
 		},
-		robux: { [string]: number },
 	}?,
 }
 
@@ -277,7 +275,7 @@ export type SpinLine = {
 	odds: SpinOdds,
 }
 
-export type SpinView = { ok: boolean, coins: SpinLine, crystals: SpinLine }
+export type SpinView = { ok: boolean, coins: SpinLine }
 
 export type SpinHit = {
 	cur: string,
@@ -290,7 +288,6 @@ export type SpinHit = {
 
 export type DayCard = {
 	coins: number?,
-	crystals: number?,
 	ball: number?,
 	trials: number?,
 	got: boolean?,

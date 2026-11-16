@@ -1,7 +1,7 @@
 --!strict
 -- Direct buy of one ball (M3.2, docs/economy.md «Тиры и цены» and «Шар дня»). Pure.
--- The client names an element id and "coins" or "crystals"; the price is Economy.PRICE of that ball's tier.
--- The ball of the day is one missing ball per UTC day, 30% off in both currencies (floored). The same ball is
+-- The client names an element id and "coins" (E4: the only currency); the price is Economy.PRICE of that ball's tier.
+-- The ball of the day is one missing ball per UTC day, 30% off (floored). The same ball is
 -- not offered again for DAILY_BALL.repeatDays days. Legendaries are in the pool. The choice is a function of
 -- the UTC day and the collection (and of the recent offers, which are themselves that function), never of a
 -- client claim. A refusal (owned, unknown id, bad currency, short balance) changes nothing and does not spend.
@@ -12,7 +12,7 @@ local Shop = {}
 
 local NEL = 27
 
-export type Deal = { e: number, coins: number, crystals: number }
+export type Deal = { e: number, coins: number }
 export type Bought = { e: number, cur: string, n: number, daily: boolean }
 
 local function owns(d: any, e: number): boolean
@@ -39,7 +39,7 @@ end
 
 -- Full tier price, or the ball-of-the-day price when `e` is `sale`.
 function Shop.cost(E: any, e: number, cur: string, sale: number): number?
-	if cur ~= "coins" and cur ~= "crystals" then
+	if cur ~= "coins" then
 		return nil
 	end
 	local tier = tierOf(E, e)
@@ -99,7 +99,6 @@ function Shop.offer(d: any, E: any): Deal?
 	return {
 		e = e,
 		coins = Shop.cost(E, e, "coins", e) :: number,
-		crystals = Shop.cost(E, e, "crystals", e) :: number,
 	}
 end
 
@@ -113,7 +112,7 @@ end
 -- Buys `e` for `cur`. Nil, and the wallet and the collection untouched, when it cannot.
 function Shop.buy(d: any, e: unknown, cur: unknown, now: number, E: any, log: { Wallet.Flow }?): Bought?
 	local id = validId(e)
-	if not id or (cur ~= "coins" and cur ~= "crystals") or tierOf(E, id) == nil or owns(d, id) then
+	if not id or cur ~= "coins" or tierOf(E, id) == nil or owns(d, id) then
 		return nil
 	end
 	Shop.refresh(d, now, E)

@@ -1,11 +1,11 @@
 --!strict
--- Coins and crystals of a profile (M3.1), pure. Every change goes through add/spend with a reason, and lands in
+-- Coins of a profile (M3.1; E4: the only currency), pure. Every change goes through add/spend with a reason, and lands in
 -- `log` as a Flow: Profiles sends the flows to AnalyticsService (LogEconomyEvent) and to the client (counters).
 local Wallet = {}
 
-export type Purse = { coins: number, crystals: number }
+export type Purse = { coins: number }
 
--- cur: "coins" | "crystals"; n > 0; sink = spent; kind = AnalyticsEconomyTransactionType name; why = item SKU
+-- cur: "coins"; n > 0; sink = spent; kind = AnalyticsEconomyTransactionType name; why = item SKU
 -- (what for: "match_duel", "login_d3", "quest_win2", "book_new"...); bal = balance after.
 export type Flow = { cur: string, n: number, sink: boolean, kind: string, why: string, bal: number }
 
@@ -20,7 +20,7 @@ end
 
 function Wallet.add(d: Purse, cur: string, n: number, why: string, kind: string, log: { Flow }?): number
 	n = amount(n)
-	if n <= 0 or (cur ~= "coins" and cur ~= "crystals") then
+	if n <= 0 or cur ~= "coins" then
 		return 0
 	end
 	local t = d :: any
@@ -35,7 +35,7 @@ end
 function Wallet.spend(d: Purse, cur: string, n: number, why: string, kind: string, log: { Flow }?): boolean
 	n = amount(n)
 	local t = d :: any
-	if n <= 0 or (cur ~= "coins" and cur ~= "crystals") or t[cur] < n then
+	if n <= 0 or cur ~= "coins" or t[cur] < n then
 		return false
 	end
 	t[cur] -= n
@@ -45,13 +45,10 @@ function Wallet.spend(d: Purse, cur: string, n: number, why: string, kind: strin
 	return true
 end
 
--- A gift table {coins?, crystals?} paid at once.
-function Wallet.gift(d: Purse, g: { coins: number?, crystals: number? }, why: string, kind: string, log: { Flow }?)
+-- A gift table {coins?} paid at once.
+function Wallet.gift(d: Purse, g: { coins: number? }, why: string, kind: string, log: { Flow }?)
 	if g.coins then
 		Wallet.add(d, "coins", g.coins, why, kind, log)
-	end
-	if g.crystals then
-		Wallet.add(d, "crystals", g.crystals, why, kind, log)
 	end
 end
 

@@ -1,7 +1,7 @@
 --!strict
 -- Skins tab of the shop (docs/ui.md «Магазин»): filter chips on top (ALL, SKINS, TRAILS, FORCES, FRAMES, EXTRA),
 -- then a grid of whole-row cards in the BALLS style: tier gradient and stripe, a preview well with the tier ribbon,
--- the name and kind, a green coin price and a Robux button; an owned look reads OWNED with EQUIP.
+-- the name and kind, a green coin price (E4: coins only); an owned look reads OWNED with EQUIP.
 -- Every preview is drawn inside its well: a skin is a ball in its material on a glow (dark skins on a light one),
 -- a trail is the player's ball with its tail, a force is the ball in a ring and flash of its colour, a frame is a
 -- portrait of the ball in that frame.
@@ -40,7 +40,6 @@ local TIER_COL = {
 	legendary = HEX("#ffd63c"),
 }
 local TIER_WORD = { common = "COMMON", rare = "RARE", epic = "EPIC", legendary = "LEGENDARY" }
-local ROBUX_COL = HEX("#1c9e6a")
 
 type Filter = "all" | "SKIN" | "TRAIL" | "FORCE" | "FRAME" | "EXTRA"
 local CHIPS: { { key: Filter, word: string } } = {
@@ -487,7 +486,6 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 		end
 	end
 	local on = if shelf then shelf.on else nil
-	local robux: { [string]: number } = if shelf then shelf.robux else {}
 	local function wearing(id: string): boolean
 		if not on then
 			return false
@@ -693,8 +691,7 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 				end)
 			end
 		else
-			local rw = math.floor(previewW * 0.4)
-			local coinW = previewW - rw - 6
+			local coinW = previewW
 			local coins = Theme.price(
 				card,
 				Money.fmt(look.coins),
@@ -710,26 +707,6 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 			coins.Activated:Connect(function()
 				ctx.act(Net.Action.look, nil, id)
 			end)
-			local pid = robux[id]
-			local pay = Theme.button(
-				card,
-				`R${look.robux}`,
-				UDim2.fromOffset(rw, BTN_H),
-				UDim2.fromOffset(pad + coinW + 6, by),
-				ROBUX_COL,
-				nil,
-				22
-			)
-			pay.Name = "PayRobux"
-			pay.ZIndex = 10
-			if type(pid) == "number" and pid > 0 then
-				pay.Active = true
-				pay.Activated:Connect(function()
-					ctx.act(Net.Action.pay, nil, id)
-				end)
-			else
-				Theme.disable(pay)
-			end
 		end
 	end
 	local rowsN = math.ceil(#shown / cols)

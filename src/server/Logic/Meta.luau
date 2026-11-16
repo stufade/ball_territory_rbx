@@ -27,7 +27,6 @@ export type DailyBall = { day: number, e: number, recent: { number } }
 function Meta.fresh(): { [string]: any }
 	return {
 		coins = 0,
-		crystals = 0,
 		-- UTC day number (os.time() // 86400) of the first load, -1 = not set yet
 		born = -1,
 		-- login reward: days claimed so far (never reset), UTC day of the last claim (-1 = never)
@@ -37,7 +36,7 @@ function Meta.fresh(): { [string]: any }
 		-- reaction names found (the book), in the order found
 		book = {} :: { string },
 		-- spins since the last pity tier (M3.2)
-		pity = { coins = 0, crystals = 0 },
+		pity = { coins = 0 },
 		-- duel wins in a row
 		streak = 0,
 		-- starter pack (M3.2): first shown at os.time(), offer ends at os.time() (0 = not shown)
@@ -80,7 +79,6 @@ end
 -- Reads the v2 fields of `raw` into `d` (already fresh). Anything malformed keeps the default.
 function Meta.read(d: any, raw: { [string]: any })
 	d.coins = int(raw.coins, 0, 1e9, 0)
-	d.crystals = int(raw.crystals, 0, 1e9, 0)
 	d.born = int(raw.born, -1, 1e7, -1)
 	d.loginDays = int(raw.loginDays, 0, 1e6, 0)
 	d.dailyClaimed = int(raw.dailyClaimed, -1, 1e7, -1)
@@ -106,7 +104,7 @@ function Meta.read(d: any, raw: { [string]: any })
 		end
 	end
 	if type(raw.pity) == "table" then
-		d.pity = { coins = int(raw.pity.coins, 0, 1e6, 0), crystals = int(raw.pity.crystals, 0, 1e6, 0) }
+		d.pity = { coins = int(raw.pity.coins, 0, 1e6, 0) }
 	end
 	d.streak = int(raw.streak, 0, 1e6, 0)
 	d.starterSeen = int(raw.starterSeen, 0, 2 ^ 40, 0)

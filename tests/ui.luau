@@ -1,5 +1,5 @@
 --!strict
--- M3.1 plaza UI on a GUI stand-in (tests/Gui): coin and crystal counters roll up, the login screen opens by itself
+-- M3.1 plaza UI on a GUI stand-in (tests/Gui): the coin counter rolls up, the login screen opens by itself
 -- once a day (not before the first match), CLAIM sends Action daily, the claimed card pops; quests panel, reaction
 -- book (42 cells, found coloured, the rest "???"), result coins line; layout on the phone (1168x540 canvas) and
 -- PC (960x540): inside the screen, clear of PLAY's column, the stick and the jump button.
@@ -33,7 +33,7 @@ end
 
 local function cards(pos: number, ready: boolean): { any }
 	local list = {}
-	local gifts = { { coins = 50 }, { coins = 75 }, { crystals = 15 }, { coins = 100 }, { coins = 150, trials = 1 } }
+	local gifts = { { coins = 50 }, { coins = 75 }, { coins = 300 }, { coins = 100 }, { coins = 150, trials = 1 } }
 	gifts[6] = { coins = 200 }
 	gifts[7] = { ball = 13 }
 	for i, g in gifts do
@@ -45,7 +45,7 @@ local function cards(pos: number, ready: boolean): { any }
 	return list
 end
 
-local function view(coins: number, crystals: number, ready: boolean, n: number): any
+local function view(coins: number, _unused: number, ready: boolean, n: number): any
 	return {
 		level = 3,
 		xp = 40,
@@ -55,7 +55,6 @@ local function view(coins: number, crystals: number, ready: boolean, n: number):
 		boostMult = 2,
 		levelBalls = 9,
 		coins = coins,
-		crystals = crystals,
 		daily = {
 			n = n,
 			pos = if ready then n + 1 else n,
@@ -175,12 +174,12 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	flags.busy = true -- hold it while the layout is checked
 	step(w, 3)
 	check(w.root.Visible and not w.pop.Visible, `{tag}: counters on the plaza`)
-	local coins, gems = find(w.root, "Coins"), find(w.root, "Crystals")
-	check(coins and gems and find(coins, "Value").Text == "0", `{tag}: coin and crystal pills`)
+	local coins = find(w.root, "Coins")
+	check(coins and find(w.root, "Crystals") == nil and find(coins, "Value").Text == "0", `{tag}: one coin pill`)
 	-- topbar.Y 86 is the phone safe area (taller than the slot above PLAY). Applying it
 	-- again would open a hole on the right; the compact y 12 / 60 stays.
-	local coinR, gemR = rectOf(coins), rectOf(gems)
-	check(coinR[2] == 12 and gemR[2] == 60, `{tag}: tall topbar does not drop the pills ({coinR[2]}, {gemR[2]})`)
+	local coinR = rectOf(coins)
+	check(coinR[2] == 12, `{tag}: tall topbar does not drop the pill ({coinR[2]})`)
 	local dailyBtn = find(w.root, "DailyBtn")
 	check(dailyBtn and find(dailyBtn, "Dot") and find(dailyBtn, "Caption").Text == "DAILY", `{tag}: DAILY with "!"`)
 	check(find(find(w.root, "QuestsBtn"), "Sub").Text == "1/3", `{tag}: QUESTS 1/3`)
@@ -192,7 +191,7 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	local roblox = { 0, 0, 354, 86 }
 	local stick = { 83, 298, 166, 166 }
 	local jump = { cv.X - 131, 415, 97, 97 }
-	for _, name in { "Coins", "Crystals", "DailyBtn", "QuestsBtn", "BookBtn", "ShopBtn" } do
+	for _, name in { "Coins", "DailyBtn", "QuestsBtn", "BookBtn", "ShopBtn" } do
 		local r = rectOf(find(w.root, name))
 		check(r[1] >= 0 and r[2] >= 0 and r[1] + r[3] <= cv.X and r[2] + r[4] <= cv.Y, `{tag}: {name} on screen`)
 		check(not overlap(r, play), `{tag}: {name} clear of PLAY/PARTY/HOW TO PLAY`)
@@ -207,11 +206,11 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	check(shopR[1] == wantX and shopR[2] == wantY and shopR[3] == 80, `{tag}: SHOP at {shopR[1]},{shopR[2]}`)
 	check(find(find(w.root, "ShopBtn"), "Caption").Text == "SHOP", `{tag}: SHOP caption`)
 	check(find(find(w.root, "ShopBtn"), "Sub").Text == "22", `{tag}: SHOP missing count`)
-	check(not overlap(shopR, coinR) and not overlap(shopR, gemR), `{tag}: SHOP clear of the counters`)
+	check(not overlap(shopR, coinR), `{tag}: SHOP clear of the counter`)
 	-- bug A: the Roblox player list (190 real px, full height, top right) must not cover the pills or the "+"
 	local list = { cv.X - 190 / case[2], 0, 190 / case[2], cv.Y }
-	local addR = rectOf(find(w.root, "AddGems"))
-	for name, r in { Coins = coinR, Crystals = gemR, AddGems = addR } do
+	local addR = rectOf(find(w.root, "AddCoins"))
+	for name, r in { Coins = coinR, AddCoins = addR } do
 		check(not overlap(r, list), `{tag}: {name} clear of the player list ({r[1] + r[3]} vs {list[1]})`)
 	end
 	check(addR[4] * case[2] >= 44, `{tag}: + still 44 real px`)
@@ -349,25 +348,25 @@ for _, spec in { { 1920, 1080, 58 }, { 1280, 720, 58 }, { 2560, 1440, 36 } } do
 	local vpX, vpY, inset = spec[1], spec[2], spec[3]
 	local tag = `{vpX}x{vpY}`
 	local w, s, topbar, cv = wide(vpX, vpY, inset)
-	local coinR, gemR = rectOf(find(w.root, "Coins")), rectOf(find(w.root, "Crystals"))
+	local coinR = rectOf(find(w.root, "Coins"))
+	local addR = rectOf(find(w.root, "AddCoins"))
 	local play = { cv.X - 14 - 230, 138, 230, 104 }
 	check(coinR[2] * s >= 48, `{tag}: coins clear the top 48px ({coinR[2] * s})`)
-	check(gemR[2] * s >= 48, `{tag}: crystals clear the top 48px ({gemR[2] * s})`)
 	check(coinR[2] <= topbar.Y + 0.01, `{tag}: one topbar inset, not two ({coinR[2]} vs {topbar.Y})`)
-	check(not overlap(coinR, play) and not overlap(gemR, play), `{tag}: pills clear of PLAY`)
-	check(coinR[1] + coinR[3] <= cv.X and gemR[2] + gemR[4] < 138, `{tag}: pills on screen above PLAY`)
+	check(not overlap(coinR, play) and not overlap(addR, play), `{tag}: pill and + clear of PLAY`)
+	check(coinR[1] + coinR[3] <= cv.X and coinR[2] + coinR[4] < 138, `{tag}: pill on screen above PLAY`)
 end
 
--- level 10: a toast with its coins and crystals
+-- level 10: a toast with its coins (150 + the every-5th 300)
 do
 	local w = make(V2(1168, 540))
 	Wallet.setState(w, { ph = "lobby" })
 	local v = view(150, 15, false, 1)
-	v.news = { { level = 10, coins = 150, crystals = 15 } }
+	v.news = { { level = 10, coins = 450 } }
 	Wallet.setProfile(w, v)
 	step(w, 0.1)
 	local t = w.root.Parent:FindFirstChild("Toast", true)
-	check(t and t.Text == "LEVEL 10!  +150 COINS  +15 CRYSTALS", `level 10 toast ({t and t.Text})`)
+	check(t and t.Text == "LEVEL 10!  +450 COINS", `level 10 toast ({t and t.Text})`)
 end
 
 -- an older server (no economy fields): nothing shows
@@ -519,7 +518,7 @@ do
 	local w, _, acts = make(cv)
 	Wallet.setState(w, { ph = "lobby" })
 	local v = view(5000, 80, false, 1)
-	v.dailyBall = { e = 4, coins = 700, crystals = 35, endsAt = 1e8 }
+	v.dailyBall = { e = 4, coins = 700, endsAt = 1e8 }
 	Wallet.setProfile(w, v)
 	find(w.root, "ShopBtn").Activated:Fire()
 	local panel = find(w.pop, "ShopPanel")
@@ -545,7 +544,7 @@ do
 	check(today and find(today, "Deal").Text == "-30%", "shop: ball of the day marked")
 	check(find(today, "Name").Text == "WATER", "shop: day ball name")
 	check(find(find(today, "PayCoins"), "Label").Text == "700", "shop: day coin price is the discount")
-	check(find(find(today, "PayGems"), "Label").Text == "35", "shop: day crystal price is the discount")
+	check(find(today, "PayGems") == nil and find(today, "PayRobux") == nil, "shop: E4 one price on the deal")
 	check(rectOf(today)[1] + rectOf(today)[3] <= rectOf(find(panel, "Row5"))[1], "shop: the deal is first (left)")
 	check(rectOf(today)[4] > rectOf(find(panel, "Row5"))[4], "shop: the deal is larger than a shelf row")
 	check(find(find(panel, "Row5"), "Deal") == nil, "shop: a normal ball is not marked")
@@ -557,52 +556,40 @@ do
 	check(find(find(find(panel, "Row11"), "PayCoins"), "Label").Text == "3,000", "shop: rare price")
 	local ends = find(panel, "Ends").Text
 	check(string.find(ends, "^ENDS %d+h %d%d") ~= nil, `shop: real timer ({ends})`)
-	local coinBtn, gemBtn = rectOf(find(today, "PayCoins")), rectOf(find(today, "PayGems"))
-	check(coinBtn[4] >= 64 and gemBtn[4] >= 64, "shop: price buttons are a large tap")
-	check(
-		coinBtn[1] + coinBtn[3] <= gemBtn[1] and gemBtn[1] + gemBtn[3] <= pr[1] + pr[3] - 4,
-		"shop: prices inside the panel"
-	)
+	local coinBtn = rectOf(find(today, "PayCoins"))
+	check(coinBtn[4] >= 64, "shop: price button is a large tap")
+	check(inside(find(today, "PayCoins"), today), "shop: price inside the banner")
 	check(
 		coinBtn[2] >= rectOf(find(today, "Name"))[2] + rectOf(find(today, "Name"))[4],
 		"shop: price clear of the name (under it)"
 	)
 	check(find(find(panel, "Row5"), "Tier").Text == "COMMON", "shop: common tier is on the card")
 	check(find(find(panel, "Row11"), "Tier").Text == "RARE", "shop: rare tier is on the card")
-	-- M4-S4: every card and the deal sell for coins, crystals and R$ (the full tier price), side by side
+	-- E4: every card and the deal sell for coins only, one price
 	for _, name in { "Row5", "Row11" } do
 		local row = find(panel, name)
-		local c, g, r = rectOf(find(row, "PayCoins")), rectOf(find(row, "PayGems")), rectOf(find(row, "PayRobux"))
-		check(c[1] + c[3] <= g[1] and g[1] + g[3] <= r[1], `shop: {name} coins, crystals, R$ in a row`)
-		check(c[4] * 0.72 >= 44 and r[4] * 0.72 >= 44 and r[3] >= 62, `shop: {name} prices are 44 px on a phone`)
-		check(inside(find(row, "PayRobux"), row), `shop: {name} R$ inside the card`)
+		local c = rectOf(find(row, "PayCoins"))
+		check(find(row, "PayGems") == nil and find(row, "PayRobux") == nil, `shop: {name} one coin price`)
+		check(c[4] * 0.72 >= 44, `shop: {name} price is 44 px on a phone`)
+		check(inside(find(row, "PayCoins"), row), `shop: {name} price inside the card`)
 		check(
 			rectOf(find(row, "Tier"))[2] + rectOf(find(row, "Tier"))[4] <= c[2],
 			`shop: {name} tier clear of the prices`
 		)
 	end
 	check(find(find(panel, "Row5"), "Label", true) ~= nil, "shop: card labels")
-	check(find(find(find(panel, "Row11"), "PayRobux"), "Label").Text == `R${Economy.PRICE.robux.rare}`, "shop: R$ rare")
-	check(find(find(today, "PayRobux"), "Label").Text == `R${Economy.PRICE.robux.common}`, "shop: R$ deal full price")
-	check(
-		rectOf(find(today, "PayGems"))[1] + rectOf(find(today, "PayGems"))[3] <= rectOf(find(today, "PayRobux"))[1]
-			and inside(find(today, "PayRobux"), today),
-		"shop: deal R$ right of the crystals, inside the banner"
-	)
 	for _, t in { "TabBalls", "TabSkins", "TabPacks" } do
 		check(rectOf(find(panel, t))[4] * 0.72 >= 44, `shop: {t} is 44 px on a phone`)
 	end
-	check(rectOf(find(panel, "AddGems"))[4] * 0.72 >= 44, "shop: + is 44 px on a phone")
+	check(rectOf(find(panel, "AddCoins"))[4] * 0.72 >= 44, "shop: + is 44 px on a phone")
+	check(find(panel, "TabPacks"):FindFirstChild("Label", true).Text == "COINS", "shop: the packs tab is COINS")
 	check(find(panel, "TabBalls") and find(panel, "TabSkins"), "shop: balls and skins tabs")
 	check(find(panel, "TabSpin") == nil, "shop: no SPIN tab until the server allows paid random")
 	buttonsFit(panel, cv, "shop")
 	find(today, "PayCoins").Activated:Fire()
 	check(#acts == 1 and acts[1][1] == "buy" and acts[1][2] == 4 and acts[1][3] == "coins", "shop: Action buy coins")
-	find(find(panel, "Row11"), "PayGems").Activated:Fire()
-	check(acts[2][1] == "buy" and acts[2][2] == 11 and acts[2][3] == "crystals", "shop: Action buy crystals")
-	find(find(panel, "Row11"), "PayRobux").Activated:Fire()
-	check(acts[3][1] == "pay" and acts[3][2] == 11 and acts[3][3] == "ball", "shop: R$ sends Action pay ball")
-	table.remove(acts, 3)
+	find(find(panel, "Row11"), "PayCoins").Activated:Fire()
+	check(acts[2][1] == "buy" and acts[2][2] == 11 and acts[2][3] == "coins", "shop: Action buy rare for coins")
 	-- server answer: coins down, the ball joins the collection, the deal leaves the list
 	local paid = view(4300, 80, false, 1)
 	paid.balls = { 0, 1, 2, 3, 4, 17 }
@@ -618,7 +605,7 @@ do
 	check(not w.pop.Visible, "shop: close")
 end
 
--- M4-S4 crystal packs: "+" on the HUD crystal counter and in the shop header opens six packs; the best value is
+-- E4 coin packs: "+" on the HUD coin counter and in the shop header opens six packs; the best value is
 -- marked, R$ sends Action pay pack; the offers strip shows only what the server offers; phone and 720p fit.
 for _, cv in { V2(960, 540), V2(1168, 540) } do
 	local tag = `{cv.X} packs`
@@ -628,18 +615,18 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	v.passOffer = { vip = true, coins2x = true, fastSpin = true }
 	v.spin = { ok = true }
 	Wallet.setProfile(w, v)
-	local add = find(w.root, "AddGems")
+	local add = find(w.root, "AddCoins")
 	local ar = rectOf(add)
 	check(ar[3] * 0.72 >= 44 and ar[4] * 0.72 >= 44, `{tag}: HUD + is 44 px on a phone`)
-	local gr = rectOf(find(w.root, "Crystals"))
+	local gr = rectOf(find(w.root, "Coins"))
 	local cx, cy = ar[1] + ar[3] / 2, ar[2] + ar[4] / 2
 	check(
 		cx > gr[1] and cx < gr[1] + gr[3] and cy > gr[2] and cy < gr[2] + gr[4],
-		`{tag}: HUD + on the crystal counter`
+		`{tag}: HUD + on the coin counter`
 	)
 	check(ar[2] + ar[4] <= 138, `{tag}: HUD + above PLAY (playY 138)`)
 	check(
-		not overlap(rectOf(find(find(w.root, "Crystals"), "Value")), rectOf(find(w.root, "Disc"))),
+		not overlap(rectOf(find(find(w.root, "Coins"), "Value")), rectOf(find(w.root, "Disc"))),
 		`{tag}: + clear of the number`
 	)
 	for _, b in { "ShopBtn", "DailyBtn", "QuestsBtn", "BookBtn", "SpinBtn" } do
@@ -652,7 +639,7 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	buttonsFit(panel, cv, tag)
 	local body = rectOf(find(panel, "Body"))
 	local n = 0
-	for i = 1, #Economy.CRYSTAL_PACKS do
+	for i = 1, #Economy.COIN_PACKS do
 		local pk = find(panel, `Pack{i}`)
 		if pk then
 			n += 1
@@ -660,8 +647,8 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 			local b = find(pk, "PayRobux")
 			check(inside(b, pk) and rectOf(b)[4] * 0.72 >= 44, `{tag}: pack {i} R$ is 44 px inside the card`)
 			check(
-				find(b, "Label").Text == `R${Economy.CRYSTAL_PACKS[i].robux}`
-					and find(pk, "Amount").Text == Money.fmt(Economy.CRYSTAL_PACKS[i].crystals),
+				find(b, "Label").Text == `R${Economy.COIN_PACKS[i].robux}`
+					and find(pk, "Amount").Text == Money.fmt(Economy.COIN_PACKS[i].coins),
 				`{tag}: pack {i} amount and price from Economy`
 			)
 			check(inside(find(pk, "Pile"), pk), `{tag}: pack {i} pile inside the card`)
@@ -715,7 +702,7 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 		`{tag}: only offered passes`
 	)
 	find(panel, "TabBalls").Activated:Fire()
-	find(find(w.pop, "ShopPanel"), "AddGems").Activated:Fire()
+	find(find(w.pop, "ShopPanel"), "AddCoins").Activated:Fire()
 	check(find(w.pop, "ShopPanel"):GetAttribute("Tab") == "packs", `{tag}: header + opens the packs`)
 	check(body[4] > 0, `{tag}: body`)
 end
@@ -723,7 +710,7 @@ end
 -- Spin: personal odds before the tap, prices from the profile (Economy), the reel stops on the server's ball.
 local function spinBoard(pityCoins: number): any
 	local function line(cur: string, pity: number): any
-		local s = Economy.SPIN[cur]
+		local s = Economy.SPIN
 		return {
 			price = s.price,
 			refund = s.refund,
@@ -739,7 +726,7 @@ local function spinBoard(pityCoins: number): any
 			},
 		}
 	end
-	return { ok = true, coins = line("coins", pityCoins), crystals = line("crystals", 0) }
+	return { ok = true, coins = line("coins", pityCoins) }
 end
 
 for _, cv in { V2(1168, 540), V2(960, 540) } do
@@ -785,11 +772,11 @@ do
 	check(find(find(panel, "Coin_common"), "Pct").Text == "70%", "spin: coin common odds")
 	check(find(find(panel, "Coin_legendary"), "Pct").Text == "1%", "spin: coin legendary odds")
 	check(find(find(panel, "Coin_refund"), "Pct").Text == "0%", "spin: refund line is shown")
-	check(find(find(panel, "Gem_epic"), "Pct").Text == "15%", "spin: crystal epic odds")
+	check(find(panel, "Gem_epic") == nil and find(panel, "OddsGems") == nil, "spin: E4 one roulette, no crystal odds")
 	check(string.find(find(panel, "PityCoins").Text, "3/10") ~= nil, "spin: coin guarantee counter")
-	check(string.find(find(panel, "PityGems").Text, "0/30") ~= nil, "spin: crystal guarantee counter")
+	check(find(panel, "PityGems") == nil, "spin: one guarantee counter")
 	local go = find(panel, "SpinGo")
-	check(find(go, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.coins.price)}`, "spin: coin price from Economy")
+	check(find(go, "Label").Text == `SPIN {Money.fmt(Economy.SPIN.price)}`, "spin: coin price from Economy")
 	check(rectOf(go)[4] >= 52, "spin: the spin button is a large tap")
 	local reelIcons = 0
 	local reel = find(panel, "Reel")
@@ -801,7 +788,7 @@ do
 	check(reelIcons >= 8, `spin: reel shows ball icons ({reelIcons})`)
 	check(find(find(panel, "Coin_common"), "Icon").Image == Art.BALLS, "spin: odds row uses a ball icon")
 	buttonsFit(panel, cv, "spin")
-	check(find(panel, "ModeCoins") ~= nil and find(panel, "ModeGems") ~= nil, "spin: coin and crystal modes")
+	check(find(panel, "ModeCoins") == nil and find(panel, "ModeGems") == nil, "spin: no currency switch")
 	go.Activated:Fire()
 	check(
 		#acts == 1 and acts[1][1] == "spin" and acts[1][2] == nil and acts[1][3] == "coins",
@@ -813,7 +800,7 @@ do
 	-- the server's answer: the ball is already chosen; the reel is only the show
 	v.coins = 4000
 	v.spin = spinBoard(4)
-	v.spinResult = { cur = "coins", tier = "rare", e = 11, back = 0, pity = 4, price = Economy.SPIN.coins.price }
+	v.spinResult = { cur = "coins", tier = "rare", e = 11, back = 0, pity = 4, price = Economy.SPIN.price }
 	Wallet.setProfile(w, v)
 	panel = find(w.pop, "ShopPanel")
 	check(
@@ -833,19 +820,12 @@ do
 	step(w, 2.1)
 	check(panel:GetAttribute("SpinOn") == "rare", "spin: reel stops on the server tier")
 	check(find(panel, "Result").Text == "RARE · LAVA", "spin: the stopped prize is the server ball")
-	find(panel, "ModeGems").Activated:Fire()
-	check(
-		find(find(panel, "SpinGo"), "Label").Text == `SPIN {Money.fmt(Economy.SPIN.crystals.price)}`,
-		"spin: crystal price from Economy"
-	)
 	find(panel, "SpinGo").Activated:Fire()
-	check(#acts == 2 and acts[2][1] == "spin" and acts[2][3] == "crystals", "spin: crystal tap after the reel")
+	check(#acts == 2 and acts[2][1] == "spin" and acts[2][3] == "coins", "spin: a new tap after the reel")
 
-	local poor = view(Economy.SPIN.coins.price - 1, 0, false, 1)
+	local poor = view(Economy.SPIN.price - 1, 0, false, 1)
 	poor.spin = spinBoard(4)
 	Wallet.setProfile(w, poor)
-	find(w.pop, "SpinGo").Activated:Fire()
-	find(w.pop, "ModeGems").Activated:Fire()
 	find(w.pop, "SpinGo").Activated:Fire()
 	check(#acts == 2, "spin: a short balance does not send")
 
@@ -870,7 +850,7 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	local panel = find(w.pop, "ShopPanel")
 	buttonsFit(panel, cv, tag)
 	local cardR = rectOf(find(panel, "SpinCard"))
-	for _, name in { "ModeCoins", "ModeGems", "SpinGo" } do
+	for _, name in { "SpinGo" } do
 		local r = rectOf(find(panel, name))
 		check(r[4] >= 62, `{tag}: {name} tall enough ({r[4]})`)
 		check(inside(find(panel, name), find(panel, "SpinCard")), `{tag}: {name} inside the card`)
@@ -945,7 +925,6 @@ do
 			need = 27,
 			owned = owned,
 			on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
-			robux = {},
 		}
 	end
 	for _, cv in { V2(960, 540), V2(1168, 540) } do
@@ -1051,10 +1030,9 @@ do
 		check(row and find(row, "Name").Text == "WOOD" and find(row, "Kind").Text == "FRAME", `{tag}: cheapest row`)
 		local pay = find(row, "PayCoins")
 		check(pay and pay.Active == true and rectOf(pay)[4] >= 62, `{tag}: coin price is a live button`)
-		check(find(row, "PayRobux").Active == false, `{tag}: a placeholder Robux id stays grey`)
+		check(find(row, "PayRobux") == nil, `{tag}: E4 no R$ button on a look`)
 		local before = #acts
 		pay.Activated:Fire()
-		find(row, "PayRobux").Activated:Fire()
 		check(
 			#acts == before + 1 and acts[before + 1][1] == "look" and acts[before + 1][3] == "frame_wood",
 			`{tag}: five balls still send Action look`
@@ -1067,7 +1045,6 @@ do
 	local early = view(2000, 0, false, 1)
 	early.balls = { 0 }
 	early.shelf = shelfOf(1, {})
-	early.shelf.robux = { frame_wood = 9301 }
 	Wallet.setProfile(earlyW, early)
 	find(earlyW.root, "ShopBtn").Activated:Fire()
 	find(earlyW.pop, "TabSkins").Activated:Fire()
@@ -1075,8 +1052,8 @@ do
 	check(
 		find(earlyW.pop, "Count").Text == "1/27"
 			and find(earlyRow, "PayCoins").Active == true
-			and find(earlyRow, "PayRobux").Active == true,
-		"shelf: one ball sells coins and a live R$ id"
+			and find(earlyRow, "PayRobux") == nil,
+		"shelf: one ball sells for coins only"
 	)
 	find(earlyRow, "PayCoins").Activated:Fire()
 	check(
@@ -1098,7 +1075,7 @@ do
 	local row = find(w.pop, "R_frame_wood")
 	check(find(w.pop, "Count").Text == "27/27" and find(w.pop, "Lock") == nil, "shelf: full set, no lock")
 	check(find(find(row, "PayCoins"), "Label").Text == "2,000", "shelf: coin price from Economy")
-	check(find(row, "PayRobux").Active == false, "shelf: a placeholder Robux id does not sell")
+	check(find(row, "PayRobux") == nil, "shelf: no R$ button")
 	find(row, "PayCoins").Activated:Fire()
 	check(#acts == 1 and acts[1][1] == "look" and acts[1][3] == "frame_wood", "shelf: Action look for coins")
 	v.coins = 0
@@ -1121,14 +1098,13 @@ for _, vp in { { 390, 844 }, { 1280, 720 } } do
 	local w = make(cv)
 	Wallet.setState(w, { ph = "lobby" })
 	local v = view(5000, 80, false, 1)
-	v.dailyBall = { e = 4, coins = 700, crystals = 35, endsAt = 1e8 }
+	v.dailyBall = { e = 4, coins = 700, endsAt = 1e8 }
 	v.spin = spinBoard(1)
 	v.shelf = {
 		n = 5,
 		need = 27,
 		owned = {},
 		on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
-		robux = {},
 	}
 	Wallet.setProfile(w, v)
 	find(w.root, "SpinBtn").Activated:Fire()
@@ -1176,38 +1152,27 @@ do
 	end
 end
 
--- Shelf: the R$ button asks the server (action pay with the look id); the client never opens a prompt.
+-- E4: the shelf has no R$ button at all; a look is bought with coins (Action look).
 do
 	local cv = V2(1168, 540)
 	local w, _, acts = make(cv)
 	Wallet.setState(w, { ph = "lobby" })
 	local v = view(5000, 10, false, 1)
-	local robux: { [string]: number } = {}
-	for _, l in Economy.LOOKS do
-		robux[l.id] = 1234
-	end
 	v.shelf = {
 		n = 5,
 		need = 27,
 		owned = {},
 		on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
-		robux = robux,
 	}
 	Wallet.setProfile(w, v)
 	find(w.root, "ShopBtn").Activated:Fire()
 	find(find(w.pop, "ShopPanel"), "TabSkins").Activated:Fire()
 	local card = find(w.pop, "R_trail_dust")
-	local pay = card and find(card, "PayRobux")
-	check(pay ~= nil, "pay: R$ button on the look card")
-	if pay then
-		local before = #acts
-		pay.Activated:Fire()
-		local last = acts[#acts]
-		check(
-			#acts == before + 1 and last[1] == "pay" and last[2] == nil and last[3] == "trail_dust",
-			"pay: Shelf R$ sends action pay with the look id"
-		)
-	end
+	check(card ~= nil and find(card, "PayRobux") == nil, "E4: no R$ button on the look card")
+	local before = #acts
+	find(card, "PayCoins").Activated:Fire()
+	local last = acts[#acts]
+	check(#acts == before + 1 and last[1] == "look" and last[3] == "trail_dust", "E4: the look sells for coins")
 end
 
 print(`{passed} passed, {fails} failed`)

@@ -1,7 +1,7 @@
 --!strict
 -- M3.1 economy, pure: profile v1 -> v2 migration, XP cap and level 10+ pay, match coins (AFK, friend limit, x2,
 -- streak), login reward by UTC days (no reset on a missed day, VOID on the 7th), daily quests (reset at 00:00 UTC,
--- all-done bonus once), the reaction book (no duplicates, crystals every 10, all 42), analytics flows,
+-- all-done bonus once), the reaction book (no duplicates, 200 coins every 10, all 42), analytics flows,
 -- direct buy (full tier price, ball-of-the-day 30% in both currencies, owned / short balance / a second buy).
 -- lune run tests/economy
 local process = require("@lune/process")
@@ -68,35 +68,58 @@ do
 		wins = 8,
 	}
 	local d = Progress.migrate(v1)
-	check(d.v == 2 and Progress.VERSION == 2, "v1 -> v2: version")
+	check(d.v == 3 and Progress.VERSION == 3, "v1 -> v3: version")
 	check(d.level == 6 and d.xp == 120 and #d.balls == 6 and d.matches == 14 and d.wins == 8, "v1 -> v2: M2 kept")
 	check(d.tut and d.rewarded and d.played and d.boostUntil == 5000, "v1 -> v2: flags kept")
-	check(d.coins == 0 and d.crystals == 0 and d.loginDays == 0 and d.dailyClaimed == -1, "v1 -> v2: wallet, login")
+	check(d.coins == 0 and (d :: any).crystals == nil and d.loginDays == 0 and d.dailyClaimed == -1, "v1 -> v2: wallet, login")
 	check(d.streak == 0 and #d.book == 0 and d.quests.day == -1 and #d.quests.list == 0, "v1 -> v2: quests, book")
-	check(d.pity.coins == 0 and d.pity.crystals == 0 and d.starterSeen == 0 and d.starterUntil == 0, "v1 -> v2: pity")
+	check(d.pity.coins == 0 and (d.pity :: any).crystals == nil and d.starterSeen == 0 and d.starterUntil == 0, "v1 -> v2: pity")
 	check(d.trialsUsed.n == 0 and d.trialBonus == 0 and d.dailyBall.e == -1 and d.friend.n == 0, "v1 -> v2: rest")
 	-- a v2 record round trip, and junk in v2 fields
-	d.coins, d.crystals, d.loginDays, d.dailyClaimed, d.streak = 1234, 56, 9, 20400, 4
+	d.coins, d.loginDays, d.dailyClaimed, d.streak = 1234, 9, 20400, 4
 	d.book = { "WILDFIRE", "STEAM" }
 	d.quests = { day = 20402, list = { { id = "play3", n = 2, done = false } }, all = false }
 	d.friend = { day = 20402, n = 3 }
 	local back = Progress.migrate(d)
-	check(back.coins == 1234 and back.crystals == 56 and back.loginDays == 9 and back.dailyClaimed == 20400, "v2 trip")
+	check(back.coins == 1234 and back.loginDays == 9 and back.dailyClaimed == 20400, "v3 trip")
 	check(#back.book == 2 and back.quests.list[1].n == 2 and back.friend.n == 3 and back.streak == 4, "v2 trip: rest")
 	local junk = Progress.migrate({
 		v = 2,
 		coins = -5,
-		crystals = 0 / 0,
+		crystals = 0 / 0, -- a NaN migrates as 0 coins
 		book = { "WILDFIRE", "WILDFIRE", 7, "NOT A REACTION" },
 		quests = { day = "x", list = { { id = "nope", n = 3 }, "x", { id = "rx10", n = -1 } } },
 		pity = "x",
 		streak = math.huge,
 	})
-	check(junk.coins == 0 and junk.crystals == 0 and junk.streak == 0 and junk.pity.coins == 0, "v2 junk: numbers")
+	check(junk.coins == 0 and (junk :: any).crystals == nil and junk.streak == 0 and junk.pity.coins == 0, "v2 junk: numbers")
 	check(#junk.book == 2, "v2 junk: book duplicates and non-strings dropped")
 	Progress.repair(junk, cfg, NAMES)
 	check(#junk.book == 1 and junk.book[1] == "WILDFIRE", "repair: unknown reactions dropped")
 	check(#junk.quests.list == 1 and junk.quests.list[1].id == "rx10" and junk.quests.list[1].n == 0, "repair: quests")
+
+	-- E4 migration: a v2 record's crystals become coins once at CRYSTAL_TO_COINS, pity.crystals is dropped
+	check(E.CRYSTAL_TO_COINS == 20, "E4: 20 coins a crystal")
+	local mlog = {}
+	local old = { v = 2, coins = 700, crystals = 56, pity = { coins = 4, crystals = 17 }, balls = { 0, 1 } }
+	local m = Progress.migrate(old, E.CRYSTAL_TO_COINS, mlog)
+	check(m.v == 3 and m.coins == 700 + 56 * 20, `E4 migration: coins += crystals * 20, got {m.coins}`)
+	check((m :: any).crystals == nil and m.pity.coins == 4 and (m.pity :: any).crystals == nil, "E4 migration: crystals gone")
+	check(
+		#mlog == 1 and mlog[1].cur == "coins" and mlog[1].n == 1120 and mlog[1].why == "migrate_crystals",
+		"E4 migration: one source flow migrate_crystals"
+	)
+	-- saved as v3: loading it again does not pay twice (even with a stray crystals key)
+	local again = table.clone(m) :: any
+	again.crystals = 56
+	local mlog2 = {}
+	local m2 = Progress.migrate(again, E.CRYSTAL_TO_COINS, mlog2)
+	check(m2.coins == m.coins and #mlog2 == 0, "E4 migration: once only")
+	-- v2 without crystals, and a fresh record: nothing to add, no flow
+	local mlog3 = {}
+	check(Progress.migrate({ v = 2, coins = 5 }, 20, mlog3).coins == 5 and #mlog3 == 0, "E4 migration: no crystals")
+	check(Progress.migrate(nil, 20, mlog3).coins == 0 and #mlog3 == 0, "E4 migration: new player")
+	check(Progress.migrate({ v = 2, crystals = 1e12 }, 20, {}).coins == 1e9, "E4 migration: capped at the wallet max")
 end
 
 -- 2. XP cap and levels 10+ -----------------------------------------------------------------------------------------
@@ -113,18 +136,18 @@ do
 	d.level = cfg.LEVEL_BALLS
 	local log = {}
 	local ups = Progress.addXp(d, Progress.need(9, cfg), cfg, rng(1), log)
-	check(#ups == 1 and ups[1].level == 10 and ups[1].e == nil and ups[1].coins == 150, "level 10: 150 coins")
-	check(ups[1].crystals == 15 and d.crystals == 15, "level 10: every 5th also 15 crystals")
+	check(#ups == 1 and ups[1].level == 10 and ups[1].e == nil and ups[1].coins == 450, "level 10: 150 + 300 coins")
+	check(d.coins == 450 and E.LEVEL_BONUS.every == 5 and E.LEVEL_BONUS.coins == 300, "level 10: every 5th +300")
 	ups = Progress.addXp(d, Progress.need(10, cfg), cfg, rng(1), log)
-	check(ups[1].level == 11 and ups[1].coins == 150 and ups[1].crystals == nil, "level 11: coins only")
-	check(d.coins == 300 and sum(log, "coins") == 300 and log[1].why == "level_10", "level pay in the log")
+	check(ups[1].level == 11 and ups[1].coins == 150, "level 11: 150 coins only")
+	check(d.coins == 600 and sum(log, "coins") == 600 and log[1].why == "level_10", "level pay in the log")
 	-- many levels at once
 	local x = 0
 	for l = 11, 19 do
 		x += Progress.need(l, cfg)
 	end
 	ups = Progress.addXp(d, x, cfg, rng(1), log)
-	check(#ups == 9 and d.level == 20 and d.coins == 300 + 9 * 150 and d.crystals == 45, "levels 12..20 at once")
+	check(#ups == 9 and d.level == 20 and d.coins == 600 + 9 * 150 + 2 * 300, "levels 12..20 at once")
 end
 
 -- 3. Match coins: modes, caps, AFK, friend limit, x2, streak -----------------------------------------------------------
@@ -196,11 +219,11 @@ do
 	check(c and c.pos == 2 and d.coins == 125, "00:00 UTC: day 2, 75 coins")
 	-- three days missed: the count goes on
 	c = Daily.claim(d, midnight + 4 * DAY, E, log) :: Daily.Claim
-	check(c and c.pos == 3 and d.crystals == 15, "missed days do not reset: day 3 = 15 crystals")
+	check(c and c.pos == 3 and d.coins == 125 + 300, "missed days do not reset: day 3 = 300 coins")
 	for i = 4, 6 do
 		c = Daily.claim(d, midnight + (i + 1) * DAY, E, log) :: Daily.Claim
 	end
-	check(c.pos == 6 and d.trialBonus == 1 and d.coins == 125 + 100 + 150 + 200, "days 4-6, the trial of day 5")
+	check(c.pos == 6 and d.trialBonus == 1 and d.coins == 125 + 300 + 100 + 150 + 200, "days 4-6, the trial of day 5")
 	check(not Progress.owns(d, 13), "no VOID before day 7")
 	c = Daily.claim(d, midnight + 8 * DAY, E, log) :: Daily.Claim
 	check(c.pos == 7 and c.cycle == 1 and c.gift.ball == 13 and Progress.owns(d, 13), "day 7: VOID")
@@ -212,14 +235,14 @@ do
 	end
 	check(c.pos == 7 and c.cycle == 2 and c.gift.ball == nil, "cycle 2 day 7: no ball")
 	check(
-		d.coins - coins == 50 + 75 + 100 + 150 + 200 + 300 + 4000,
-		"cycle 2: coins of the days + 300 on the 7th + the day-14 milestone"
+		d.coins - coins == 50 + 75 + 300 + 100 + 150 + 200 + 500 + 4000,
+		"cycle 2: coins of the days + 500 on the 7th + the day-14 milestone"
 	)
 	check(
-		c.mile and c.mile.day == 14 and c.mile.coins == 4000 and c.mile.crystals == nil,
+		c.mile and c.mile.day == 14 and c.mile.coins == 4000,
 		"day 14 milestone on that claim"
 	)
-	check(d.crystals == 15 + 15 + 10 and d.loginDays == 14, "cycle 2: 15 on day 3, 10 on day 7")
+	check(d.loginDays == 14, "cycle 2: 14 login days")
 	cards, pos, ready = Daily.cards(d, midnight + 16 * DAY, E)
 	check(ready and pos == 1 and cards[1].today and not cards[1].got and not cards[7].ball, "cycle 3 cards")
 	-- VOID owned before the 7th day: the 7th gives the later prize
@@ -227,40 +250,36 @@ do
 	table.insert(o.balls, 13)
 	o.loginDays = 6
 	c = Daily.claim(o, NOW, E, {}) :: Daily.Claim
-	check(c.pos == 7 and c.gift.ball == nil and o.coins == 300 and o.crystals == 10, "VOID owned: 300 + 10 instead")
+	check(c.pos == 7 and c.gift.ball == nil and o.coins == 500, "VOID owned: 500 coins instead")
 	check(c.mile == nil, "day 7 is not a milestone")
 	check(log[1].kind == "TimedReward" and log[1].why == "login_d1", "login flows: TimedReward, login_d1")
 end
 
 -- 4b. Login milestones d14–d42: each pays once, day 13 pays none, day 42 does not repay day 14 -----------------
 do
-	local sumC, sumX = 0, 0
+	local sumC = 0
 	check(#E.MILE == 5 and #E.LOOKS == 30, "MILE and LOOKS copied into Economy")
 	check(
-		E.LOOKS[1].id == "frame_wood" and E.LOOKS[1].coins == 2000 and E.LOOKS[1].robux == 49,
+		E.LOOKS[1].id == "frame_wood" and E.LOOKS[1].coins == 2000 and (E.LOOKS[1] :: any).robux == nil,
 		"LOOKS starts at frame_wood"
 	)
 	check(
-		E.LOOKS[30].id == "frame_champion" and E.LOOKS[30].coins == 36000 and E.LOOKS[30].robux == 499,
+		E.LOOKS[30].id == "frame_champion" and E.LOOKS[30].coins == 36000,
 		"LOOKS ends at frame_champion"
 	)
 	for _, m in E.MILE do
 		sumC += m.coins
-		sumX += m.crystals or 0
 	end
-	check(sumC == 28000 and sumX == 100, "milestones total 28 000 coins and 100 crystals")
+	check(sumC == 30000, "milestones total 30 000 coins (E4)")
 
 	local function dailyCoins(gift: any): number
 		return gift.coins or 0
-	end
-	local function dailyCrystals(gift: any): number
-		return gift.crystals or 0
 	end
 
 	local d = Progress.new()
 	local hits: { [number]: number } = {}
 	for n = 1, 42 do
-		local beforeC, beforeX = d.coins, d.crystals
+		local beforeC = d.coins
 		local log = {}
 		local c = Daily.claim(d, NOW + (n - 1) * DAY, E, log) :: Daily.Claim
 		check(c ~= nil and c.n == n, `claim {n}`)
@@ -277,16 +296,12 @@ do
 		if mile then
 			hits[n] = (hits[n] or 0) + 1
 			check(
-				c.mile and c.mile.day == mile.day and c.mile.coins == mile.coins and c.mile.crystals == mile.crystals,
+				c.mile and c.mile.day == mile.day and c.mile.coins == mile.coins,
 				`day {n}: claim.mile is that chest`
 			)
 			check(
 				d.coins - beforeC == dailyCoins(c.gift) + mile.coins,
 				`day {n}: coins are the daily plus that chest once`
-			)
-			check(
-				d.crystals - beforeX == dailyCrystals(c.gift) + (mile.crystals or 0),
-				`day {n}: crystals are the daily plus that chest once`
 			)
 			local saw = false
 			for _, f in log do
@@ -391,8 +406,7 @@ do
 	end
 	f = Book.add(d, all, NAMES, E.BOOK, log)
 	check(#f.new == 40 and #d.book == 42 and f.all, "the rest: 40 new, the book is full")
-	check(d.crystals == 4 * 10, "10 crystals at 10, 20, 30, 40")
-	check(d.coins == 42 * 25 + 1000, "25 a reaction + 1000 for all 42")
+	check(d.coins == 42 * 25 + 4 * 200 + 1000, "25 a reaction + 200 at 10, 20, 30, 40 + 1000 for all 42")
 	local seen = {}
 	local dup = false
 	for _, k in d.book do
@@ -427,7 +441,7 @@ do
 	check(res.coins.friend and res.coins.coins == math.floor((50 + 6 + 8) * 1.25 + 0.5), "active: coins with friend")
 	check(res.gain.mult == cfg.XP.boost * E.FRIEND.xp, "friend XP x1.5 on top of the boost")
 	check(#res.book.new == 2 and d.friend.n == 1, "active: book")
-	check(sum(log, "coins") == d.coins and sum(log, "crystals") == d.crystals, "flows add up to the wallet")
+	check(sum(log, "coins") == d.coins, "flows add up to the wallet")
 	local v = Award.view(d, NOW, 5000, cfg, #NAMES)
 	check(v.coins == d.coins and v.daily.ready and v.daily.pos == 1 and #v.daily.cards == 7, "view: wallet, daily")
 	check(#v.quests.list == 3 and v.quests.endsAt == 5000 + 12 * 3600, "view: quests, reset at 00:00 UTC")
@@ -476,27 +490,26 @@ do
 		"regular price: sink"
 	)
 
-	-- ball of the day: both prices are 30% off (floor), the buy charges that, not the full price
+	-- ball of the day: the price is 30% off (floor), the buy charges that, not the full price
 	local day = Progress.new()
 	local view = Award.view(day, NOW, 9000, cfg, 27)
 	local deal = view.dailyBall
 	local dayTier = tierOf(deal.e)
 	local coinOff = off(E.PRICE.coins[dayTier])
-	local gemOff = off(E.PRICE.crystals[dayTier])
 	check(
-		deal.coins == coinOff and deal.crystals == gemOff and deal.endsAt == 9000 + 12 * 3600,
-		`daily ball: coins {deal.coins}, crystals {deal.crystals}`
+		deal.coins == coinOff and deal.crystals == nil and deal.endsAt == 9000 + 12 * 3600,
+		`daily ball: one price, coins {deal.coins}`
 	)
-	day.crystals = E.PRICE.crystals[dayTier]
-	local paid = Shop.buy(day, deal.e, "crystals", NOW, E, {})
-	check(paid ~= nil and paid.daily and paid.n == gemOff, `daily ball: charged {gemOff} crystals, not the full price`)
-	check(day.crystals == E.PRICE.crystals[dayTier] - gemOff and copies(day, deal.e) == 1, "daily ball: discount kept")
+	day.coins = E.PRICE.coins[dayTier]
+	local paid = Shop.buy(day, deal.e, "coins", NOW, E, {})
+	check(paid ~= nil and paid.daily and paid.n == coinOff, `daily ball: charged {coinOff} coins, not the full price`)
+	check(day.coins == E.PRICE.coins[dayTier] - coinOff and copies(day, deal.e) == 1, "daily ball: discount kept")
 	check(Award.view(day, NOW, 9000, cfg, 27).dailyBall == nil, "daily ball: gone from the snapshot once owned")
 
 	-- the same buy again does not charge and does not add a second copy
-	local left = day.crystals
-	check(Shop.buy(day, deal.e, "crystals", NOW, E, {}) == nil, "repeat buy: refused")
-	check(day.crystals == left and copies(day, deal.e) == 1, "repeat buy: no second charge, still one ball")
+	local left = day.coins
+	check(Shop.buy(day, deal.e, "coins", NOW, E, {}) == nil, "repeat buy: refused")
+	check(day.coins == left and copies(day, deal.e) == 1, "repeat buy: no second charge, still one ball")
 
 	-- already owned, before any buy of it
 	local owned = Progress.new()
@@ -518,6 +531,7 @@ do
 	local junk = Progress.new()
 	junk.coins = 100000
 	check(Shop.buy(junk, 4, "robux", NOW, E, {}) == nil, "bad currency: refused")
+	check(Shop.buy(junk, 4, "crystals", NOW, E, {}) == nil, "E4: crystals are not a currency")
 	check(Shop.buy(junk, 99, "coins", NOW, E, {}) == nil, "unknown id: refused")
 	check(Shop.buy(junk, 1.5, "coins", NOW, E, {}) == nil, "fractional id: refused")
 	check(junk.coins == 100000 and #junk.balls == 0, "bad requests: nothing spent")
@@ -573,8 +587,8 @@ do
 			and o.refund == refund
 	end
 
-	for _, cur in { "coins", "crystals" } do
-		local spec = E.SPIN[cur]
+	for _, cur in { "coins" } do
+		local spec = E.SPIN
 		local baseSum = 0
 		for _, tier in E.TIER_ORDER do
 			baseSum += spec.odds[tier]
@@ -606,13 +620,13 @@ do
 		end
 	end
 
-	local base = E.SPIN.coins.odds
-	local fresh = Spin.odds(Progress.new().balls, E.SPIN.coins, E)
+	local base = E.SPIN.odds
+	local fresh = Spin.odds(Progress.new().balls, E.SPIN, E)
 	check(same(fresh, base.common, base.rare, base.epic, base.legendary, 0), "open collection: the posted odds")
 
 	local down = Progress.new()
 	fill(down, "legendary")
-	local moved = Spin.odds(down.balls, E.SPIN.coins, E)
+	local moved = Spin.odds(down.balls, E.SPIN, E)
 	check(moved.legendary == 0 and moved.epic == base.epic + base.legendary, "legendary share moves down onto epic")
 	check(
 		moved.common == base.common and moved.rare == base.rare and moved.refund == 0,
@@ -620,7 +634,7 @@ do
 	)
 
 	fill(down, "rare")
-	local both = Spin.odds(down.balls, E.SPIN.coins, E)
+	local both = Spin.odds(down.balls, E.SPIN, E)
 	check(both.epic == base.epic + base.legendary, "a closed rare does not add itself to epic")
 	check(
 		both.common == base.common + base.rare and both.rare == 0 and both.refund == 0,
@@ -629,28 +643,24 @@ do
 
 	local low = Progress.new()
 	fill(low, "common")
-	local commons = Spin.odds(low.balls, E.SPIN.coins, E)
+	local commons = Spin.odds(low.balls, E.SPIN, E)
 	check(commons.common == 0 and commons.refund == base.common, "common share goes to refund, nothing is lower")
 	check(
 		commons.rare == base.rare and commons.epic == base.epic and commons.legendary == base.legendary,
 		"common share does not move up"
 	)
 
-	local xbase = E.SPIN.crystals.odds
-	local top = Progress.new()
-	fill(top, "legendary")
-	local xleg = Spin.odds(top.balls, E.SPIN.crystals, E)
-	check(
-		xleg.legendary == 0 and xleg.epic == xbase.epic + xbase.legendary,
-		"crystal legendary share moves down onto epic"
-	)
+	-- E4: one roulette, the numbers of docs/economy.md
+	check(E.SPIN.price == 1000 and E.SPIN.price10 == 10000 and E.SPIN.refund == 250, "E4 roulette: 1000 / 10000 / 250")
+	check(E.SPIN.pity.tier == "epic" and E.SPIN.pity.every == 10, "E4 roulette: epic+ by spin 10")
+	check(Spin.board(Progress.new(), E, true).crystals == nil, "E4: the board has one line")
 
 	-- nothing but legendaries left: lower shares become refund, they do not climb
 	local onlyLeg = Progress.new()
 	fill(onlyLeg, "common")
 	fill(onlyLeg, "rare")
 	fill(onlyLeg, "epic")
-	local parked = Spin.odds(onlyLeg.balls, E.SPIN.coins, E)
+	local parked = Spin.odds(onlyLeg.balls, E.SPIN, E)
 	check(
 		parked.legendary == base.legendary and parked.refund == 100 - base.legendary,
 		"lower shares do not become a legendary"
@@ -667,27 +677,20 @@ do
 		first ~= nil and first.e == E.TIERS.common[1] and second ~= nil and second.e == E.TIERS.common[2],
 		"ball is the next missing of the tier"
 	)
-	check(first.e ~= second.e and two.coins == 5000 - 2 * E.SPIN.coins.price, "no repeat, price is Economy.SPIN")
+	check(first.e ~= second.e and two.coins == 5000 - 2 * E.SPIN.price, "no repeat, price is Economy.SPIN")
 
 	local poor = Progress.new()
-	poor.coins = E.SPIN.coins.price - 1
-	poor.crystals = E.SPIN.crystals.price - 1
+	poor.coins = E.SPIN.price - 1
 	check(Spin.roll(poor, "coins", E, zero, {}) == nil, "short coins: no spin")
-	check(Spin.roll(poor, "crystals", E, zero, {}) == nil, "short crystals: no spin")
-	check(
-		poor.coins == E.SPIN.coins.price - 1 and poor.crystals == E.SPIN.crystals.price - 1,
-		"short balance: nothing spent"
-	)
-	check(
-		#poor.balls == 0 and poor.pity.coins == 0 and poor.pity.crystals == 0,
-		"short balance: no ball, pity unchanged"
-	)
+	check(poor.coins == E.SPIN.price - 1, "short balance: nothing spent")
+	check(#poor.balls == 0 and poor.pity.coins == 0, "short balance: no ball, pity unchanged")
 	check(Spin.roll(poor, "robux", E, zero, {}) == nil, "bad currency: no spin")
+	poor.coins = 100000
+	check(Spin.roll(poor, "crystals", E, zero, {}) == nil and poor.coins == 100000, "E4: no crystal spin")
 
 	local banned = Progress.new()
 	banned.coins = 5000
 	check(Spin.roll(banned, "coins", E, zero, {}, true) == nil, "paid random restricted: coin spin refused")
-	check(Spin.roll(banned, "crystals", E, zero, {}, true) == nil, "paid random restricted: crystal spin refused")
 	check(banned.coins == 5000 and #banned.balls == 0 and banned.pity.coins == 0, "restricted: nothing spent")
 
 	-- rng() == 1 misses every tier (strict <) and refunds. Pity does not call it; the next call picks the ball.
@@ -754,27 +757,6 @@ do
 		"a natural epic resets the counter early"
 	)
 
-	local gems = Progress.new()
-	gems.crystals = E.SPIN.crystals.price * 30
-	local rngG = warmup(29)
-	for i = 1, 29 do
-		local hit = Spin.roll(gems, "crystals", E, rngG, {})
-		check(
-			hit ~= nil and hit.tier == "refund" and hit.back == E.SPIN.crystals.refund,
-			`crystal pity spin {i} refunds`
-		)
-	end
-	check(gems.pity.crystals == 29 and #gems.balls == 0, "crystal guarantee waits until spin 30")
-	local legendHit = Spin.roll(gems, "crystals", E, rngG, {})
-	check(
-		legendHit ~= nil
-			and legendHit.tier == "legendary"
-			and legendHit.e == E.TIERS.legendary[1]
-			and gems.pity.crystals == 0,
-		"crystal spin 30 is a legendary and the counter resets"
-	)
-	local spent = E.SPIN.crystals.price * 30 - E.SPIN.crystals.refund * 29
-	check(gems.crystals == E.SPIN.crystals.price * 30 - spent, "crystal price and refund come from Economy")
 end
 
 -- Pass perks: VIP quest, Fast Spin x10 ------------------------------------------------------------------------
@@ -802,16 +784,13 @@ do
 	coins.coins = 20000
 	local hits = Spin.roll10(coins, "coins", E, zero, {})
 	check(hits ~= nil and #hits == 10, "x10 coins: ten hits")
-	check(coins.coins >= 20000 - E.SPIN.coins.price * 10 and coins.coins < 20000, "x10 coins: paid ten times the price")
-	local gems = Progress.new()
-	gems.crystals = E.SPIN.crystals.price10 - 1
+	check(coins.coins >= 20000 - E.SPIN.price10 and coins.coins < 20000, "x10 coins: paid price10")
+	local short = Progress.new()
+	short.coins = E.SPIN.price10 - 1
 	check(
-		Spin.roll10(gems, "crystals", E, zero, {}) == nil and gems.crystals == E.SPIN.crystals.price10 - 1,
-		"x10 crystals short: nothing spent"
+		Spin.roll10(short, "coins", E, zero, {}) == nil and short.coins == E.SPIN.price10 - 1,
+		"x10 short: nothing spent"
 	)
-	gems.crystals = 1000
-	local gh = Spin.roll10(gems, "crystals", E, zero, {})
-	check(gh ~= nil and #gh == 10 and gems.crystals >= 1000 - E.SPIN.crystals.price10, "x10 crystals uses price10")
 	local banned = Progress.new()
 	banned.coins = 20000
 	check(Spin.roll10(banned, "coins", E, zero, {}, true) == nil and banned.coins == 20000, "x10 under a ban: refused")

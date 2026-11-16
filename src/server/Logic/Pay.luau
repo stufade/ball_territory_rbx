@@ -1,13 +1,11 @@
 --!strict
 -- Which Robux purchase the server lets a client open (docs/products.md). Pure: the prompt itself is Passes.prompt.
--- The client names a key and an optional number; the server picks the product or pass id, so an owned look, an
--- owned ball, a second starter pack, an owned pass, or Fast Spin under a paid-random ban never opens a prompt.
---   "pack"         arg = crystal pack index
---   "ball"         arg = element id (remembered as the choice for the tier receipt)
+-- The client names a key and an optional number; the server picks the product or pass id, so a second starter
+-- pack, an owned pass, or Fast Spin under a paid-random ban never opens a prompt.
+-- E4: Robux buy only coin packs, the starter pack and the passes. Balls and looks are coins only ("off").
+--   "pack"         arg = coin pack index (Economy.COIN_PACKS)
 --   "starter"      arg = the epic chosen for the pack
 --   "pass_<key>"   a game pass of Economy.PASSES
---   "<look id>"    a cosmetic of Economy.LOOKS
-local Looks = require("./Looks")
 local Progress = require("./Progress")
 local Receipt = require("./Receipt")
 
@@ -54,24 +52,11 @@ function Pay.offer(
 	end
 	local id: number? = nil
 	if key == "pack" then
-		local i = int(arg, 1, #E.CRYSTAL_PACKS)
+		local i = int(arg, 1, #E.COIN_PACKS)
 		if not i then
 			return nil, "bad"
 		end
-		id = live(ids.crystals[i])
-	elseif key == "ball" then
-		local e = int(arg, 0, 26)
-		local tier = if e then tierOf(E, e) else nil
-		if not e or not tier then
-			return nil, "bad"
-		end
-		if Progress.owns(d, e) then
-			return nil, "owned"
-		end
-		id = live(ids.ball[tier])
-		if id and not Receipt.choose(d, "ball", e, E) then
-			return nil, "bad"
-		end
+		id = live(ids.packs[i])
 	elseif key == "starter" then
 		if d.starterBought then
 			return nil, "owned"
@@ -105,13 +90,7 @@ function Pay.offer(
 		end
 		return { pass = pass, key = key }, nil
 	else
-		if not Looks.known(E, key) then
-			return nil, "bad"
-		end
-		if type(d.looks) == "table" and table.find(d.looks, key) then
-			return nil, "owned"
-		end
-		id = live(ids.looks[key])
+		return nil, "bad"
 	end
 	if not id then
 		return nil, "off"

@@ -25,7 +25,7 @@ local RARE = E.TIERS.rare[1]
 do
 	local d = Progress.new()
 	local o = Pay.offer(d, "pack", 6, E, Products, false, none)
-	check(o and o.product == Products.crystals[6], "a crystal pack opens its product")
+	check(o and o.product == Products.packs[6], "a coin pack opens its product")
 	check(Pay.offer(d, "pack", 7, E, Products, false, none) == nil, "no 7th pack")
 	check(Pay.offer(d, "pack", 0 / 0, E, Products, false, none) == nil, "NaN pack refused")
 	check(Pay.offer(d, 5, 1, E, Products, false, none) == nil, "a non-string key is refused")
@@ -34,12 +34,9 @@ end
 
 do
 	local d = Progress.new()
-	local o = Pay.offer(d, "ball", RARE, E, Products, false, none)
-	check(o and o.product == Products.ball.rare and d.robuxBall == RARE, "a missing ball opens its tier, choice kept")
-	table.insert(d.balls, RARE)
+	-- E4: balls are coins only, the old ball products never open
 	local no, why = Pay.offer(d, "ball", RARE, E, Products, false, none)
-	check(no == nil and why == "owned", "an owned ball opens nothing")
-	check(Pay.offer(d, "ball", 27, E, Products, false, none) == nil, "ball 27 refused")
+	check(no == nil and why == "bad" and d.robuxBall == -1, "E4: no Robux prompt for a ball")
 end
 
 do
@@ -54,11 +51,9 @@ end
 
 do
 	local d = Progress.new()
-	local o = Pay.offer(d, "skin_ink", nil, E, Products, false, none)
-	check(o and o.product == Products.looks.skin_ink, "a look opens its product")
-	table.insert(d.looks, "skin_ink")
+	-- E4: looks are coins only, the old look products never open
 	local no, why = Pay.offer(d, "skin_ink", nil, E, Products, false, none)
-	check(no == nil and why == "owned", "an owned look opens nothing")
+	check(no == nil and why == "bad", "E4: no Robux prompt for a look")
 	check(Pay.offer(d, "not_a_look", nil, E, Products, false, none) == nil, "an unknown look opens nothing")
 end
 
@@ -81,13 +76,14 @@ end
 
 do
 	local best, rate = 0, 0
-	for i, p in E.CRYSTAL_PACKS do
-		if p.crystals / p.robux > rate then
-			best, rate = i, p.crystals / p.robux
+	for i, p in E.COIN_PACKS do
+		if p.coins / p.robux > rate then
+			best, rate = i, p.coins / p.robux
 		end
 	end
-	for i, p in E.CRYSTAL_PACKS do
-		check((p.best == true) == (i == best), `best value badge only on the most crystals per Robux (pack {i})`)
+	for i, p in E.COIN_PACKS do
+		check((p.best == true) == (i == best), `best value badge only on the most coins per Robux (pack {i})`)
+		check(p.coins == ({ 50, 110, 300, 650, 1400, 3750 })[i] * E.CRYSTAL_TO_COINS, `pack {i} = old crystals * 20`)
 	end
 end
 

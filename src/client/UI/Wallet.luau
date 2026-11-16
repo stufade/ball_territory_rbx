@@ -1,6 +1,6 @@
 --!strict
 -- M3.1 on the plaza, compact at the right edge so the avatar can run (stick bottom left, jump bottom right stay free):
--- coin and crystal counters above PLAY (numbers roll up when something pays, "+25" floats up), and a row of three
+-- the coin counter above PLAY (numbers roll up when something pays, "+25" floats up), and a row of three
 -- small buttons under HOW TO PLAY: DAILY (red "!" when the login reward waits), QUESTS (done/3), BOOK (found),
 -- SHOP (balls still missing) and SPIN when the server allows paid random. They open Daily, Quests, Book, Shop and Spin.
 -- Short toasts at the top middle: a new reaction, a quest done. Data: the Profile remote (Net.ProfileView).
@@ -38,7 +38,6 @@ export type Wallet = {
 	view: Net.ProfileView?,
 	st: Net.State?,
 	coins: Money.Roll?,
-	gems: Money.Roll?,
 	open: string?,
 	-- which shop tab is showing: balls, spin, skins
 	tab: Shop.Tab,
@@ -66,12 +65,12 @@ local function layout(w: Wallet): Theme.PlazaLayout
 	return Theme.plaza(w.ctx.canvas, w.ctx.topbar)
 end
 
--- Coin / crystal counter at the top right.
+-- Coin counter at the top right.
 local function pill(w: Wallet, layer: Frame, cur: string, y: number, roll: Money.Roll)
 	local L = layout(w)
 	local box =
 		Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.walletX, y), Theme.PANEL, RIGHT)
-	box.Name = if cur == "coins" then "Coins" else "Crystals"
+	box.Name = "Coins"
 	box.BackgroundTransparency = 0.1
 	Theme.round(box, L.moneyH / 2)
 	Theme.stroke(box, 3, Theme.INK)
@@ -86,7 +85,7 @@ local function pill(w: Wallet, layer: Frame, cur: string, y: number, roll: Money
 		{
 			anchor = V2(1, 0.5),
 			align = Enum.TextXAlignment.Right,
-			color = if cur == "coins" then Money.COIN else Money.GEM,
+			color = Money.COIN,
 		}
 	)
 	t.Name = "Value"
@@ -234,35 +233,32 @@ function Wallet.render(w: Wallet)
 	end
 	local layer = Theme.clear(w.root, UDim2.fromScale(1, 1))
 	local coins = w.coins or Money.roll(v.coins or 0)
-	local gems = w.gems or Money.roll(v.crystals or 0)
-	w.coins, w.gems = coins, gems
+	w.coins = coins
 	local L = layout(w)
 	pill(w, layer, "coins", L.moneyY[1], coins)
-	pill(w, layer, "crystals", L.moneyY[2], gems)
 	-- shown on the plaza: roll to the new values now
 	Money.target(coins, v.coins or 0)
-	Money.target(gems, v.crystals or 0)
 	if w.st and w.st.ph == "queue" then
 		return
 	end
-	-- "+" at the right end of the crystal counter: the crystal packs. The disc is drawn in the pill; the hit area
-	-- is 62 design px (44 px on a phone) and only reaches into the gap above, never down onto PLAY.
-	local gemsBox = gems.box
-	if gemsBox then
-		local value = gemsBox:FindFirstChild("Value") :: TextLabel?
+	-- "+" at the right end of the coin counter: the coin packs (E4). The disc is drawn in the pill; the hit area
+	-- is 62 design px (44 px on a phone) and reaches only into the empty row below, never onto PLAY.
+	local coinBox = coins.box
+	if coinBox then
+		local value = coinBox:FindFirstChild("Value") :: TextLabel?
 		if value then
 			value.Position = UDim2.new(1, -54, 0.5, 0)
 			value.Size = UDim2.fromOffset(L.moneyW - 98, 30)
 		end
 	end
 	local add = Instance.new("TextButton")
-	add.Name = "AddGems"
+	add.Name = "AddCoins"
 	add.Text = ""
 	add.AutoButtonColor = false
 	add.BackgroundTransparency = 1
 	add.Size = UDim2.fromOffset(62, 62)
 	add.AnchorPoint = V2(1, 0.5)
-	add.Position = UDim2.fromOffset(L.walletX, L.moneyY[2] + L.moneyH / 2 - 2)
+	add.Position = UDim2.fromOffset(L.walletX, L.moneyY[1] + L.moneyH / 2 - 2)
 	add.ZIndex = 5
 	add.Parent = layer
 	local disc = Theme.frame(add, UDim2.fromOffset(36, 36), UDim2.new(1, -4, 0.5, 2), ROBUX_COL, V2(1, 0.5))
@@ -372,10 +368,10 @@ end
 local function float(w: Wallet, cur: string, n: number)
 	local L = layout(w)
 	local x = L.walletX - L.moneyW
-	local y = if cur == "coins" then L.moneyY[1] else L.moneyY[2]
+	local y = L.moneyY[1]
 	local f = Theme.label(w.pop.Parent :: Instance, `+{Money.fmt(n)}`, 28, UDim2.fromOffset(120, 32), nil, {
 		anchor = V2(1, 0),
-		color = if cur == "coins" then Money.COIN else Money.GEM,
+		color = Money.COIN,
 	})
 	f.Name = "Float"
 	f.Position = UDim2.fromOffset(x - 10, y + 4)
@@ -385,12 +381,11 @@ end
 
 function Wallet.setProfile(w: Wallet, v: Net.ProfileView)
 	w.view = v
-	-- levels after the level balls pay coins (and every 5th crystals): no NEW BALL! for them, a toast instead
+	-- levels after the level balls pay coins: no NEW BALL! for them, a toast instead
 	local ups: { Net.LevelUp } = v.news or {}
 	for _, up in ups do
 		if up.coins then
-			local gem = if up.crystals then `  +{up.crystals} CRYSTALS` else ""
-			toast(w, `LEVEL {up.level}!  +{up.coins} COINS{gem}`, Theme.YELLOW)
+			toast(w, `LEVEL {up.level}!  +{up.coins} COINS`, Theme.YELLOW)
 		end
 	end
 	local found: { string } = v.found or {}
@@ -439,9 +434,6 @@ end
 function Wallet.step(w: Wallet, dt: number)
 	if w.coins then
 		Money.step(w.coins, dt)
-	end
-	if w.gems then
-		Money.step(w.gems, dt)
 	end
 	for _, f in w.fx.frames do
 		f(dt)
@@ -526,7 +518,6 @@ function Wallet.new(parent: Instance, ctx: Ctx): Wallet
 		view = nil,
 		st = nil,
 		coins = nil,
-		gems = nil,
 		open = nil,
 		tab = "balls",
 		autoFor = nil,

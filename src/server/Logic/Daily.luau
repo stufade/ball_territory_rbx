@@ -13,8 +13,8 @@ local Daily = {}
 local DAY = 86400
 local TIERS = { "easy", "mid", "hard" }
 
-export type Gift = { coins: number?, crystals: number?, ball: number?, trials: number? }
-export type MilePay = { day: number, coins: number, crystals: number? }
+export type Gift = { coins: number?, ball: number?, trials: number? }
+export type MilePay = { day: number, coins: number }
 export type Claim = { n: number, pos: number, cycle: number, gift: Gift, mile: MilePay? }
 -- one finished, not AFK match for the quests
 export type QMatch =
@@ -72,9 +72,8 @@ function Daily.claim(d: any, now: number, E: any, log: { Wallet.Flow }?): Claim?
 	if type(miles) == "table" then
 		for _, m in miles do
 			if m.day == n then
-				local pay = { coins = m.coins, crystals = m.crystals }
-				mile = { day = m.day, coins = pay.coins, crystals = pay.crystals }
-				Wallet.gift(d, pay, `mile_d{m.day}`, "TimedReward", log)
+				mile = { day = m.day, coins = m.coins }
+				Wallet.gift(d, { coins = m.coins }, `mile_d{m.day}`, "TimedReward", log)
 				break
 			end
 		end

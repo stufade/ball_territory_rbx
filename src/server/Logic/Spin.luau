@@ -3,7 +3,8 @@
 -- a tier the player owns fully moves its share DOWN to the nearest lower tier that still has a missing ball,
 -- or to "refund" when nothing lower is open. Shares never move up, so a late spin is not a cheap legendary.
 -- The client sends only the currency. The ball (or the refund) is chosen here, before any reel.
--- `blocked` is PolicyService ArePaidRandomItemsRestricted: both wheels refuse, and nothing is spent.
+-- E4: one roulette, coins (Economy.SPIN); `cur` must be "coins".
+-- `blocked` is PolicyService ArePaidRandomItemsRestricted: the wheel refuses, and nothing is spent.
 
 local Wallet = require("./Wallet")
 
@@ -20,7 +21,7 @@ export type Line = {
 	odds: Odds,
 }
 
-export type Board = { ok: boolean, coins: Line, crystals: Line }
+export type Board = { ok: boolean, coins: Line }
 
 export type Hit = {
 	cur: string,
@@ -83,9 +84,9 @@ function Spin.odds(balls: { number }, spin: any, E: any): Odds
 	return out
 end
 
-local function line(d: any, cur: string, E: any): Line
-	local spin = E.SPIN[cur]
-	local pity = if type(d.pity) == "table" then d.pity[cur] or 0 else 0
+local function line(d: any, E: any): Line
+	local spin = E.SPIN
+	local pity = if type(d.pity) == "table" then d.pity.coins or 0 else 0
 	return {
 		price = spin.price,
 		refund = spin.refund,
@@ -98,7 +99,7 @@ end
 
 -- What the spin screen shows before the player taps. `ok` is false when paid random is restricted.
 function Spin.board(d: any, E: any, ok: boolean): Board
-	return { ok = ok, coins = line(d, "coins", E), crystals = line(d, "crystals", E) }
+	return { ok = ok, coins = line(d, E) }
 end
 
 -- One spin. Nil, and the wallet untouched, when the currency is wrong, the balance is short, or `blocked`.
@@ -111,13 +112,10 @@ function Spin.roll(
 	blocked: boolean?,
 	prepaid: boolean?
 ): Hit?
-	if blocked or (cur ~= "coins" and cur ~= "crystals") then
+	if blocked or cur ~= "coins" then
 		return nil
 	end
-	local spin = E.SPIN[cur]
-	if not spin then
-		return nil
-	end
+	local spin = E.SPIN
 	if not prepaid and not Wallet.spend(d, cur, spin.price, `spin_{cur}`, "Shop", log) then
 		return nil
 	end
@@ -126,7 +124,7 @@ function Spin.roll(
 	local pityTier = spin.pity.tier
 	local pityAt = indexOf(order, pityTier)
 	if type(d.pity) ~= "table" then
-		d.pity = { coins = 0, crystals = 0 }
+		d.pity = { coins = 0 }
 	end
 	local count = (d.pity[cur] or 0) + 1
 	local canPity = false
@@ -180,15 +178,12 @@ function Spin.roll(
 end
 
 -- Fast Spin x10 (the pass is checked by the caller): one payment, ten rolls, the pity counter runs through all
--- ten. Crystals use price10, coins ten times the price. Nil and the wallet untouched when short, bad or blocked.
+-- ten, for SPIN.price10. Nil and the wallet untouched when short, bad or blocked.
 function Spin.roll10(d: any, cur: any, E: any, rng: () -> number, log: { Wallet.Flow }?, blocked: boolean?): { Hit }?
-	if blocked or (cur ~= "coins" and cur ~= "crystals") then
+	if blocked or cur ~= "coins" then
 		return nil
 	end
-	local spin = E.SPIN[cur]
-	if not spin then
-		return nil
-	end
+	local spin = E.SPIN
 	local total = spin.price10 or spin.price * 10
 	if not Wallet.spend(d, cur, total, `spin10_{cur}`, "Shop", log) then
 		return nil

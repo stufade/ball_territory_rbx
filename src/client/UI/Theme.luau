@@ -392,12 +392,12 @@ end
 
 -- Plaza layout (docs/ui.md «Площадка»), design px of the canvas; shared by Plaza, Wallet and Level.
 --   top left, right of the Roblox buttons: icon row DAILY / QUESTS / BOOK / HELP / SHOP (secondary, opened now and then)
---   top right: coins and crystals
+--   top right: coins
 --   right edge, above the jump button: PLAY (biggest) and PARTY under it - the only main actions
 --   bottom middle, between the stick and the jump button: level, XP bar, next ball; the 2x XP icon right of it
 export type PlazaLayout = {
 	right: number,
-	-- right edge of the coin / crystal pills: left of the Roblox player list
+	-- right edge of the coin pill: left of the Roblox player list
 	walletX: number,
 	playW: number,
 	playY: number,
@@ -426,7 +426,7 @@ function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	local playY = 138
 	local moneyH = 42
 	local moneyGap = 6
-	-- Coins and crystals stay on the right, above PLAY. On a wide screen the Roblox
+	-- Coins stay on the right, above PLAY. On a wide screen the Roblox
 	-- player list covers that corner, so drop the stack under the top bar. topbar.Y
 	-- is already the GuiInset in design px (one pad included). Use it once. A phone
 	-- safe area is much taller than the gap above PLAY; applying it would open a hole
@@ -685,9 +685,8 @@ function Theme.rise(o: GuiObject, delay: number)
 end
 
 Theme.PRICE_COIN = hex("#2ed068")
-Theme.PRICE_GEM = hex("#7a3cff")
 
--- Price button (Ball vs Ball green): coins green, crystals purple; the currency icon on the left, the amount
+-- Price button (Ball vs Ball green): coins green; the currency icon on the left, the amount
 -- right of it. `icon` draws the currency (Money.icon) - passed in, Money requires Theme.
 function Theme.price(
 	parent: Instance,
@@ -699,7 +698,7 @@ function Theme.price(
 	textSize: number?
 ): TextButton
 	local h = size.Y.Offset
-	local color = if cur == "coins" then Theme.PRICE_COIN else Theme.PRICE_GEM
+	local color = Theme.PRICE_COIN
 	local b = Theme.button(parent, text, size, pos, color, nil, textSize or 24)
 	b.Name = if cur == "coins" then "PayCoins" else "PayGems"
 	local lip = math.clamp(math.floor(h * 0.1 + 0.5), 4, 9)

@@ -26,7 +26,6 @@ export type Shelf = {
 	need: number,
 	owned: { string },
 	on: On,
-	robux: { [string]: number },
 }
 
 local function blank(): On
@@ -238,18 +237,8 @@ function Looks.match(d: any, E: any): Match?
 	return out
 end
 
--- Profile view. `products.looks` is the asset-id table; only ids above 0 are sent (0 is not for sale).
-function Looks.snapshot(d: any, E: any, products: any): Shelf
-	local robux: { [string]: number } = {}
-	local ids = if type(products) == "table" and type(products.looks) == "table" then products.looks else {}
-	if type(E) == "table" and type(E.LOOKS) == "table" then
-		for _, look in E.LOOKS do
-			local id = ids[look.id]
-			if type(id) == "number" and id > 0 and id == math.floor(id) and id == id then
-				robux[look.id] = id
-			end
-		end
-	end
+-- Profile view. E4: looks are coins only, no product ids are sent.
+function Looks.snapshot(d: any, E: any): Shelf
 	local w = if type(d.worn) == "table" then d.worn else blank()
 	-- only ids the shelf can draw; a retired id stays on the profile
 	local have: { string } = {}
@@ -273,7 +262,6 @@ function Looks.snapshot(d: any, E: any, products: any): Shelf
 			ko = w.ko == true,
 			ball = if type(w.ball) == "number" then w.ball else -1,
 		},
-		robux = robux,
 	}
 end
 

@@ -5,8 +5,8 @@
 -- coins are left. Prints days to 50% / 100% of the balls, the first coin purchase, coins on hand, the empty-middle
 -- gaps, and how fast the cosmetic sink drains coins.
 -- lune run tools/econ/sim [players]      (default 400 per kind)
--- E4 (2026-11-16): runs two models and prints a comparison at the end. "old" = the live crystal economy
--- (top-level fields of Economy.luau), "e4" = one currency (E.E4, E.COIN_PACKS): free crystals become coins at
+-- E4 (2026-11-16): runs two models and prints a comparison at the end. "old" = the crystal economy
+-- (frozen in model() below), "e4" = one currency (the live Economy.luau, E.COIN_PACKS): free crystals become coins at
 -- CRYSTAL_TO_COINS, one coin roulette, payers buy coin packs.
 --
 -- MILE and LOOKS live in Economy.luau. This sim reads those tables so the numbers cannot drift.
@@ -20,29 +20,53 @@ local XP = Config.XP
 -- Values of one model. The sim below reads V only, so both models share every rule.
 local function model(name: string): any
 	if name == "old" then
+		-- the crystal economy before E4, frozen here (Economy.luau keeps only the live one-currency values)
 		local packs = {}
-		for _, pk in E.CRYSTAL_PACKS do
-			table.insert(packs, { amount = pk.crystals, robux = pk.robux })
+		for _, pk in E.COIN_PACKS do
+			table.insert(packs, { amount = pk.coins // E.CRYSTAL_TO_COINS, robux = pk.robux })
 		end
 		return {
 			name = "old",
-			PRICE = E.PRICE,
-			SPIN = E.SPIN.coins,
-			XSPIN = E.SPIN.crystals,
-			DAILY = E.DAILY,
-			LATER_DAY7 = E.LATER_DAY7,
-			MILE = E.MILE,
-			levelEvery = E.LEVEL_CRYSTALS_EVERY,
-			levelCrystals = E.LEVEL_CRYSTALS,
+			PRICE = {
+				coins = E.PRICE.coins,
+				crystals = { common = 50, rare = 100, epic = 200, legendary = 400 },
+			},
+			SPIN = E.SPIN,
+			XSPIN = {
+				price = 49,
+				price10 = 399,
+				odds = { common = 50, rare = 30, epic = 15, legendary = 5 },
+				refund = 15,
+				pity = { tier = "legendary", every = 30 },
+			},
+			DAILY = {
+				{ coins = 50 },
+				{ coins = 75 },
+				{ crystals = 15 },
+				{ coins = 100 },
+				{ coins = 150, trials = 1 },
+				{ coins = 200 },
+				{ ball = 13 },
+			},
+			LATER_DAY7 = { coins = 300, crystals = 10 },
+			MILE = {
+				{ day = 14, coins = 4000 },
+				{ day = 21, coins = 4000, crystals = 50 },
+				{ day = 28, coins = 6000 },
+				{ day = 35, coins = 6000, crystals = 50 },
+				{ day = 42, coins = 8000 },
+			},
+			levelEvery = 5,
+			levelCrystals = 15,
 			levelBonus = 0,
-			book = { every = E.BOOK.crystalsEvery, crystals = E.BOOK.crystals, coins = 0 },
-			STARTER = E.STARTER,
+			book = { every = 10, crystals = 10, coins = 0 },
+			STARTER = { robux = 99, epicChoice = true, crystals = 100, coins = 1000, hours = 48 },
 			packs = packs,
 			packCoins = false,
-			draftAny = E.DRAFT.any,
+			draftAny = 10,
 		}
 	end
-	local F = E.E4
+	local F = E
 	local packs = {}
 	for _, pk in E.COIN_PACKS do
 		table.insert(packs, { amount = pk.coins, robux = pk.robux })
@@ -663,7 +687,14 @@ local KINDS = {
 	{ name = "free 30m, looks greedy", minutes = 30, friendShare = 0, buys = {}, looksGreedy = true },
 	{ name = "free 30 min + friend", minutes = 30, friendShare = 0.3, buys = {} },
 	{ name = "free 2 h/day", minutes = 120, friendShare = 0, buys = {} },
-	{ name = "free 30m, crystal spins", minutes = 30, friendShare = 0, buys = {}, crystalsToBalls = true, oldOnly = true },
+	{
+		name = "free 30m, crystal spins",
+		minutes = 30,
+		friendShare = 0,
+		buys = {},
+		crystalsToBalls = true,
+		oldOnly = true,
+	},
 	{ name = "free 30m, 1 paid Any/day", minutes = 30, friendShare = 0, buys = {}, draftDaily = true },
 	{
 		name = "starter 30m (99)",
@@ -726,168 +757,180 @@ local function legGap(days: { number }): number
 end
 
 local N = tonumber(process.args[1]) or 400
-local summary: { [string]: { [string]: { d100: string, hand30: number, perDay: number, legs: string, rbx: number } } } = {}
+local summary: { [string]: { [string]: { d100: string, hand30: number, perDay: number, legs: string, rbx: number } } } =
+	{}
 for _, mname in { "old", "e4" } do
-V = model(mname)
-summary[mname] = {}
-print(("\n== model %s == economy sim, %d players per kind, %d days, %d looks"):format(mname, N, A.days, #LOOKS))
-print(
-	"kind                    | 1st coin buy   | 50% day      | 100% day       | coins on hand d1/3/7/14/30   | wk1 days new ball/any | R$"
-)
-for _, kind in KINDS do
-	if kind.oldOnly and mname ~= "old" then
-		continue
-	end
-	-- same seed per kind: adding or reordering kinds does not shift the others' numbers
-	rngState = 12345
-	local fb, fbm, d50, d100 = {}, {}, {}, {}
-	local hands = { [1] = {}, [3] = {}, [7] = {}, [14] = {}, [30] = {}, [60] = {}, [120] = {} }
-	local nb, na, rbx, n7, n14, n28 = {}, {}, {}, {}, {}, {}
-	local n21, n35, n42, n48 = {}, {}, {}, {}
-	local gapR, gapB, gapL = {}, {}, {}
-	local leg3, leg4, leg5 = {}, {}, {}
-	local look30, look60, look120, lookFirst, lookAll = {}, {}, {}, {}, {}
-	local lv7, lv30, earn30, cr7, cr30 = {}, {}, {}, {}, {}
-	local never = 0
-	for _ = 1, N do
-		local p = newPlayer(kind)
-		local balls: { [number]: number } = {}
-		for d = 1, A.days do
-			day(p, d)
-			balls[d] = p.n
-			if d == 7 then
-				table.insert(lv7, p.level)
-				table.insert(cr7, p.freeCr)
-			elseif d == 30 then
-				table.insert(lv30, p.level)
-				table.insert(earn30, p.earned / 30)
-				table.insert(cr30, p.freeCr)
-				table.insert(look30, p.lookN)
-			elseif d == 60 then
-				table.insert(look60, p.lookN)
+	V = model(mname)
+	summary[mname] = {}
+	print(("\n== model %s == economy sim, %d players per kind, %d days, %d looks"):format(mname, N, A.days, #LOOKS))
+	print(
+		"kind                    | 1st coin buy   | 50% day      | 100% day       | coins on hand d1/3/7/14/30   | wk1 days new ball/any | R$"
+	)
+	for _, kind in KINDS do
+		if kind.oldOnly and mname ~= "old" then
+			continue
+		end
+		-- same seed per kind: adding or reordering kinds does not shift the others' numbers
+		rngState = 12345
+		local fb, fbm, d50, d100 = {}, {}, {}, {}
+		local hands = { [1] = {}, [3] = {}, [7] = {}, [14] = {}, [30] = {}, [60] = {}, [120] = {} }
+		local nb, na, rbx, n7, n14, n28 = {}, {}, {}, {}, {}, {}
+		local n21, n35, n42, n48 = {}, {}, {}, {}
+		local gapR, gapB, gapL = {}, {}, {}
+		local leg3, leg4, leg5 = {}, {}, {}
+		local look30, look60, look120, lookFirst, lookAll = {}, {}, {}, {}, {}
+		local lv7, lv30, earn30, cr7, cr30 = {}, {}, {}, {}, {}
+		local never = 0
+		for _ = 1, N do
+			local p = newPlayer(kind)
+			local balls: { [number]: number } = {}
+			for d = 1, A.days do
+				day(p, d)
+				balls[d] = p.n
+				if d == 7 then
+					table.insert(lv7, p.level)
+					table.insert(cr7, p.freeCr)
+				elseif d == 30 then
+					table.insert(lv30, p.level)
+					table.insert(earn30, p.earned / 30)
+					table.insert(cr30, p.freeCr)
+					table.insert(look30, p.lookN)
+				elseif d == 60 then
+					table.insert(look60, p.lookN)
+				end
 			end
+			table.insert(fb, if p.firstBuy then p.firstBuy.day else 999)
+			table.insert(fbm, if p.firstBuy then p.firstBuy.min else 9999)
+			table.insert(d50, p.d50 or 999)
+			if p.d100 then
+				table.insert(d100, p.d100)
+			else
+				never += 1
+				table.insert(d100, 999)
+			end
+			for k, t in hands do
+				table.insert(t, p.hand[k])
+			end
+			table.insert(nb, p.newBallDays)
+			table.insert(na, p.newAnyDays)
+			table.insert(rbx, p.robux)
+			table.insert(n7, balls[7])
+			table.insert(n14, balls[14])
+			table.insert(n21, balls[21])
+			table.insert(n28, balls[28])
+			table.insert(n35, balls[35])
+			table.insert(n42, balls[42])
+			table.insert(n48, balls[48])
+			table.insert(gapR, maxGap(p.rewards, 14, 48))
+			table.insert(gapB, maxGap(p.ballDays, 14, 48))
+			table.insert(gapL, legGap(p.legDays))
+			local legs = table.clone(p.legDays)
+			table.sort(legs)
+			table.insert(leg3, legs[3] or 999)
+			table.insert(leg4, legs[4] or 999)
+			table.insert(leg5, legs[5] or 999)
+			table.insert(look120, p.lookN)
+			table.insert(lookFirst, p.lookFirst or 999)
+			table.insert(lookAll, p.lookAll or 999)
 		end
-		table.insert(fb, if p.firstBuy then p.firstBuy.day else 999)
-		table.insert(fbm, if p.firstBuy then p.firstBuy.min else 9999)
-		table.insert(d50, p.d50 or 999)
-		if p.d100 then
-			table.insert(d100, p.d100)
-		else
-			never += 1
-			table.insert(d100, 999)
-		end
-		for k, t in hands do
-			table.insert(t, p.hand[k])
-		end
-		table.insert(nb, p.newBallDays)
-		table.insert(na, p.newAnyDays)
-		table.insert(rbx, p.robux)
-		table.insert(n7, balls[7])
-		table.insert(n14, balls[14])
-		table.insert(n21, balls[21])
-		table.insert(n28, balls[28])
-		table.insert(n35, balls[35])
-		table.insert(n42, balls[42])
-		table.insert(n48, balls[48])
-		table.insert(gapR, maxGap(p.rewards, 14, 48))
-		table.insert(gapB, maxGap(p.ballDays, 14, 48))
-		table.insert(gapL, legGap(p.legDays))
-		local legs = table.clone(p.legDays)
-		table.sort(legs)
-		table.insert(leg3, legs[3] or 999)
-		table.insert(leg4, legs[4] or 999)
-		table.insert(leg5, legs[5] or 999)
-		table.insert(look120, p.lookN)
-		table.insert(lookFirst, p.lookFirst or 999)
-		table.insert(lookAll, p.lookAll or 999)
+		print(
+			("%-23s | d%-2d %4.0f min | d%-3d (%d-%d) | d%-3d (%d-%d) %s| %5d %5d %5d %5d %5d | %d / %d | %d"):format(
+				kind.name,
+				median(fb),
+				median(fbm),
+				median(d50),
+				pct(d50, 0.1),
+				pct(d50, 0.9),
+				median(d100),
+				pct(d100, 0.1),
+				pct(d100, 0.9),
+				if never > 0 then ("never %d "):format(never) else "",
+				median(hands[1]),
+				median(hands[3]),
+				median(hands[7]),
+				median(hands[14]),
+				median(hands[30]),
+				median(nb),
+				median(na),
+				median(rbx)
+			)
+		)
+		print(
+			("%-23s   balls d7/14/28: %d / %d / %d, level d7/d30: %d / %d, coins/day (d1-30): %d, free crystals d7/d30: %d / %d"):format(
+				"",
+				median(n7),
+				median(n14),
+				median(n28),
+				median(lv7),
+				median(lv30),
+				median(earn30),
+				median(cr7),
+				median(cr30)
+			)
+		)
+		print(
+			("%-23s   d14-48 gap reward/ball/legendary: %d / %d / %d days, balls 14/21/28/35/42/48: %d %d %d %d %d %d"):format(
+				"",
+				median(gapR),
+				median(gapB),
+				median(gapL),
+				median(n14),
+				median(n21),
+				median(n28),
+				median(n35),
+				median(n42),
+				median(n48)
+			)
+		)
+		print(
+			("%-23s   legendary ball 3/4/5 on day %d / %d / %d (1 and 2 are the tutorial spin and VOID)"):format(
+				"",
+				median(leg3),
+				median(leg4),
+				median(leg5)
+			)
+		)
+		print(
+			("%-23s   looks d30/60/120: %d / %d / %d of %d, first d%d, all d%d, coins d60/d120: %d / %d"):format(
+				"",
+				median(look30),
+				median(look60),
+				median(look120),
+				#LOOKS,
+				median(lookFirst),
+				median(lookAll),
+				median(hands[60]),
+				median(hands[120])
+			)
+		)
+		summary[mname][kind.name] = {
+			d100 = ("d%d (%d-%d)"):format(median(d100), pct(d100, 0.1), pct(d100, 0.9)),
+			hand30 = median(hands[30]),
+			perDay = median(earn30),
+			legs = ("%d/%d/%d"):format(median(leg3), median(leg4), median(leg5)),
+			rbx = median(rbx),
+		}
 	end
-	print(
-		("%-23s | d%-2d %4.0f min | d%-3d (%d-%d) | d%-3d (%d-%d) %s| %5d %5d %5d %5d %5d | %d / %d | %d"):format(
-			kind.name,
-			median(fb),
-			median(fbm),
-			median(d50),
-			pct(d50, 0.1),
-			pct(d50, 0.9),
-			median(d100),
-			pct(d100, 0.1),
-			pct(d100, 0.9),
-			if never > 0 then ("never %d "):format(never) else "",
-			median(hands[1]),
-			median(hands[3]),
-			median(hands[7]),
-			median(hands[14]),
-			median(hands[30]),
-			median(nb),
-			median(na),
-			median(rbx)
-		)
-	)
-	print(
-		("%-23s   balls d7/14/28: %d / %d / %d, level d7/d30: %d / %d, coins/day (d1-30): %d, free crystals d7/d30: %d / %d"):format(
-			"",
-			median(n7),
-			median(n14),
-			median(n28),
-			median(lv7),
-			median(lv30),
-			median(earn30),
-			median(cr7),
-			median(cr30)
-		)
-	)
-	print(
-		("%-23s   d14-48 gap reward/ball/legendary: %d / %d / %d days, balls 14/21/28/35/42/48: %d %d %d %d %d %d"):format(
-			"",
-			median(gapR),
-			median(gapB),
-			median(gapL),
-			median(n14),
-			median(n21),
-			median(n28),
-			median(n35),
-			median(n42),
-			median(n48)
-		)
-	)
-	print(
-		("%-23s   legendary ball 3/4/5 on day %d / %d / %d (1 and 2 are the tutorial spin and VOID)"):format(
-			"",
-			median(leg3),
-			median(leg4),
-			median(leg5)
-		)
-	)
-	print(
-		("%-23s   looks d30/60/120: %d / %d / %d of %d, first d%d, all d%d, coins d60/d120: %d / %d"):format(
-			"",
-			median(look30),
-			median(look60),
-			median(look120),
-			#LOOKS,
-			median(lookFirst),
-			median(lookAll),
-			median(hands[60]),
-			median(hands[120])
-		)
-	)
-	summary[mname][kind.name] = {
-		d100 = ("d%d (%d-%d)"):format(median(d100), pct(d100, 0.1), pct(d100, 0.9)),
-		hand30 = median(hands[30]),
-		perDay = median(earn30),
-		legs = ("%d/%d/%d"):format(median(leg3), median(leg4), median(leg5)),
-		rbx = median(rbx),
-	}
-end
 end
 
-print("\n== old vs e4 (median): 27/27 day (p10-p90) | coins on hand d30 | coins earned/day d1-30 | legendary 3/4/5 day | R$")
+print(
+	"\n== old vs e4 (median): 27/27 day (p10-p90) | coins on hand d30 | coins earned/day d1-30 | legendary 3/4/5 day | R$"
+)
 for _, kind in KINDS do
 	local o, n = summary.old[kind.name], summary.e4[kind.name]
 	if o and n then
 		print(
 			("%-24s | %-13s -> %-13s | %5d -> %5d | %4d -> %4d | %s -> %s | %d"):format(
-				kind.name, o.d100, n.d100, o.hand30, n.hand30, o.perDay, n.perDay, o.legs, n.legs, n.rbx
+				kind.name,
+				o.d100,
+				n.d100,
+				o.hand30,
+				n.hand30,
+				o.perDay,
+				n.perDay,
+				o.legs,
+				n.legs,
+				n.rbx
 			)
 		)
 	end

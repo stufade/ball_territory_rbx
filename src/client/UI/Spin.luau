@@ -182,8 +182,9 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		legendary = sample("legendary"),
 	}
 
-	local lines: { [string]: Net.SpinLine } = { coins = board.coins, crystals = board.crystals }
-	local cur = if hit and lines[hit.cur] then hit.cur else "coins"
+	-- E4: one roulette, coins
+	local lines: { [string]: Net.SpinLine } = { coins = board.coins }
+	local cur = "coins"
 
 	-- layout: reel well on top, chips + guarantee row, then the buttons. Buttons >= 64 design px
 	-- (44 px on a 390 px tall phone).
@@ -334,7 +335,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	lift(resultBox, 12)
 
 	local function prefix(c: string): string
-		return if c == "coins" then "Coin" else "Gem"
+		return "Coin"
 	end
 
 	-- odds: one chip per tier, left of the guarantee
@@ -342,7 +343,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	local oddsW = innerW - pityW - gap
 	local function chips(c: string, line: Net.SpinLine)
 		local box = Theme.clear(card, UDim2.fromOffset(oddsW, rowH), UDim2.fromOffset(pad, rowY))
-		box.Name = if c == "coins" then "OddsCoins" else "OddsGems"
+		box.Name = "OddsCoins"
 		local weight = { common = 1, rare = 1, epic = 1, legendary = 1.25, refund = 1 }
 		local sum = 0
 		for _, tier in CYCLE do
@@ -393,7 +394,6 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		end
 	end
 	chips("coins", board.coins)
-	chips("crystals", board.crystals)
 
 	-- guarantee: the tier it promises, how many spins left, a filling bar
 	local function pityBox(c: string, line: Net.SpinLine)
@@ -407,7 +407,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 			Theme.BG,
 			14
 		)
-		box.Name = if c == "coins" then "PityBoxCoins" else "PityBoxGems"
+		box.Name = "PityBoxCoins"
 		local be = box:FindFirstChild("Edge") :: UIStroke
 		be.Color = col
 		local d = rowH - 12
@@ -448,30 +448,12 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 			UDim2.fromScale(0.5, 0.5),
 			{ anchor = MID, stroke = 2, z = 4 }
 		)
-		count.Name = if c == "coins" then "PityCoins" else "PityGems"
+		count.Name = "PityCoins"
 	end
 	pityBox("coins", board.coins)
-	pityBox("crystals", board.crystals)
 
-	-- buttons: the currency switch (coin / crystal pills) and the big SPIN
-	local iconFn = function(parent: Instance, c: string, d: number, pos: UDim2): GuiObject
-		return Money.icon(parent, c, d, pos)
-	end
-	local modeW = math.clamp(math.floor(innerW * 0.19), 150, 190)
-	local modeCoins =
-		Theme.price(card, "COINS", UDim2.fromOffset(modeW, btnH), UDim2.fromOffset(pad, btnY), "coins", iconFn, 24)
-	modeCoins.Name = "ModeCoins"
-	local modeGems = Theme.price(
-		card,
-		"CRYSTALS",
-		UDim2.fromOffset(modeW, btnH),
-		UDim2.fromOffset(pad + modeW + 8, btnY),
-		"crystals",
-		iconFn,
-		24
-	)
-	modeGems.Name = "ModeGems"
-	local goX = pad + modeW * 2 + 18
+	-- the big SPIN (E4: one currency, no currency switch)
+	local goX = pad
 	local goW = innerW + pad - goX
 	-- Fast Spin pass (server-owned): ten spins for one payment; without it, the pass for R$ in the same place.
 	-- The whole tab is gone under a paid-random ban, so this never shows there.
@@ -492,8 +474,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	)
 	go.Name = "SpinGo"
 	local function price10(c: string): number
-		local sp = (Economy.SPIN :: any)[c]
-		return sp.price10 or lines[c].price * 10
+		return (Economy.SPIN :: any).price10 or lines[c].price * 10
 	end
 	local ten: TextButton? = nil
 	if tenW > 0 then
@@ -528,10 +509,6 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	end
 	local goLip = math.clamp(math.floor(btnH * 0.1 + 0.5), 4, 9)
 	local goLabel = go:FindFirstChild("Label") :: TextLabel?
-	modeCoins.NextSelectionRight = modeGems
-	modeGems.NextSelectionLeft = modeCoins
-	modeGems.NextSelectionRight = go
-	go.NextSelectionLeft = modeGems
 
 	local hold = false
 	local function paint(c: string)
@@ -540,36 +517,18 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		end
 		cur = c
 		panel:SetAttribute("SpinCur", c)
-		local coinOn = c == "coins"
-		local show: { [string]: boolean } =
-			{ OddsCoins = coinOn, OddsGems = not coinOn, PityBoxCoins = coinOn, PityBoxGems = not coinOn }
-		for name, on in show do
-			local o = card:FindFirstChild(name) :: GuiObject?
-			if o then
-				o.Visible = on
-			end
-		end
 		for _, cell in refundTiles do
-			local old = cell:FindFirstChild("Coin") or cell:FindFirstChild("Gem")
+			local old = cell:FindFirstChild("Coin")
 			if old then
 				old:Destroy()
 			end
 			Money.icon(cell, c, math.floor(ballD * 0.82), UDim2.fromOffset(tileW / 2, math.floor(tileH * 0.42)))
 		end
-		for b, on in { [modeCoins] = coinOn, [modeGems] = not coinOn } do
-			local base = if b == modeCoins then Theme.PRICE_COIN else Theme.PRICE_GEM
-			b.BackgroundColor3 = if on then base else base:Lerp(Theme.SLOT, 0.6)
-			Theme.select(b, on)
-			local l = b:FindFirstChild("Label") :: TextLabel?
-			if l then
-				l.TextColor3 = if on then Theme.TEXT else Theme.DIM
-			end
-		end
 		local price = lines[c].price
-		local bal = if coinOn then v.coins or 0 else v.crystals or 0
+		local bal = v.coins or 0
 		local afford = bal >= price
 		local text = `SPIN {Money.fmt(price)}`
-		local old = go:FindFirstChild("Coin") or go:FindFirstChild("Gem")
+		local old = go:FindFirstChild("Coin")
 		if old then
 			old:Destroy()
 		end
@@ -586,7 +545,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 			lift(ic, 4)
 		end
 		go.Active = afford and panel:GetAttribute("SpinPhase") ~= "spinning"
-		go.BackgroundColor3 = if afford then (if coinOn then Theme.PRICE_COIN else Theme.PRICE_GEM) else Theme.PANEL_HI
+		go.BackgroundColor3 = if afford then Theme.PRICE_COIN else Theme.PANEL_HI
 		if ten and hasFast then
 			local p10 = price10(c)
 			local ok10 = bal >= p10
@@ -596,24 +555,16 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 				l10.TextColor3 = if ok10 then Theme.TEXT else Theme.DIM
 			end
 			ten.Active = ok10 and panel:GetAttribute("SpinPhase") ~= "spinning"
-			ten.BackgroundColor3 = if ok10
-				then (if coinOn then Theme.PRICE_COIN else Theme.PRICE_GEM)
-				else Theme.PANEL_HI
+			ten.BackgroundColor3 = if ok10 then Theme.PRICE_COIN else Theme.PANEL_HI
 		end
 	end
 
-	modeCoins.Activated:Connect(function()
-		paint("coins")
-	end)
-	modeGems.Activated:Connect(function()
-		paint("crystals")
-	end)
 	go.Activated:Connect(function()
 		if hold or panel:GetAttribute("SpinPhase") ~= "odds" then
 			return
 		end
 		local line = lines[cur]
-		local now = if cur == "coins" then v.coins or 0 else v.crystals or 0
+		local now = v.coins or 0
 		if now < line.price then
 			return
 		end
@@ -625,7 +576,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 			if hold or panel:GetAttribute("SpinPhase") ~= "odds" then
 				return
 			end
-			local now = if cur == "coins" then v.coins or 0 else v.crystals or 0
+			local now = v.coins or 0
 			if now < price10(cur) then
 				return
 			end
@@ -805,7 +756,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 			mEdge.Color = TIER_COL[hit.tier]:Lerp(WHITE, 0.2)
 			panel:SetAttribute("SpinOn", hit.tier)
 			panel:SetAttribute("SpinPhase", "odds")
-			local bal = if cur == "coins" then v.coins or 0 else v.crystals or 0
+			local bal = v.coins or 0
 			go.Active = bal >= lines[cur].price
 			result.Text = prize(hit)
 			celebrate(hit.tier, prizeTile)

@@ -1,9 +1,10 @@
 --!strict
 -- M3.1 reaction book: all 42 reactions in a 6 x 7 grid. Found ones are cells in the reaction's colour with its name,
--- the rest dark silhouettes with "???". Header: count and the pay (25 coins each new, 10 crystals every 10, 1000 for
--- all). Reactions found in the last match glow (NEW!).
+-- the rest dark silhouettes with "???". Header: count and the pay (25 coins each new, 200 more every 10, 1000 for
+-- all; Economy.BOOK). Reactions found in the last match glow (NEW!).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
 local Look = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Look"))
 local Money = require("./Money")
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net"))
@@ -48,7 +49,7 @@ function Book.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, fresh: { [strin
 			stroke = 4,
 		})
 	head.Name = "Head"
-	-- "+25 (coin) EACH NEW · EVERY 10: +10 (gem)"
+	-- "+25 (coin) EACH NEW · EVERY 10: +200 · ALL: +1000"
 	local hint = Theme.clear(panel, UDim2.fromOffset(560, 26), UDim2.fromOffset(20, 52))
 	local function piece(text: string, x: number, wd: number)
 		Theme.text(hint, text, 20, UDim2.fromOffset(wd, 26), UDim2.fromOffset(x, 0), {
@@ -58,11 +59,10 @@ function Book.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, fresh: { [strin
 			bold = true,
 		})
 	end
-	piece("+25", 0, 40)
+	local B = Economy.BOOK
+	piece(`+{B.coins}`, 0, 40)
 	Money.icon(hint, "coins", 22, UDim2.fromOffset(52, 13))
-	piece("EACH NEW · EVERY 10: +10", 68, 260)
-	Money.icon(hint, "crystals", 24, UDim2.fromOffset(338, 13))
-	piece("· ALL: +1000", 356, 150)
+	piece(`EACH NEW · EVERY {B.bonusEvery}: +{B.bonus} · ALL: +{B.allCoins}`, 68, 420)
 	local close =
 		Theme.button(panel, "X", UDim2.fromOffset(56, 56), UDim2.new(1, -10, 0, 10), Theme.BAD, nil, 30, V2(1, 0))
 	close.Name = "Close"

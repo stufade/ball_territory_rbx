@@ -73,7 +73,7 @@ function Analytics.custom(player: Player, name: string, value: number, mode: str
 	end)
 end
 
--- M3.1 economy (docs/economy.md «Что делать luau-coder» 8): every source and sink of coins and crystals.
+-- M3.1 economy (docs/economy.md «Что делать luau-coder» 8): every source and sink of coins (E4: the only currency).
 -- f: Logic/Wallet.Flow {cur, n, sink, kind (AnalyticsEconomyTransactionType name), why (item SKU), bal}.
 function Analytics.flows(player: Player, log: { any })
 	for _, f in log do
@@ -81,7 +81,7 @@ function Analytics.flows(player: Player, log: { any })
 			AnalyticsService:LogEconomyEvent(
 				player,
 				if f.sink then Enum.AnalyticsEconomyFlowType.Sink else Enum.AnalyticsEconomyFlowType.Source,
-				if f.cur == "coins" then "Coins" else "Crystals",
+				"Coins",
 				f.n,
 				f.bal,
 				f.kind,
@@ -115,13 +115,13 @@ function Analytics.collection(player: Player, balls: number, day: number, book: 
 	event(player, "Collection", balls, d, `book {book // 10 * 10}`)
 end
 
--- M3.2 hooks (spins and offers do not exist in M3.1): a spin (coins | crystals, tier, pity counter after),
+-- M3.2 hooks (spins and offers do not exist in M3.1): a spin (coins, tier, pity counter after),
 -- an offer (what, shown | declined | bought).
 function Analytics.spin(player: Player, kind: string, tier: string, pity: number)
 	event(player, "Spin", pity, kind, tier)
 end
 
--- Once per session when PolicyService answers. hidden = both paid spins stay off (not a broken shop).
+-- Once per session when PolicyService answers. hidden = the roulette stays off (not a broken shop).
 function Analytics.paidRandom(player: Player, restricted: boolean)
 	event(player, "PaidRandom", if restricted then 1 else 0, if restricted then "hidden" else "shown", "spin")
 end
@@ -130,7 +130,7 @@ function Analytics.offer(player: Player, what: string, action: string)
 	event(player, "Offer", 1, what, action)
 end
 
--- A cosmetic (docs/economy.md «Косметика»): the look id, paid with coins or Robux.
+-- A cosmetic (docs/economy.md «Косметика»): the look id, paid with coins (or a late Robux receipt).
 function Analytics.look(player: Player, id: string, pay: string)
 	event(player, "Look", 1, id, pay)
 end

@@ -1,11 +1,11 @@
 --!strict
 -- Developer product and game pass ids of the live game (universe 10775439626), created 2026-11-15
 -- on Creator Dashboard → Monetization. Table of names, prices and ids: docs/products.md.
--- `crystals` is parallel to Economy.CRYSTAL_PACKS. `ball` keys are Economy.PRICE.robux.
--- `looks` keys are Economy.LOOKS ids. A non-zero id is granted by Logic/Looks when the receipt is processed.
+-- `packs` is parallel to Economy.COIN_PACKS (E4: the former crystal packs, same ids). `ball` (tiers) and `looks`
+-- (Economy.LOOKS ids) are no longer sold (E4: coins only); they stay so a late receipt still grants (Logic/Receipt).
 -- `passes` keys are Economy.PASSES ids; they are game passes, not products (UserOwnsGamePassAsync).
 return {
-	crystals = { 3732004217, 3732004316, 3732004487, 3732004521, 3732004528, 3732004535 },
+	packs = { 3732004217, 3732004316, 3732004487, 3732004521, 3732004528, 3732004535 },
 	ball = { common = 3732004545, rare = 3732004551, epic = 3732004558, legendary = 3732004565 },
 	starter = 3732004572,
 	passes = { coins2x = 2089810640, vip = 2088964657, fastSpin = 2088970590 },

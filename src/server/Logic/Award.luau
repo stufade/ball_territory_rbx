@@ -67,7 +67,7 @@ function Award.match(
 		afk = info.afk,
 		friend = coins.friend,
 	}, now, cfg, rand, log)
-	local quests, found = {}, { new = {}, crystals = 0, coins = 0, all = false }
+	local quests, found = {}, { new = {}, coins = 0, all = false }
 	if not info.afk then
 		quests = Daily.progress(d, {
 			mode = info.mode,
@@ -90,11 +90,8 @@ function Award.view(d: Progress.Data, now: number, serverNow: number, cfg: any, 
 	local deal = Shop.offer(d, E)
 	return {
 		coins = d.coins,
-		crystals = d.crystals,
-		-- ball of the day: both prices are already the floored 30% off; nil once that ball is owned
-		dailyBall = if deal
-			then { e = deal.e, coins = deal.coins, crystals = deal.crystals, endsAt = serverNow + Daily.left(now) }
-			else nil,
+		-- ball of the day: the price is already the floored 30% off; nil once that ball is owned
+		dailyBall = if deal then { e = deal.e, coins = deal.coins, endsAt = serverNow + Daily.left(now) } else nil,
 		daily = { n = d.loginDays, pos = pos, ready = ready, cards = cards },
 		quests = {
 			list = Daily.questView(d, E),

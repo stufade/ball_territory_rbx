@@ -147,7 +147,7 @@ function UI.start()
 	local tutor = Tutor.new(canvas, ctx :: any)
 	-- T2.2 level bar, 2x XP badge and NEW BALL! on the plaza (over the plaza buttons)
 	local level = Level.new(canvas, ctx :: any)
-	-- M3.1 coins and crystals, login reward, quests, reaction book on the plaza
+	-- M3.1 coins, login reward, quests, reaction book on the plaza
 	-- the shared ctx: canvas and topbar change with the screen
 	local wctx: any = ctx
 	wctx.busy = function()

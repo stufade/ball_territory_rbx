@@ -3,7 +3,7 @@
 -- a turning black hole (purple glow, swirling arcs, rings and specks pulled into the core, the VOID ball inside),
 -- "DAY 7: VOID" and how many days are left. Opening: the window pops, the cards pop up one by one, day 7 last with a
 -- flash, CLAIM! pulses. Taken days are dimmed with a green tick; today has a yellow frame and pulses.
--- CLAIM! -> Action daily; the server's answer rebuilds with `claim`: the card pops, coins/crystals fly from it into
+-- CLAIM! -> Action daily; the server's answer rebuilds with `claim`: the card pops, coins fly from it into
 -- a copy of the counter at its plaza place and it rolls up; VOID day: the hole flares, rays and confetti.
 -- Opens by itself once a day on the plaza (Wallet), or from the DAILY button. Motion off with ReducedMotion.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -99,21 +99,14 @@ local function shade(f: GuiObject, radius: number)
 	Theme.round(s, radius)
 end
 
--- coins / crystals of a gift: icons at y `cy`, amount under them
+-- coins of a gift: the icon at y `cy`, amount under it
 local function goods(f: Frame, c: Net.DayCard, w: number, cy: number, icon: number, size: number, ay: number)
-	local both = c.coins ~= nil and c.crystals ~= nil
-	local d = if both then math.floor(icon * 0.78) else icon
-	local dx = if both then d * 0.56 else 0
 	local amount = ""
 	if c.coins then
-		Money.icon(f, "coins", d, UDim2.fromOffset(w / 2 - dx, cy))
+		Money.icon(f, "coins", icon, UDim2.fromOffset(w / 2, cy))
 		amount = Money.fmt(c.coins)
 	end
-	if c.crystals then
-		Money.icon(f, "crystals", d, UDim2.fromOffset(w / 2 + dx, cy))
-		amount = if both then `{amount} +{c.crystals}` else Money.fmt(c.crystals)
-	end
-	local col = if c.coins then Money.COIN else Money.GEM
+	local col = Money.COIN
 	Theme.label(f, amount, size, UDim2.new(1, -8, 0, size + 4), UDim2.new(0.5, 0, 0, ay), {
 		anchor = TOP_MID,
 		color = col,
@@ -266,7 +259,7 @@ local function hole(parent: Frame, cx: number, cy: number, fx: Cheer.Ctx): Frame
 	return box
 end
 
--- the big card of day 7: VOID on the first cycle, coins and crystals later
+-- the big card of day 7: VOID on the first cycle, coins later
 local function big(panel: Frame, c: Net.DayCard, pos: number, fx: Cheer.Ctx): Frame
 	local x, y = cardAt(7)
 	local isVoid = c.ball ~= nil
@@ -330,12 +323,12 @@ local function fmtLeft(s: number): string
 	return string.format("%d:%02d:%02d", s // 3600, s // 60 % 60, s % 60)
 end
 
--- Claim: coins/crystals fly from the card (px, py) into a copy of the plaza counter, which rolls up as they land.
+-- Claim: coins fly from the card (px, py) into a copy of the plaza counter, which rolls up as they land.
 local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: number, py: number, ctx: Ctx)
 	local cv = ctx.canvas
 	local L = Theme.plaza(cv, ctx.topbar or V2(0, 0))
 	local k = 0
-	for _, cur in { "coins", "crystals" } do
+	for _, cur in { "coins" } do
 		local n = (gift :: any)[cur] :: number?
 		if not n then
 			continue
@@ -346,7 +339,7 @@ local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: numb
 		local box =
 			Theme.frame(layer, UDim2.fromOffset(L.moneyW, L.moneyH), UDim2.fromOffset(L.walletX, y), Theme.PANEL)
 		box.AnchorPoint = V2(1, 0)
-		box.Name = if cur == "coins" then "FlyCoins" else "FlyCrystals"
+		box.Name = "FlyCoins"
 		box.ZIndex = 30
 		Theme.round(box, L.moneyH / 2)
 		Theme.stroke(box, 3, Theme.INK)
@@ -356,7 +349,7 @@ local function fly(layer: Frame, v: Net.ProfileView, gift: Net.DayCard, px: numb
 			Theme.label(box, Money.fmt(total - n), 28, UDim2.fromOffset(L.moneyW - 54, 30), UDim2.new(1, -14, 0.5, 0), {
 				anchor = V2(1, 0.5),
 				align = Enum.TextXAlignment.Right,
-				color = if cur == "coins" then Money.COIN else Money.GEM,
+				color = Money.COIN,
 				z = 31,
 			})
 		t.Name = "Value"
@@ -564,8 +557,8 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 			Cheer.rays(layer, ctx.fx, e, px, py, 520).ZIndex = 1
 			Cheer.confetti(layer, ctx.fx)
 		end
-		-- coins burst in LIGHT yellow, crystals in CRYSTAL blue
-		local col = if isVoid then e elseif gift.crystals and not gift.coins then 14 else 9
+		-- coins burst in LIGHT yellow
+		local col = if isVoid then e else 9
 		Cheer.burst(layer, ctx.fx, col, px, py)
 		local hy = if claim.pos == 7 then py - BH / 2 + 60 else py - CH / 2 - 6
 		local taken = Theme.label(

@@ -1,5 +1,5 @@
 --!strict
--- M3.1 coin and crystal art in the V2 style (flat shapes with an ink outline and a shine, no image assets) and the
+-- M3.1 coin art in the V2 style (flat shapes with an ink outline and a shine, no image assets) and the
 -- rolling number of a counter. Rolls run from step(dt) on Heartbeat, not TweenService.
 local Theme = require("./Theme")
 
@@ -9,33 +9,17 @@ local MID = Vector2.new(0.5, 0.5)
 
 Money.COIN = Color3.fromHex("#ffd63c")
 Money.COIN_DARK = Color3.fromHex("#e89a14")
-Money.GEM = Color3.fromHex("#6fd8ff")
-Money.GEM_DARK = Color3.fromHex("#9a5cff")
 
--- A coin (yellow disc, darker rim, shine) or a crystal (a turned square, blue to purple) of size d.
+-- A coin (yellow disc, darker rim, shine) of size d. E4: coins are the only currency; `cur` stays for callers.
 function Money.icon(parent: Instance, cur: string, d: number, pos: UDim2?): Frame
 	local box = Theme.clear(parent, UDim2.fromOffset(d, d), pos, MID)
-	box.Name = if cur == "coins" then "Coin" else "Gem"
-	if cur == "coins" then
-		local o = Theme.disc(box, d, Money.COIN_DARK, UDim2.fromScale(0.5, 0.5))
-		Theme.stroke(o, math.max(2, d // 14), Theme.INK)
-		local i = Theme.disc(o, d * 0.72, Money.COIN, UDim2.fromScale(0.5, 0.5))
-		i.ZIndex = o.ZIndex + 1
-		local s = Theme.disc(o, d * 0.22, Color3.new(1, 1, 1), UDim2.fromScale(0.36, 0.34), 0.25)
-		s.ZIndex = o.ZIndex + 2
-	else
-		local g = Theme.frame(box, UDim2.fromScale(0.7, 0.7), UDim2.fromScale(0.5, 0.5), Money.GEM, MID)
-		g.Rotation = 45
-		Theme.round(g, math.max(2, d // 10))
-		Theme.stroke(g, math.max(2, d // 14), Theme.INK)
-		local grad = Instance.new("UIGradient")
-		grad.Color = ColorSequence.new(Money.GEM, Money.GEM_DARK)
-		grad.Rotation = 45
-		grad.Parent = g
-		local s = Theme.frame(g, UDim2.fromScale(0.3, 0.3), UDim2.fromScale(0.2, 0.2), Color3.new(1, 1, 1))
-		s.BackgroundTransparency = 0.25
-		Theme.round(s, 3)
-	end
+	box.Name = "Coin"
+	local o = Theme.disc(box, d, Money.COIN_DARK, UDim2.fromScale(0.5, 0.5))
+	Theme.stroke(o, math.max(2, d // 14), Theme.INK)
+	local i = Theme.disc(o, d * 0.72, Money.COIN, UDim2.fromScale(0.5, 0.5))
+	i.ZIndex = o.ZIndex + 1
+	local s = Theme.disc(o, d * 0.22, Color3.new(1, 1, 1), UDim2.fromScale(0.36, 0.34), 0.25)
+	s.ZIndex = o.ZIndex + 2
 	return box
 end
 
