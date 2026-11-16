@@ -347,23 +347,37 @@ local function offer(
 	local tw = w - tx - bw - 18
 	-- the line goes on two rows when one would not fit at the minimum text (a narrow PC tile)
 	local two0 = (utf8.len(line) or #line) * 0.62 * Theme.MIN_TEXT > tw
-	Theme.label(tile, title, Theme.fit(title, 26, tw, 30), UDim2.fromOffset(tw, 28), UDim2.fromOffset(tx, if two0 then 3 else 8), {
-		anchor = V2(0, 0),
-		align = Enum.TextXAlignment.Left,
-		color = Theme.YELLOW_TXT,
-		stroke = 3,
-	}).Name =
+	Theme.label(
+		tile,
+		title,
+		Theme.fit(title, 26, tw, 30),
+		UDim2.fromOffset(tw, 28),
+		UDim2.fromOffset(tx, if two0 then 3 else 8),
+		{
+			anchor = V2(0, 0),
+			align = Enum.TextXAlignment.Left,
+			color = Theme.YELLOW_TXT,
+			stroke = 3,
+		}
+	).Name =
 		"Title"
 	local two = two0 -- "EPIC +3K / COINS"
 	local ly = if two then 30 else 36
 	local lh = if two then h - ly - 2 else 22
-	Theme.label(tile, line, if two then Theme.MIN_TEXT else Theme.fit(line, 18, tw, 22), UDim2.fromOffset(tw, lh), UDim2.fromOffset(tx, ly), {
-		anchor = V2(0, 0),
-		align = Enum.TextXAlignment.Left,
-		color = Theme.TEXT,
-		bold = true,
-		wrap = two,
-	}).Name =
+	Theme.label(
+		tile,
+		line,
+		if two then Theme.MIN_TEXT else Theme.fit(line, 18, tw, 22),
+		UDim2.fromOffset(tw, lh),
+		UDim2.fromOffset(tx, ly),
+		{
+			anchor = V2(0, 0),
+			align = Enum.TextXAlignment.Left,
+			color = Theme.TEXT,
+			bold = true,
+			wrap = two,
+		}
+	).Name =
 		"Line"
 	local buy = Theme.button(
 		tile,

@@ -71,9 +71,15 @@ do
 	check(d.v == 3 and Progress.VERSION == 3, "v1 -> v3: version")
 	check(d.level == 6 and d.xp == 120 and #d.balls == 6 and d.matches == 14 and d.wins == 8, "v1 -> v2: M2 kept")
 	check(d.tut and d.rewarded and d.played and d.boostUntil == 5000, "v1 -> v2: flags kept")
-	check(d.coins == 0 and (d :: any).crystals == nil and d.loginDays == 0 and d.dailyClaimed == -1, "v1 -> v2: wallet, login")
+	check(
+		d.coins == 0 and (d :: any).crystals == nil and d.loginDays == 0 and d.dailyClaimed == -1,
+		"v1 -> v2: wallet, login"
+	)
 	check(d.streak == 0 and #d.book == 0 and d.quests.day == -1 and #d.quests.list == 0, "v1 -> v2: quests, book")
-	check(d.pity.coins == 0 and (d.pity :: any).crystals == nil and d.starterSeen == 0 and d.starterUntil == 0, "v1 -> v2: pity")
+	check(
+		d.pity.coins == 0 and (d.pity :: any).crystals == nil and d.starterSeen == 0 and d.starterUntil == 0,
+		"v1 -> v2: pity"
+	)
 	check(d.trialsUsed.n == 0 and d.trialBonus == 0 and d.dailyBall.e == -1 and d.friend.n == 0, "v1 -> v2: rest")
 	-- a v2 record round trip, and junk in v2 fields
 	d.coins, d.loginDays, d.dailyClaimed, d.streak = 1234, 9, 20400, 4
@@ -92,7 +98,10 @@ do
 		pity = "x",
 		streak = math.huge,
 	})
-	check(junk.coins == 0 and (junk :: any).crystals == nil and junk.streak == 0 and junk.pity.coins == 0, "v2 junk: numbers")
+	check(
+		junk.coins == 0 and (junk :: any).crystals == nil and junk.streak == 0 and junk.pity.coins == 0,
+		"v2 junk: numbers"
+	)
 	check(#junk.book == 2, "v2 junk: book duplicates and non-strings dropped")
 	Progress.repair(junk, cfg, NAMES)
 	check(#junk.book == 1 and junk.book[1] == "WILDFIRE", "repair: unknown reactions dropped")
@@ -104,7 +113,10 @@ do
 	local old = { v = 2, coins = 700, crystals = 56, pity = { coins = 4, crystals = 17 }, balls = { 0, 1 } }
 	local m = Progress.migrate(old, E.CRYSTAL_TO_COINS, mlog)
 	check(m.v == 3 and m.coins == 700 + 56 * 20, `E4 migration: coins += crystals * 20, got {m.coins}`)
-	check((m :: any).crystals == nil and m.pity.coins == 4 and (m.pity :: any).crystals == nil, "E4 migration: crystals gone")
+	check(
+		(m :: any).crystals == nil and m.pity.coins == 4 and (m.pity :: any).crystals == nil,
+		"E4 migration: crystals gone"
+	)
 	check(
 		#mlog == 1 and mlog[1].cur == "coins" and mlog[1].n == 1120 and mlog[1].why == "migrate_crystals",
 		"E4 migration: one source flow migrate_crystals"
@@ -238,10 +250,7 @@ do
 		d.coins - coins == 50 + 75 + 300 + 100 + 150 + 200 + 500 + 4000,
 		"cycle 2: coins of the days + 500 on the 7th + the day-14 milestone"
 	)
-	check(
-		c.mile and c.mile.day == 14 and c.mile.coins == 4000,
-		"day 14 milestone on that claim"
-	)
+	check(c.mile and c.mile.day == 14 and c.mile.coins == 4000, "day 14 milestone on that claim")
 	check(d.loginDays == 14, "cycle 2: 14 login days")
 	cards, pos, ready = Daily.cards(d, midnight + 16 * DAY, E)
 	check(ready and pos == 1 and cards[1].today and not cards[1].got and not cards[7].ball, "cycle 3 cards")
@@ -263,10 +272,7 @@ do
 		E.LOOKS[1].id == "frame_wood" and E.LOOKS[1].coins == 2000 and (E.LOOKS[1] :: any).robux == nil,
 		"LOOKS starts at frame_wood"
 	)
-	check(
-		E.LOOKS[30].id == "frame_champion" and E.LOOKS[30].coins == 36000,
-		"LOOKS ends at frame_champion"
-	)
+	check(E.LOOKS[30].id == "frame_champion" and E.LOOKS[30].coins == 36000, "LOOKS ends at frame_champion")
 	for _, m in E.MILE do
 		sumC += m.coins
 	end
@@ -295,10 +301,7 @@ do
 		end
 		if mile then
 			hits[n] = (hits[n] or 0) + 1
-			check(
-				c.mile and c.mile.day == mile.day and c.mile.coins == mile.coins,
-				`day {n}: claim.mile is that chest`
-			)
+			check(c.mile and c.mile.day == mile.day and c.mile.coins == mile.coins, `day {n}: claim.mile is that chest`)
 			check(
 				d.coins - beforeC == dailyCoins(c.gift) + mile.coins,
 				`day {n}: coins are the daily plus that chest once`
@@ -756,7 +759,6 @@ do
 		hitEpic ~= nil and hitEpic.tier == "epic" and natural.pity.coins == 0,
 		"a natural epic resets the counter early"
 	)
-
 end
 
 -- Pass perks: VIP quest, Fast Spin x10 ------------------------------------------------------------------------

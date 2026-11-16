@@ -156,10 +156,7 @@ do
 	local coins = d.coins
 	check(Receipt.apply(d, receipt(9201, "st-1"), USER, cat, E, {}) == "granted", "the starter pack is granted once")
 	check(
-		d.starterBought
-			and Progress.owns(d, EPIC)
-			and d.coins == coins + E.STARTER.coins
-			and E.STARTER.coins == 3000,
+		d.starterBought and Progress.owns(d, EPIC) and d.coins == coins + E.STARTER.coins and E.STARTER.coins == 3000,
 		"starter pays the epic and 3 000 coins from Economy"
 	)
 	check(
@@ -182,7 +179,10 @@ do
 	local d = fresh()
 	table.insert(d.balls, 0)
 	local coins = d.coins
-	check(Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "granted", "an old look receipt grants the look")
+	check(
+		Receipt.apply(d, receipt(9301, "look-1"), USER, cat, E, {}) == "granted",
+		"an old look receipt grants the look"
+	)
 	check(
 		d.looks[1] == "frame_wood" and d.coins == coins and #d.receipts == 1 and #d.balls == 1,
 		"the grant owns the look and spends no coins"
