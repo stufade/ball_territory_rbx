@@ -5,6 +5,9 @@
 -- coins are left. Prints days to 50% / 100% of the balls, the first coin purchase, coins on hand, the empty-middle
 -- gaps, and how fast the cosmetic sink drains coins.
 -- lune run tools/econ/sim [players]      (default 400 per kind)
+-- E4 (2026-11-16): runs two models and prints a comparison at the end. "old" = the live crystal economy
+-- (top-level fields of Economy.luau), "e4" = one currency (E.E4, E.COIN_PACKS): free crystals become coins at
+-- CRYSTAL_TO_COINS, one coin roulette, payers buy coin packs.
 --
 -- MILE and LOOKS live in Economy.luau. This sim reads those tables so the numbers cannot drift.
 local process = require("@lune/process")
@@ -13,6 +16,56 @@ local E = require("../../src/shared/Economy")
 local Mock = require("../../tests/Mock")
 local Config = Mock.loader(Mock.world(), {}, {})("src/server/Config.luau")
 local XP = Config.XP
+
+-- Values of one model. The sim below reads V only, so both models share every rule.
+local function model(name: string): any
+	if name == "old" then
+		local packs = {}
+		for _, pk in E.CRYSTAL_PACKS do
+			table.insert(packs, { amount = pk.crystals, robux = pk.robux })
+		end
+		return {
+			name = "old",
+			PRICE = E.PRICE,
+			SPIN = E.SPIN.coins,
+			XSPIN = E.SPIN.crystals,
+			DAILY = E.DAILY,
+			LATER_DAY7 = E.LATER_DAY7,
+			MILE = E.MILE,
+			levelEvery = E.LEVEL_CRYSTALS_EVERY,
+			levelCrystals = E.LEVEL_CRYSTALS,
+			levelBonus = 0,
+			book = { every = E.BOOK.crystalsEvery, crystals = E.BOOK.crystals, coins = 0 },
+			STARTER = E.STARTER,
+			packs = packs,
+			packCoins = false,
+			draftAny = E.DRAFT.any,
+		}
+	end
+	local F = E.E4
+	local packs = {}
+	for _, pk in E.COIN_PACKS do
+		table.insert(packs, { amount = pk.coins, robux = pk.robux })
+	end
+	return {
+		name = "e4",
+		PRICE = F.PRICE,
+		SPIN = F.SPIN,
+		XSPIN = nil,
+		DAILY = F.DAILY,
+		LATER_DAY7 = F.LATER_DAY7,
+		MILE = F.MILE,
+		levelEvery = F.LEVEL_BONUS.every,
+		levelCrystals = 0,
+		levelBonus = F.LEVEL_BONUS.coins,
+		book = { every = F.BOOK.bonusEvery, crystals = 0, coins = F.BOOK.bonus },
+		STARTER = F.STARTER,
+		packs = packs,
+		packCoins = true,
+		draftAny = F.DRAFT.any,
+	}
+end
+local V = model("e4")
 
 -- Assumptions of play (not game values): minutes per match with queue, draft, rounds, result and the walk on the
 -- plaza; share of duels; win rates vs mixed bots/people; reactions and KOs per match.
@@ -35,7 +88,6 @@ local A = {
 }
 
 -- Same tables Economy pays and the shop will sell.
-local MILE = E.MILE
 local LOOKS = E.LOOKS
 
 local NB = 27
@@ -229,7 +281,7 @@ local function spendLooks(p: P, day: number)
 		local reserve = 0
 		local t = if p.kind.looksGreedy then nil else cheapestMissing(p)
 		if t then
-			reserve = E.PRICE.coins[t]
+			reserve = V.PRICE.coins[t]
 		end
 		if best == nil or p.coins - best.coins < reserve then
 			return
@@ -251,7 +303,7 @@ end
 local function spendCoins(p: P, day: number)
 	while p.n < NB do
 		local best, bestRatio = nil :: string?, 0
-		local cp = E.PRICE.coins
+		local cp = V.PRICE.coins
 		local t = cheapestMissing(p)
 		if t and p.coins >= cp[t] then
 			best, bestRatio = "direct", 1
@@ -263,7 +315,7 @@ local function spendCoins(p: P, day: number)
 				best, bestRatio = "daily", ratio
 			end
 		end
-		local s = E.SPIN.coins
+		local s = V.SPIN
 		if p.kind.noSpin then
 			-- paid-random policy: both roulettes stay hidden, so this player never spins
 		elseif p.coins >= s.price then
@@ -295,9 +347,12 @@ end
 
 -- Payers put crystals into the collection (upper bound: real payers also spend them in the draft).
 local function spendCrystals(p: P, day: number)
-	local xp = E.PRICE.crystals
+	if not V.XSPIN then
+		return -- e4: no crystals
+	end
+	local xp = V.PRICE.crystals
 	while p.n < NB and p.kind.crystalsToBalls do
-		local s = E.SPIN.crystals
+		local s = V.XSPIN
 		local ratio = spinValue(p, s, xp) / s.price
 		if not p.kind.noSpin and p.crystals >= s.price and ratio >= 1 then
 			p.crystals -= s.price
@@ -347,9 +402,11 @@ local function addXp(p: P, amount: number, day: number)
 		else
 			p.coins += E.LEVEL_COINS
 			p.earned += E.LEVEL_COINS
-			if p.level % E.LEVEL_CRYSTALS_EVERY == 0 then
-				p.crystals += E.LEVEL_CRYSTALS
-				p.freeCr += E.LEVEL_CRYSTALS
+			if p.level % V.levelEvery == 0 then
+				p.crystals += V.levelCrystals
+				p.freeCr += V.levelCrystals
+				p.coins += V.levelBonus
+				p.earned += V.levelBonus
 			end
 		end
 	end
@@ -409,9 +466,10 @@ local function playMatch(p: P, day: number, matchesToday: number)
 		if p.book < REACTIONS and rand() < A.bookHit * (REACTIONS - p.book) / REACTIONS then
 			p.book += 1
 			coinsGain(p, E.BOOK.coins)
-			if p.book % E.BOOK.crystalsEvery == 0 then
-				p.crystals += E.BOOK.crystals
-				p.freeCr += E.BOOK.crystals
+			if p.book % V.book.every == 0 then
+				p.crystals += V.book.crystals
+				p.freeCr += V.book.crystals
+				coinsGain(p, V.book.coins)
 			end
 			if p.book == REACTIONS then
 				coinsGain(p, E.BOOK.allCoins)
@@ -470,13 +528,13 @@ local function buy(p: P, day: number)
 	end
 	for _, what in plan do
 		if what == "starter" then
-			local S = E.STARTER
+			local S = V.STARTER
 			p.robux += S.robux
 			local pool = missing(p, "epic")
 			if #pool > 0 then
 				give(p, pool[1], day)
 			end
-			p.crystals += S.crystals
+			p.crystals += S.crystals or 0
 			coinsGain(p, S.coins)
 		elseif what == "x2" then
 			p.x2 = true
@@ -485,11 +543,13 @@ local function buy(p: P, day: number)
 			p.vip = true
 			p.robux += E.PASSES.vip.robux
 		elseif type(what) == "number" then
-			for _, pack in E.CRYSTAL_PACKS do
-				if pack.crystals == what then
-					p.crystals += pack.crystals
-					p.robux += pack.robux
-				end
+			-- pack by index 1..6 (same product id in both models: crystal pack -> coin pack)
+			local pack = V.packs[what]
+			p.robux += pack.robux
+			if V.packCoins then
+				coinsGain(p, pack.amount)
+			else
+				p.crystals += pack.amount
 			end
 		end
 	end
@@ -500,9 +560,9 @@ local function day(p: P, d: number)
 	-- login reward
 	p.loginDay += 1
 	local i = ((p.loginDay - 1) % 7) + 1
-	local r: any = E.DAILY[i]
+	local r: any = V.DAILY[i]
 	if p.loginDay > 7 and i == 7 then
-		r = E.LATER_DAY7
+		r = V.LATER_DAY7
 	end
 	if r.coins then
 		coinsGain(p, r.coins)
@@ -514,7 +574,7 @@ local function day(p: P, d: number)
 	if r.ball then
 		give(p, r.ball, d)
 	end
-	for _, m in MILE do
+	for _, m in V.MILE do
 		if p.loginDay == m.day then
 			if m.coins then
 				coinsGain(p, m.coins)
@@ -535,6 +595,16 @@ local function day(p: P, d: number)
 	end
 	p.daily = if #miss > 0 then miss[irange(1, #miss)] else nil
 	buy(p, d)
+	if p.kind.draftDaily then
+		-- one paid "Any ball" a day: old model from free crystals, e4 from coins
+		if V.XSPIN then
+			if p.crystals >= V.draftAny then
+				p.crystals -= V.draftAny
+			end
+		elseif p.coins >= V.draftAny then
+			p.coins -= V.draftAny
+		end
+	end
 	spendCrystals(p, d)
 	spendCoins(p, d)
 	-- play
@@ -593,7 +663,8 @@ local KINDS = {
 	{ name = "free 30m, looks greedy", minutes = 30, friendShare = 0, buys = {}, looksGreedy = true },
 	{ name = "free 30 min + friend", minutes = 30, friendShare = 0.3, buys = {} },
 	{ name = "free 2 h/day", minutes = 120, friendShare = 0, buys = {} },
-	{ name = "free 30m, crystal spins", minutes = 30, friendShare = 0, buys = {}, crystalsToBalls = true },
+	{ name = "free 30m, crystal spins", minutes = 30, friendShare = 0, buys = {}, crystalsToBalls = true, oldOnly = true },
+	{ name = "free 30m, 1 paid Any/day", minutes = 30, friendShare = 0, buys = {}, draftDaily = true },
 	{
 		name = "starter 30m (99)",
 		minutes = 30,
@@ -605,7 +676,7 @@ local KINDS = {
 		name = "dolphin 30m (~850)",
 		minutes = 30,
 		friendShare = 0,
-		buys = { [2] = { "starter" }, [3] = { "x2" }, [5] = { 650 } },
+		buys = { [2] = { "starter" }, [3] = { "x2" }, [5] = { 4 } }, -- pack 4 = R$499
 		crystalsToBalls = true,
 	},
 	{ name = "x2 only 30m (249)", minutes = 30, friendShare = 0, buys = { [1] = { "x2" } } },
@@ -613,7 +684,7 @@ local KINDS = {
 		name = "whale 30m (1400/wk)",
 		minutes = 30,
 		friendShare = 0,
-		buys = { [1] = { "x2", "vip", 1400 }, [2] = { "starter" }, [8] = { 1400 }, [15] = { 1400 } },
+		buys = { [1] = { "x2", "vip", 5 }, [2] = { "starter" }, [8] = { 5 }, [15] = { 5 } }, -- pack 5 = R$999
 		crystalsToBalls = true,
 	},
 }
@@ -655,11 +726,18 @@ local function legGap(days: { number }): number
 end
 
 local N = tonumber(process.args[1]) or 400
-print(("E3.2 economy sim, %d players per kind, %d days, %d looks"):format(N, A.days, #LOOKS))
+local summary: { [string]: { [string]: { d100: string, hand30: number, perDay: number, legs: string, rbx: number } } } = {}
+for _, mname in { "old", "e4" } do
+V = model(mname)
+summary[mname] = {}
+print(("\n== model %s == economy sim, %d players per kind, %d days, %d looks"):format(mname, N, A.days, #LOOKS))
 print(
 	"kind                    | 1st coin buy   | 50% day      | 100% day       | coins on hand d1/3/7/14/30   | wk1 days new ball/any | R$"
 )
 for _, kind in KINDS do
+	if kind.oldOnly and mname ~= "old" then
+		continue
+	end
 	-- same seed per kind: adding or reordering kinds does not shift the others' numbers
 	rngState = 12345
 	local fb, fbm, d50, d100 = {}, {}, {}, {}
@@ -793,4 +871,24 @@ for _, kind in KINDS do
 			median(hands[120])
 		)
 	)
+	summary[mname][kind.name] = {
+		d100 = ("d%d (%d-%d)"):format(median(d100), pct(d100, 0.1), pct(d100, 0.9)),
+		hand30 = median(hands[30]),
+		perDay = median(earn30),
+		legs = ("%d/%d/%d"):format(median(leg3), median(leg4), median(leg5)),
+		rbx = median(rbx),
+	}
+end
+end
+
+print("\n== old vs e4 (median): 27/27 day (p10-p90) | coins on hand d30 | coins earned/day d1-30 | legendary 3/4/5 day | R$")
+for _, kind in KINDS do
+	local o, n = summary.old[kind.name], summary.e4[kind.name]
+	if o and n then
+		print(
+			("%-24s | %-13s -> %-13s | %5d -> %5d | %4d -> %4d | %s -> %s | %d"):format(
+				kind.name, o.d100, n.d100, o.hand30, n.hand30, o.perDay, n.perDay, o.legs, n.legs, n.rbx
+			)
+		)
+	end
 end
