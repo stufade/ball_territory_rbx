@@ -14,9 +14,9 @@
 | rare | остановка ленты на rare | 16480578737 | Roblox_Pinball_8Bit_Blip_07 (Roblox) | Creator Store, free | 16480578302 8Bit_Blip_10 | 0.5 / 0.8 с |
 | epic | остановка ленты на epic | 1846251193 | Jackpot Mania «Win», 3 с (APM, Sonoton) | то же | 1844259840 | 0.6 / 2 с |
 | legend | остановка ленты на legend | 1846251212 | Jackpot Mania «Star Prize», 6 с (APM) | то же | 1837762472 «Victory Dance (sting a)» | 0.7 / 3.2 с |
-| click | клик UI (cue готов, Gui пока не вызывает) | 15675059323 | Roblox_UI_Bright_Click (Roblox) | Creator Store, free | 15675032796 Small_Click | 0.5 |
-| tick | тик рулетки (cue готов, Spin пока не вызывает; не на закраску) | 16480580213 | Roblox_Pinball_8Bit_Blip_01 (Roblox) | то же | 16480580064 Blip_02 | 0.45 / 0.25 с |
-| coin | монеты (cue готов, пока не вызывается) | 127645268874265 | CoinTransfer_01 (Roblox) | то же | 16480570986 Bumper_Low_Bells_02 | 0.55 / 1 с |
+| click | клик любой кнопки UI (`Theme.press` → `Theme.sfx`) | 15675059323 | Roblox_UI_Bright_Click (Roblox) | Creator Store, free | 15675032796 Small_Click | 0.3 |
+| tick | тик рулетки: каждая карточка под маркером (Spin) | 16480580213 | Roblox_Pinball_8Bit_Blip_01 (Roblox) | то же | 16480580064 Blip_02 | 0.25 / 0.25 с |
+| coin | рост счётчика монет (`Money.step`), ≤8 в секунду | 127645268874265 | CoinTransfer_01 (Roblox) | то же | 16480570986 Bumper_Low_Bells_02 | 0.3 / 0.5 с |
 | music | лобби | 1837768352 | «Retro Gamer (a)», Skip Armstrong (APM), 2:12 | то же | 1837351107 «Rainbow Road» | 0.20 |
 | musicMatch | свой матч | 1837768494 | «Battle Hero (a)», Skip Armstrong (APM), 1:59 | то же | 1837768323 «Final Boss (a)» | 0.14 |
 

@@ -262,8 +262,27 @@ local EASE_OUT = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection
 
 -- Press and hover: the whole button scales as one piece (its UIScale), smoothly, no bounce; the text has a fixed
 -- size so nothing inside moves on its own.
+-- Plays a Render/Sfx cue; silent if the module is not there (tests, early boot).
+local sfxMod: any = nil
+function Theme.sfx(name: string)
+	if sfxMod == nil then
+		local ok, mod: any = pcall(function(): any
+			local render = script.Parent.Parent:FindFirstChild("Render")
+			local sfx = render and render:FindFirstChild("Sfx")
+			return if sfx then (require :: any)(sfx) else false
+		end)
+		sfxMod = if ok then mod else false
+	end
+	if sfxMod then
+		pcall(sfxMod.play, name)
+	end
+end
+
 function Theme.press(b: GuiButton)
 	local s = scaleOf(b)
+	b.Activated:Connect(function()
+		Theme.sfx("click")
+	end)
 	local over, down = false, false
 	local function go(info: TweenInfo)
 		if Theme.reduced() then

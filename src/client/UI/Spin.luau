@@ -755,7 +755,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 				if under ~= lastTile and t - lastTick > 0.07 then
 					lastTile = under
 					lastTick = t
-					playSfx("hit")
+					playSfx("tick")
 					Theme.scaleOf(marker).Scale = 1.05
 				end
 				local ms = Theme.scaleOf(marker)

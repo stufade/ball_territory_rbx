@@ -27,12 +27,12 @@ local IDS: { [string]: Cue } = {
 	rare = { id = 16480578737, volume = 0.5, cut = 0.8 }, -- Roblox_Pinball_8Bit_Blip_07
 	epic = { id = 1846251193, volume = 0.6, cut = 2 }, -- APM Jackpot Mania "Win"
 	legend = { id = 1846251212, volume = 0.7, cut = 3.2 }, -- APM Jackpot Mania "Star Prize"
-	-- UI cues, ready for Gui to call Sfx.play (not wired yet)
-	click = { id = 15675059323, volume = 0.5, limit = 6 }, -- Roblox_UI_Bright_Click
-	tick = { id = 16480580213, volume = 0.45, limit = 12, cut = 0.25 }, -- Roblox_Pinball_8Bit_Blip_01
-	coin = { id = 127645268874265, volume = 0.55, limit = 6, cut = 1 }, -- Roblox CoinTransfer_01
+	-- UI cues, quieter than the match sounds (Theme.press, Spin strip, Money.step)
+	click = { id = 15675059323, volume = 0.3, limit = 6 }, -- Roblox_UI_Bright_Click
+	tick = { id = 16480580213, volume = 0.25, limit = 12, cut = 0.25 }, -- Roblox_Pinball_8Bit_Blip_01
+	coin = { id = 127645268874265, volume = 0.3, limit = 8, cut = 0.5 }, -- Roblox CoinTransfer_01
 	-- Music from the Roblox Creator Store (APMOfficial, free for all experiences), see docs/audio.md.
-	-- Quieter than every effect (lowest effect cue is 0.45). Lobby = plaza track, match = own track.
+	-- Quieter than every effect (UI cues are quieter still). Lobby = plaza track, match = own track.
 	music = { id = 1837768352, volume = 0.2, looped = true },
 	musicMatch = { id = 1837768494, volume = 0.14, looped = true },
 }

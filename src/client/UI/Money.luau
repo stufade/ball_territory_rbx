@@ -108,7 +108,15 @@ function Money.pill(n: number): string
 end
 
 -- A number that rolls from what it shows to its target (0.9 s, ease out) and pulses its box while it rolls.
-export type Roll = { shown: number, from: number, to: number, t: number, label: TextLabel?, box: GuiObject? }
+export type Roll = {
+	shown: number,
+	from: number,
+	to: number,
+	t: number,
+	label: TextLabel?,
+	box: GuiObject?,
+	coinAt: number?,
+}
 
 local DUR = 0.9
 
@@ -123,6 +131,7 @@ function Money.target(r: Roll, to: number)
 	r.from = r.shown
 	r.to = to
 	r.t = 0
+	r.coinAt = 0
 end
 
 -- Returns true while it moves.
@@ -133,6 +142,14 @@ function Money.step(r: Roll, dt: number): boolean
 		r.t = math.min(DUR, r.t + dt)
 		local u = r.t / DUR
 		r.shown = r.from + (r.to - r.from) * (1 - (1 - u) ^ 3)
+	end
+	-- coin sound while the number grows, at most 8 a second
+	if r.to > r.from and r.t < DUR then
+		local now = os.clock()
+		if now >= (r.coinAt or 0) and r.label and r.label.Parent then
+			r.coinAt = now + 0.125
+			Theme.sfx("coin")
+		end
 	end
 	local l = r.label
 	if l and l.Parent then
