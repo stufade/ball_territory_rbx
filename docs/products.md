@@ -1,15 +1,15 @@
 # Products and passes (live ids)
 
-Universe 10775439626, created 2026-11-15 via Creator Dashboard. Managed Pricing is off for all (its Terms of Use were not accepted); prices are the fixed Robux prices of `Economy.luau`. No icons yet (default image).
+Universe 10775439626, created 2026-11-15 via Creator Dashboard. E4 (2026-11-16): the six crystal packs were renamed to coin packs (same ids and prices), Starter Pack description updated. Ball-tier and cosmetic products are unused in game, kept for late receipts. Managed Pricing is off for all (its Terms of Use were not accepted); prices are the fixed Robux prices of `Economy.luau`. No icons yet (default image).
 
 | Name | Type | Robux | Id |
 |---|---|---|---|
-| 50 Crystals | developer product | 49 | 3732004217 |
-| 110 Crystals | developer product | 99 | 3732004316 |
-| 300 Crystals | developer product | 249 | 3732004487 |
-| 650 Crystals | developer product | 499 | 3732004521 |
-| 1400 Crystals | developer product | 999 | 3732004528 |
-| 3750 Crystals | developer product | 2499 | 3732004535 |
+| 1,000 Coins | developer product | 49 | 3732004217 |
+| 2,200 Coins | developer product | 99 | 3732004316 |
+| 6,000 Coins | developer product | 249 | 3732004487 |
+| 13,000 Coins | developer product | 499 | 3732004521 |
+| 28,000 Coins | developer product | 999 | 3732004528 |
+| 75,000 Coins | developer product | 2499 | 3732004535 |
 | Common Ball | developer product | 49 | 3732004545 |
 | Rare Ball | developer product | 99 | 3732004551 |
 | Epic Ball | developer product | 199 | 3732004558 |
