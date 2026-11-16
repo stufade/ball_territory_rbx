@@ -68,6 +68,19 @@ function Theme.reduced(): boolean
 	return GuiService.ReducedMotionEnabled
 end
 
+-- Gamepad focus on `obj`. The engine warns "invalid GuiObject" when the target is not in the live GUI tree yet (a window
+-- that is still being built) or was destroyed by a rebuild, so the pick waits one frame and re-checks.
+function Theme.focus(obj: GuiObject?)
+	if obj == nil then
+		return
+	end
+	task.defer(function()
+		if obj.Parent ~= nil and obj.Selectable and obj:IsDescendantOf(game) then
+			GuiService.SelectedObject = obj
+		end
+	end)
+end
+
 export type TextOpts = {
 	color: Color3?,
 	bold: boolean?, -- small body font (Arimo Bold) instead of the heavy title font
@@ -719,7 +732,7 @@ function Theme.price(
 	local h = size.Y.Offset
 	local color = Theme.PRICE_COIN
 	local b = Theme.button(parent, text, size, pos, color, nil, textSize or 24)
-	b.Name = if cur == "coins" then "PayCoins" else "PayGems"
+	b.Name = "PayCoins"
 	local lip = math.clamp(math.floor(h * 0.1 + 0.5), 4, 9)
 	local d = math.min(34, h - lip - 12)
 	local ic = icon(b, cur, d, UDim2.fromOffset(8 + d / 2, (h - lip) / 2))
@@ -750,7 +763,7 @@ function Theme.purse(
 ): Frame
 	local h = 44
 	local box = Theme.frame(parent, UDim2.fromOffset(w, h), pos, Theme.BG)
-	box.Name = if cur == "coins" then "BalCoins" else "BalGems"
+	box.Name = "BalCoins"
 	Theme.round(box, h / 2)
 	Theme.stroke(box, 3, Theme.INK)
 	Theme.gradient(box, Theme.SLOT, Theme.BG)

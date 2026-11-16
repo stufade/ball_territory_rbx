@@ -776,7 +776,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 
 	if tab == "packs" then
 		Shop.packs(body, v, ctx, bodyW, bodyH)
-		GuiService.SelectedObject = close
+		Theme.focus(close)
 	elseif tab == "spin" then
 		Spin.fill(body, v, {
 			canvas = cv,
@@ -792,7 +792,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 			close = ctx.close,
 			act = ctx.act,
 		}, bodyW, bodyH)
-		GuiService.SelectedObject = close
+		Theme.focus(close)
 	else
 		-- one scrolling ribbon: the ball of the day as a banner on top, then the cards
 		local scrollW = 12
@@ -880,7 +880,7 @@ function Shop.build(parent: Frame, v: Net.ProfileView, ctx: Ctx)
 		end
 		local rowsN = math.ceil(#missing / cols)
 		list.CanvasSize = UDim2.fromOffset(0, math.max(y0 + rowsN * (cardH + GAP) - GAP, 1))
-		GuiService.SelectedObject = todayCoin or close
+		Theme.focus(todayCoin or close)
 	end
 
 	if esc then

@@ -5,7 +5,6 @@
 -- bottom the currency switch and one big 3D SPIN button. The server picks the prize before the reel moves;
 -- the reel only shows it. The reveal grows with the tier: common pops, rare glows, epic adds rays and a
 -- burst, legendary flashes the window white, shakes it and throws confetti.
-local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Art = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Art"))
@@ -26,7 +25,7 @@ local Spin = {}
 -- Reel run time (s). Long enough to read the tiers going by, short enough to spin again.
 Spin.TIME = 2
 
-local CYCLE = { "common", "rare", "epic", "legendary", "refund" }
+local ALL_TIERS = { "common", "rare", "epic", "legendary", "refund" }
 
 local TIER_COL: { [string]: Color3 } = {
 	common = Color3.fromHex("#3d8bff"),
@@ -185,6 +184,13 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	-- E4: one roulette, coins
 	local lines: { [string]: Net.SpinLine } = { coins = board.coins }
 	local cur = "coins"
+	-- a tier with a 0% chance (REFUND today) shows neither as a chip nor on the drum
+	local CYCLE: { string } = {}
+	for _, tier in ALL_TIERS do
+		if shareOf(board.coins.odds, tier) > 0 then
+			table.insert(CYCLE, tier)
+		end
+	end
 
 	-- layout: reel well on top, chips + guarantee row, then the buttons. Buttons >= 64 design px
 	-- (44 px on a 390 px tall phone).
@@ -823,7 +829,9 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 		end)
 	end
 
-	GuiService.SelectedObject = if go.Active then go else modeCoins
+	if go.Active then
+		Theme.focus(go)
+	end
 end
 
 return Spin

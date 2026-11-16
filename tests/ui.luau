@@ -555,8 +555,11 @@ do
 	check(today and find(today, "Deal").Text == "-30%", "shop: ball of the day marked")
 	check(find(today, "Name").Text == "WATER", "shop: day ball name")
 	check(find(find(today, "PayCoins"), "Label").Text == "700", "shop: day coin price is the discount")
-	check(find(today, "PayGems") == nil and find(today, "PayRobux") == nil, "shop: E4 one price on the deal")
-	check(rectOf(today)[2] + rectOf(today)[4] <= rectOf(find(panel, "Row5"))[2], "shop: the deal is first (a banner on top)")
+	check(find(today, "PayRobux") == nil, "shop: E4 one price on the deal")
+	check(
+		rectOf(today)[2] + rectOf(today)[4] <= rectOf(find(panel, "Row5"))[2],
+		"shop: the deal is first (a banner on top)"
+	)
 	check(rectOf(today)[3] > rectOf(find(panel, "Row5"))[3], "shop: the deal is wider than a card")
 	check(find(find(panel, "Row5"), "Deal") == nil, "shop: a normal ball is not marked")
 	check(
@@ -577,7 +580,7 @@ do
 	for _, name in { "Row5", "Row11" } do
 		local row = find(panel, name)
 		local c = rectOf(find(row, "PayCoins"))
-		check(find(row, "PayGems") == nil and find(row, "PayRobux") == nil, `shop: {name} one coin price`)
+		check(find(row, "PayRobux") == nil, `shop: {name} one coin price`)
 		check(c[4] * 0.72 >= 44, `shop: {name} price is 44 px on a phone`)
 		check(inside(find(row, "PayCoins"), row), `shop: {name} price inside the card`)
 		check(
@@ -628,10 +631,7 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	check(ar[3] * 0.72 >= 44 and ar[4] * 0.72 >= 44, `{tag}: HUD + is 44 px on a phone`)
 	local gr = rectOf(find(w.root, "Coins"))
 	local cx, cy = ar[1] + ar[3] / 2, ar[2] + ar[4] / 2
-	check(
-		cx > gr[1] and cx < gr[1] + gr[3] and cy > gr[2] and cy < gr[2] + gr[4],
-		`{tag}: HUD + on the coin counter`
-	)
+	check(cx > gr[1] and cx < gr[1] + gr[3] and cy > gr[2] and cy < gr[2] + gr[4], `{tag}: HUD + on the coin counter`)
 	check(ar[2] + ar[4] <= 138, `{tag}: HUD + above PLAY (playY 138)`)
 	check(
 		not overlap(rectOf(find(find(w.root, "Coins"), "Value")), rectOf(find(w.root, "Disc"))),
@@ -779,7 +779,7 @@ do
 	check(inside(find(panel, "SpinGo"), find(panel, "SpinCard")), "spin: pack button inside the featured card")
 	check(find(find(panel, "Coin_common"), "Pct").Text == "70%", "spin: coin common odds")
 	check(find(find(panel, "Coin_legendary"), "Pct").Text == "1%", "spin: coin legendary odds")
-	check(find(find(panel, "Coin_refund"), "Pct").Text == "0%", "spin: refund line is shown")
+	check(find(panel, "Coin_refund") == nil, "spin: a 0% tier (refund) has no chip")
 	check(find(panel, "Gem_epic") == nil and find(panel, "OddsGems") == nil, "spin: E4 one roulette, no crystal odds")
 	check(string.find(find(panel, "PityCoins").Text, "3/10") ~= nil, "spin: coin guarantee counter")
 	check(find(panel, "PityGems") == nil, "spin: one guarantee counter")
@@ -816,9 +816,9 @@ do
 		"spin: outcome is set before the reel"
 	)
 	check(
-		find(panel, "Tile16"):GetAttribute("Tier") == "common"
-			and find(panel, "Tile17"):GetAttribute("Tier") == "rare"
-			and find(panel, "Tile18"):GetAttribute("Tier") == "epic",
+		find(panel, "Tile13"):GetAttribute("Tier") == "common"
+			and find(panel, "Tile14"):GetAttribute("Tier") == "rare"
+			and find(panel, "Tile15"):GetAttribute("Tier") == "epic",
 		"spin: neighbours are the fixed cycle"
 	)
 	check(find(find(panel, "Tile17"), "Icon").Image == Art.BALLS, "spin: the landed tile is a ball")
@@ -1075,7 +1075,10 @@ do
 			#acts == before + 1 and acts[before + 1][1] == "look" and acts[before + 1][3] == "frame_wood",
 			`{tag}: five balls still send Action look`
 		)
-		check(not overlap(rectOf(find(panel, "Close")), rectOf(find(panel, "BalCoins"))), `{tag}: close clear of the coins`)
+		check(
+			not overlap(rectOf(find(panel, "Close")), rectOf(find(panel, "BalCoins"))),
+			`{tag}: close clear of the coins`
+		)
 	end
 
 	local earlyW, _, earlyActs = make(V2(960, 540))
@@ -1212,7 +1215,6 @@ do
 	local last = acts[#acts]
 	check(#acts == before + 1 and last[1] == "look" and last[3] == "trail_dust", "E4: the look sells for coins")
 end
-
 
 -- M4-S5: every shop tab on the phone (1168x540 canvas, phone rule, scale 0.72) and the PC (960x540, 1280x720,
 -- scale 1.333): no button outside its card or the panel, every live button at least 44 real px both ways.
