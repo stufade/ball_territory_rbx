@@ -202,14 +202,168 @@ def flame_mask():
     return blur(outer.astype(np.float32), 1.0), blur(inner.astype(np.float32), 1.0)
 
 
+# ---------- custom emblem shapes (ART-2): the atlas icons for these read badly as relief ----------
+def _grid(k=1.0):
+    """Emblem space: x -0.5..0.5, y 0..1 (up); k > 1 enlarges the shape around the centre."""
+    y, x = (np.mgrid[0:ER, 0:ER] + 0.5) / ER  # y up (row 0 = bottom)
+    return (x - 0.5) / k, (y - 0.5) / k + 0.5
+
+
+def _disc(x, y, cx, cy, rx, ry=None):
+    ry = rx if ry is None else ry
+    return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1
+
+
+def _seg(x, y, a, b, w):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = np.clip(((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy), 0, 1)
+    return (x - a[0] - t * dx) ** 2 + (y - a[1] - t * dy) ** 2 < w * w
+
+
+def _line(x, y, pts, w):
+    m = np.zeros(x.shape, bool)
+    for a, b in zip(pts, pts[1:]):
+        m |= _seg(x, y, a, b, w)
+    return m
+
+
+def _goo(m, s=3.0):
+    """Union with gooey fillets: blur the hard mask and re-threshold."""
+    return smooth(blur(m.astype(np.float32), s), 0.42, 0.58) > 0.5
+
+
+def _spiral(x, y, cx, cy, r0, pitch, turns, w, rot=0.0, sign=1):
+    """Archimedean spiral line r = r0 + pitch * theta / 2pi, theta in [0, turns * 2pi]."""
+    r = np.hypot(x - cx, y - cy)
+    th = (sign * np.arctan2(y - cy, x - cx) - rot) % (2 * math.pi)
+    k = np.round((r - r0 - pitch * th / (2 * math.pi)) / pitch)
+    k = np.clip(k, 0, math.ceil(turns))
+    tt = th + 2 * math.pi * k
+    d = np.abs(r - r0 - pitch * tt / (2 * math.pi))
+    return (d < w) & (tt <= turns * 2 * math.pi)
+
+
+def leaf_mask():
+    x, y = _grid()
+    a = math.radians(35)
+    d = (math.sin(a), math.cos(a))
+    base, L = (-0.19, 0.17), 0.7
+    X = (x - base[0]) * d[0] + (y - base[1]) * d[1]
+    Y = -(x - base[0]) * d[1] + (y - base[1]) * d[0]
+    t = X / L
+    tc = np.clip(t, 0, 1)
+    off = 0.035 * np.sin(math.pi * tc)  # the leaf curls slightly
+    w = 0.21 * np.sin(math.pi * tc ** 0.8) ** 0.75
+    Yo = Y - off
+    outer = (np.abs(Yo) < w) & (t > 0) & (t < 1)
+    outer |= _seg(X, Y, (-0.13, -0.02), (0.02, 0.0), 0.024)  # stem
+    veins = _seg(X, Yo, (0.03, 0), (0.9 * L, 0), 0.014)
+    for t0 in (0.22, 0.42, 0.62):
+        t1 = t0 + 0.17
+        w1 = 0.21 * math.sin(math.pi * t1 ** 0.8) ** 0.75 * 0.72
+        for sd in (-1, 1):
+            veins |= _seg(X, Yo, (t0 * L, 0), (t1 * L, sd * w1), 0.011)
+    return outer.astype(np.float32), (veins & outer).astype(np.float32), None, 0.022
+
+
+def slime_mask():
+    x, y = _grid(1.25)
+    cx, cy, r = 0.0, 0.53, 0.235
+    tip = (y > cy) & (np.abs(x - cx) < r * np.clip(1 - (y - cy) / 0.37, 0, 1) ** 1.35)
+    m = _disc(x, y, cx, cy, r) | tip
+    m |= _seg(x, y, (-0.13, cy - 0.12), (-0.13, 0.15), 0.042) | _disc(x, y, -0.13, 0.13, 0.06)  # long drip
+    m |= _seg(x, y, (0.12, cy - 0.12), (0.12, 0.27), 0.034) | _disc(x, y, 0.12, 0.255, 0.048)  # short drip
+    m |= _disc(x, y, 0.0, cy - 0.235, 0.05, 0.06)  # bulge between the drips
+    outer = _goo(m, 2.2)
+    shine = _disc(x, y, -0.1, 0.57, 0.05, 0.08) | _disc(x, y, -0.03, 0.7, 0.022)
+    return outer.astype(np.float32), shine.astype(np.float32), None, -0.006
+
+
+def gas_mask():
+    x, y = _grid(1.12)
+    m = np.zeros(x.shape, bool)
+    for cx, cy, r in ((-0.2, 0.5, 0.14), (-0.04, 0.6, 0.19), (0.16, 0.53, 0.16), (-0.1, 0.42, 0.15),
+                      (0.1, 0.41, 0.14), (0.27, 0.45, 0.09)):
+        m |= _disc(x, y, cx, cy, r)
+    # wisps curling out of the cloud base
+    m |= _spiral(x, y, -0.22, 0.24, 0.0, 0.075, 1.15, 0.026, rot=math.radians(80))
+    m |= _spiral(x, y, 0.2, 0.25, 0.0, 0.06, 1.0, 0.022, rot=math.radians(100), sign=-1)
+    outer = _goo(m, 2.0)
+    swirl = _spiral(x, y, -0.05, 0.53, 0.0, 0.075, 1.6, 0.017) | _spiral(x, y, 0.17, 0.47, 0.0, 0.055, 1.1, 0.015,
+                                                                         sign=-1)
+    return outer.astype(np.float32), (swirl & outer).astype(np.float32), None, 0.022
+
+
+def ghost_mask():
+    x, y = _grid()
+    body = _disc(x, y, 0.0, 0.56, 0.25) & (y > 0.56)
+    hem = 0.2 - 0.065 * np.abs(np.cos(3 * math.pi * (x + 0.25) / 0.5))
+    body |= (np.abs(x) < 0.25) & (y <= 0.56) & (y > hem)
+    outer = _goo(body, 1.5)
+    face = _disc(x, y, -0.09, 0.57, 0.045, 0.068) | _disc(x, y, 0.09, 0.57, 0.045, 0.068) | \
+        _disc(x, y, 0.0, 0.41, 0.04, 0.05)
+    return outer.astype(np.float32), face.astype(np.float32), None, 0.03
+
+
+def gem_mask():
+    x, y = _grid()
+    top, gird, tw, gw, bot = 0.74, 0.58, 0.15, 0.31, 0.15
+    crown = (y >= gird) & (y <= top) & (np.abs(x) <= gw - (gw - tw) * (y - gird) / (top - gird))
+    pav = (y < gird) & (y > bot) & (np.abs(x) <= gw * (y - bot) / (gird - bot))
+    outer = crown | pav
+    W = 0.012
+    fac = _seg(x, y, (-gw, gird), (gw, gird), W)
+    fac |= _line(x, y, [(-tw, top), (-0.1, gird), (0.0, top)], W) | _line(x, y, [(0.0, top), (0.1, gird), (tw, top)], W)
+    fac |= _seg(x, y, (-0.1, gird), (0.0, bot), W) | _seg(x, y, (0.1, gird), (0.0, bot), W)
+    return outer.astype(np.float32), (fac & outer).astype(np.float32), None, 0.016
+
+
+def bomb_mask():
+    x, y = _grid(1.22)
+    cx, cy, r = -0.07, 0.4, 0.28
+    body = _disc(x, y, cx, cy, r)
+    a = math.radians(45)
+    d = (math.cos(a), math.sin(a))
+    n0 = (cx + r * 0.93 * d[0], cy + r * 0.93 * d[1])
+    n1 = (n0[0] + 0.08 * d[0], n0[1] + 0.08 * d[1])
+    neck = _seg(x, y, n0, n1, 0.075)
+    fuse_pts = [n1, (n1[0] + 0.04, n1[1] + 0.07), (n1[0] + 0.03, n1[1] + 0.13), (n1[0] + 0.08, n1[1] + 0.17)]
+    fuse = _line(x, y, fuse_pts, 0.026) & ~neck
+    sx, sy = fuse_pts[-1][0] + 0.02, fuse_pts[-1][1] + 0.02
+    rr = np.hypot(x - sx, y - sy)
+    th = np.arctan2(y - sy, x - sx)
+    spark = rr < 0.04 + 0.075 * np.abs(np.cos(4 * th + 0.3)) ** 5
+    outer = body | neck | fuse | spark
+    band = body & (np.abs(y - cy - 0.02 * (x - cx) / r) < 0.045)
+    rivets = np.zeros(x.shape, bool)
+    for rx in (-0.22, -0.06, 0.1):
+        rivets |= _disc(x, y, cx + rx + 0.0, cy + 0.02 * rx / r, 0.024)
+    band &= ~rivets
+    shine = _disc(x, y, cx - 0.12, cy + 0.12, 0.08, 0.1) & ~_disc(x, y, cx - 0.09, cy + 0.08, 0.085, 0.11) & body
+    paint = np.zeros(x.shape, np.float32)
+    paint[shine] = 0.33
+    paint[fuse] = 0.66
+    paint[spark] = 1.0
+    return outer.astype(np.float32), band.astype(np.float32), paint, 0.016
+
+
+SHAPES = {"PLANT": leaf_mask, "SLIME": slime_mask, "GAS": gas_mask, "GHOST": ghost_mask, "CRYSTAL": gem_mask,
+          "BOMB": bomb_mask}
+
+
 def emblem(e):
     """Returns (colour image, mask image, height array). mask: R fill, G groove, B inner (second colour level)."""
     col, row = e % 8, e // 8
     y0 = AH - (row + 1) * 128
     tile = zoom2(apx[y0:y0 + 128, col * 128:(col + 1) * 128].copy())
     inner = np.zeros((ER, ER), np.float32)
+    paint, inner_h = None, 0.02
     if TITLE[e] == "FIRE":
         a, inner = flame_mask()
+        tile[:, :, :3] = 1.0
+    elif TITLE[e] in SHAPES:
+        a, inner, paint, inner_h = SHAPES[TITLE[e]]()
+        a, inner = blur(a, 1.0), blur(inner, 0.7)
         tile[:, :, :3] = 1.0
     else:
         a = blur(smooth(tile[:, :, 3], 0.4, 0.6), 0.8)
@@ -218,7 +372,7 @@ def emblem(e):
     dil = smooth(blur(hard, 5.0), 0.04, 0.2)
     groove = np.clip(dil - fill, 0, 1)
     bevel = smooth(blur(hard, 3.0), 0.5, 0.97)
-    h = 0.042 * bevel - 0.014 * blur(groove, 1.5) - 0.02 * blur(inner, 1.2) * bevel
+    h = 0.042 * bevel - 0.014 * blur(groove, 1.5) - inner_h * blur(inner, 1.2) * bevel
     rgb = tile.copy()
     rgb[:, :, 3] = 1.0
     ci = bpy.data.images.new(f"emb{e}", ER, ER, alpha=True)
@@ -230,7 +384,16 @@ def emblem(e):
     mi.colorspace_settings.name = "Non-Color"
     mi.pixels.foreach_set(mk.astype(np.float32).ravel())
     mi.pack()
-    return ci, mi, h
+    pi = None
+    if paint is not None:  # paint codes: 0.33 shine, 0.66 fuse, 1.0 spark (glows)
+        pk = np.zeros((ER, ER, 4), np.float32)
+        pk[:, :, 0] = pk[:, :, 1] = pk[:, :, 2] = blur(paint, 0.6)
+        pk[:, :, 3] = 1.0
+        pi = bpy.data.images.new(f"paint{e}", ER, ER, alpha=True)
+        pi.colorspace_settings.name = "Non-Color"
+        pi.pixels.foreach_set(pk.ravel())
+        pi.pack()
+    return ci, mi, h, pi
 
 
 # ---------- sphere: emblem UVs (angles of the normal around the front -Y axis) ----------
@@ -366,7 +529,8 @@ def look_plant(b, e, obj):
     vein = b.maprange(v, 0.03, 0.0)
     base = grad(b, obj, C(10, 80, 30), C(70, 215, 100))
     base = b.mix(b.math("MULTIPLY", vein, 0.6), base, C(190, 255, 150))
-    return dict(base=base, rough=0.35, bump=vein, bump_k=0.4, sss=0.1, emb=C(200, 255, 170))
+    return dict(base=base, rough=0.35, bump=vein, bump_k=0.4, sss=0.1, emb=C(215, 255, 160),
+                emb_inner=C(40, 140, 50))
 
 
 def look_lightning(b, e, obj):
@@ -456,7 +620,8 @@ def look_lava(b, e, obj):
 def look_slime(b, e, obj):
     d = b.vor(obj, 3.0).outputs["Distance"]
     base = grad(b, obj, C(190, 30, 120), C(255, 140, 215))
-    return dict(base=base, rough=0.05, sss=0.4, bump=b.maprange(d, 0.0, 0.5), bump_k=-0.35, emb=C(255, 200, 235))
+    return dict(base=base, rough=0.05, sss=0.4, bump=b.maprange(d, 0.0, 0.5), bump_k=-0.35, emb=C(150, 10, 105),
+                emb_inner=C(255, 235, 248), groove=C(70, 0, 45), emb_rough=0.04)
 
 
 def look_void(b, e, obj):
@@ -478,7 +643,8 @@ def look_crystal(b, e, obj):
     base = b.ramp(cell, [(0.0, C(0, 80, 90)), (0.5, C(0, 170, 160)), (1.0, C(150, 255, 240))])
     base = b.mix(edge, base, C(220, 255, 250))
     return dict(base=base, rough=0.05, bump=cell, bump_k=0.6, emit=C(100, 255, 230),
-                emit_k=b.math("MULTIPLY", edge, 1.2), emb=C(200, 255, 248), emb_rough=0.05)
+                emit_k=b.math("MULTIPLY", edge, 1.2), emb=C(235, 255, 252), emb_rough=0.05,
+                emb_inner=C(0, 120, 125), groove=C(0, 35, 45))
 
 
 def look_mushroom(b, e, obj):
@@ -500,7 +666,8 @@ def look_67(b, e, obj):
 def look_gas(b, e, obj):
     n = b.noise(obj, 2.0, 6.0, 1.5)
     base = b.ramp(n, [(0.3, C(70, 80, 10)), (0.55, C(150, 170, 40)), (0.75, C(215, 230, 120))])
-    return dict(base=base, rough=0.4, emit=base, emit_k=b.maprange(n, 0.6, 0.8, 0.0, 0.3), emb=C(230, 245, 150))
+    return dict(base=base, rough=0.4, emit=base, emit_k=b.maprange(n, 0.6, 0.8, 0.0, 0.3), emb=C(235, 248, 160),
+                emb_inner=C(95, 110, 15), groove=C(40, 45, 5))
 
 
 def look_sound(b, e, obj):
@@ -523,18 +690,19 @@ def look_ghost(b, e, obj):
     n = b.noise(obj, 1.6, 4.0, 1.0)
     base = b.ramp(n, [(0.3, C(150, 135, 230)), (0.7, C(235, 230, 255))])
     return dict(base=base, rough=0.25, sss=0.5, emit=C(210, 200, 255), emit_k=b.math("MULTIPLY", b.rim(0.4, 2.0), 1.0),
-                emb=C(255, 255, 255), emb_icon=1)
+                emb=C(115, 70, 235), emb_inner=C(25, 12, 60), groove=C(45, 25, 110))
 
 
 def look_bomb(b, e, obj):
     base = grad(b, obj, C(12, 16, 10), C(70, 95, 50))
-    return dict(base=base, rough=0.18, coat=1.0, emb=C(230, 235, 220), emb_icon=1)
+    return dict(base=base, rough=0.18, coat=1.0, emb=C(200, 205, 215), emb_metal=0.35, emb_rough=0.15,
+                emb_inner=C(150, 40, 30), paint=[C(255, 255, 255), C(205, 160, 95), C(255, 225, 90)], paint_k=4.0)
 
 
 def look_bubble(b, e, obj):
     base = grad(b, obj, C(60, 170, 200), C(190, 245, 255))
     return dict(base=base, rough=0.03, thin=520.0, emit=C(200, 250, 255), emit_k=b.math("MULTIPLY", b.rim(0.3, 2.0), 0.8),
-                emb=C(255, 255, 255))
+                emb=C(20, 95, 210), groove=C(10, 40, 110))
 
 
 def look_glitch(b, e, obj):
@@ -575,7 +743,7 @@ def _rgb(b, v):
     return n.outputs[0]
 
 
-def build(e, ci, mi):
+def build(e, ci, mi, pi=None):
     name = TITLE[e]
     mat = bpy.data.materials.new(f"M_{name}")
     b = NB(mat)
@@ -599,8 +767,17 @@ def build(e, ci, mi):
         tint = b.mix(1.0, tint, cimg.outputs["Color"], "MULTIPLY")
     if "emb_inner" in L:
         tint = b.mix(inner, tint, sock(b, L["emb_inner"]))
+    spark = None
+    if pi is not None:
+        pimg = b.n("ShaderNodeTexImage", {"Vector": uv}, image=pi, extension="CLIP", interpolation="Linear")
+        pv = b.n("ShaderNodeSeparateColor", {0: pimg.outputs["Color"]}).outputs[0]
+        pc = L.get("paint", [(1, 1, 1, 1)] * 3)
+        pcol = b.ramp(pv, [(0.0, (1, 1, 1, 1)), (0.2, pc[0]), (0.5, pc[1]), (0.83, pc[2])], "CONSTANT")
+        tint = b.mix(b.maprange(pv, 0.1, 0.2), tint, pcol)
+        spark = b.maprange(pv, 0.8, 0.95)
     embc = b.mix(0.18, tint, base)
-    shaded = b.mix(b.math("MULTIPLY", groove, 0.75), base, (0.0, 0.0, 0.0, 1))
+    gk = 0.75 if "groove" not in L else 1.0
+    shaded = b.mix(b.math("MULTIPLY", groove, gk), base, L.get("groove", (0.0, 0.0, 0.0, 1)))
     b.nt.links.new(b.mix(fill, shaded, embc), P.inputs["Base Color"])
 
     rough = L.get("rough", 0.3)
@@ -625,6 +802,8 @@ def build(e, ci, mi):
     b.nt.links.new(emc, P.inputs["Emission Color"])
     k = b.math("MULTIPLY", ek, nofill) if em is not None else b.math("MULTIPLY", 0.0, nofill)
     k = b.math("ADD", k, b.math("MULTIPLY", fill, L.get("emb_k", 0.0)))
+    if spark is not None:
+        k = b.math("ADD", k, b.math("MULTIPLY", spark, L.get("paint_k", 3.0)))
     b.nt.links.new(k, P.inputs["Emission Strength"])
 
     # micro relief of the body (the emblem relief is real geometry)
@@ -640,10 +819,10 @@ os.makedirs(out_dir, exist_ok=True)
 names = [s.strip() for s in A.only.split(",") if s.strip()] if A.only != "ALL" else TITLE
 for name in names:
     e = TITLE.index(name)
-    ci, mi, h = emblem(e)
+    ci, mi, h, pi = emblem(e)
     displace(h)
     ball.data.materials.clear()
-    ball.data.materials.append(build(e, ci, mi))
+    ball.data.materials.append(build(e, ci, mi, pi))
     fn = name.lower().replace(" ", "_")
     sc.render.filepath = os.path.join(out_dir, f"ball_{fn}.png")
     bpy.ops.render.render(write_still=True)
