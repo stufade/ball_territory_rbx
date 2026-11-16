@@ -694,6 +694,10 @@ do
 		check(decision and decision.Name == "NotProcessedYet", "failed load: receipt is NotProcessedYet")
 		check((c3.prof.coins or 0) == coins, "failed load: nothing granted")
 		check(dsf.writes == 0, "failed load: nothing written")
+		sf.run(3)
+		check(c3.st == nil or (c3.st.ph ~= "match" and c3.st.mode ~= "tutor"), "failed load: no tutorial")
+		check(c3.st ~= nil and c3.st.ph == "lobby", "failed load: the plaza under the REJOIN window")
+		check((c3.prof.coins or 0) == coins, "failed load: no tutorial reward")
 		sf.leave(c3)
 		sf.run(0.5)
 	end

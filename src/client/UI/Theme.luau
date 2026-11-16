@@ -468,20 +468,28 @@ function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	if topbar.Y > moneyTop and topbar.Y <= maxTop + 16 then
 		moneyTop = math.min(topbar.Y, maxTop)
 	end
+	-- the icon row (5 icons) goes beside the Roblox buttons when it clears the coin pill; otherwise (a PC, where the
+	-- player list squeezes the pill in) the whole row moves under them, still one row
+	local walletX = if Theme.phone then cv.X - 14 else cv.X - 14 - math.ceil(Theme.LIST_PX / math.max(Theme.scale, 0.1))
+	local moneyW = 230
+	local rowX, rowY = topbar.X + 6, 16
+	if rowX + 5 * 90 - 10 > walletX - moneyW - 10 then
+		rowX, rowY = 14, topbar.Y + 8
+	end
 	return {
 		right = cv.X - 14,
 		-- a phone shows no player list in the corner: the coins take it and the icons fit one row
-		walletX = if Theme.phone then cv.X - 14 else cv.X - 14 - math.ceil(Theme.LIST_PX / math.max(Theme.scale, 0.1)),
+		walletX = walletX,
 		playW = 230,
 		playY = playY,
 		playH = 104,
 		partyY = 254,
 		partyH = 66,
-		rowX = topbar.X + 6,
-		rowY = 16,
+		rowX = rowX,
+		rowY = rowY,
 		icon = 80,
 		gap = 10,
-		moneyW = 180,
+		moneyW = moneyW,
 		moneyH = moneyH,
 		moneyY = { moneyTop, moneyTop + moneyH + moneyGap },
 		barW = barW,

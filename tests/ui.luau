@@ -171,6 +171,7 @@ end
 for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	local cv = case[1]
 	Theme.scale = case[2]
+	Theme.setPhone(cv.X > 1000)
 	local tag = `{cv.X}x{cv.Y}`
 	local w, canvas, acts, flags = make(cv)
 	-- during the tutorial's reward screen: no login popup (U2: it opens on the plaza right after it)
@@ -211,9 +212,9 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	end
 	local shopR = rectOf(find(w.root, "ShopBtn"))
 	-- fifth icon when it clears the coin pills; otherwise the rightmost wrap that stays clear of PLAY
-	local fits = 360 + 4 * 90 + 80 <= cv.X - 14 - math.ceil(190 / case[2]) - 180 - 10
-	local wantX = if fits then 360 + 4 * 90 elseif cv.X >= 1100 then 360 + 3 * 90 else 360 + 2 * 90
-	local wantY = if fits then 16 else 16 + 80 + 10
+	-- a phone has the row beside the Roblox buttons; a PC (player list on the right) one row under them
+	local wantX = if cv.X > 1000 then 360 + 4 * 90 else 14 + 4 * 90
+	local wantY = if cv.X > 1000 then 16 else 86 + 8
 	check(shopR[1] == wantX and shopR[2] == wantY and shopR[3] == 80, `{tag}: SHOP at {shopR[1]},{shopR[2]}`)
 	check(find(find(w.root, "ShopBtn"), "Caption").Text == "SHOP", `{tag}: SHOP caption`)
 	check(find(find(w.root, "ShopBtn"), "Sub").Text == "22", `{tag}: SHOP missing count`)
@@ -222,7 +223,10 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	local list = { cv.X - 190 / case[2], 0, 190 / case[2], cv.Y }
 	local addR = rectOf(find(w.root, "AddCoins"))
 	for name, r in { Coins = coinR, AddCoins = addR } do
-		check(not overlap(r, list), `{tag}: {name} clear of the player list ({r[1] + r[3]} vs {list[1]})`)
+		check(
+			cv.X > 1000 or not overlap(r, list),
+			`{tag}: {name} clear of the player list ({r[1] + r[3]} vs {list[1]})`
+		)
 	end
 	check(addR[4] * case[2] >= 44, `{tag}: + still 44 real px`)
 	-- NEW BALL! on screen: the login screen waits
@@ -288,7 +292,10 @@ for _, case in { { V2(1168, 540), 390 / 540 }, { V2(960, 540), 720 / 540 } } do
 	local qr = rectOf(qp)
 	check(qr[1] >= 0 and qr[1] + qr[3] <= cv.X - 14 - 230 and qr[2] + qr[4] <= cv.Y, `{tag}: quests left of PLAY`)
 	check(not overlap(qr, roblox), `{tag}: quests clear of the Roblox buttons`)
-	check(not overlap(qr, stick) and not overlap(qr, jump), `{tag}: quests clear of the stick and jump`)
+	check(
+		cv.X < 1000 or (not overlap(qr, stick) and not overlap(qr, jump)),
+		`{tag}: quests clear of the stick and jump`
+	)
 	check(find(find(qp, "Quest2"), "Done") ~= nil and find(find(qp, "Quest1"), "Count").Text == "1/3", `{tag}: rows`)
 	check(find(qp, "Reset").Text == "NEW IN 4h 59m", `{tag}: reset timer ({find(qp, "Reset").Text})`)
 	find(w.root, "QuestsBtn").Activated:Fire()
@@ -401,6 +408,10 @@ do
 	local a = Gui.new("Frame")
 	Money.result(a, { afk = true, coins = 0 }, 300, 468)
 	check(find(a, "Afk") ~= nil and find(a, "Coins") == nil, "result: AFK line")
+	check(
+		Money.pill(39000) == "39,000" and Money.pill(9999999) == "9,999,999" and Money.pill(12345678) == "12.3M",
+		"pill text: full up to 9,999,999, then M"
+	)
 	check(Money.fmt(1234567) == "1,234,567" and Money.fmt(12) == "12" and Money.fmt(100) == "100", "fmt")
 end
 
@@ -739,6 +750,7 @@ end
 
 for _, cv in { V2(1168, 540), V2(960, 540) } do
 	Theme.scale = if cv.X >= 1100 then 390 / 540 else 720 / 540
+	Theme.setPhone(cv.X > 1000)
 	local tag = `{cv.X} spin`
 	local w = make(cv)
 	Wallet.setState(w, { ph = "lobby" })
@@ -746,8 +758,9 @@ for _, cv in { V2(1168, 540), V2(960, 540) } do
 	v.spin = spinBoard(3)
 	Wallet.setProfile(w, v)
 	local btn = find(w.root, "SpinBtn")
-	local wantX = 360
-	local wantY = 16 + 90
+	-- phone: the sixth cell of the top row; PC: of its one row under the Roblox buttons
+	local wantX = if cv.X > 1000 then 360 + 5 * 90 else 14 + 5 * 90
+	local wantY = if cv.X > 1000 then 16 else 94
 	local r = rectOf(btn)
 	check(r[1] == wantX and r[2] == wantY and r[3] == 80, `{tag}: button at {r[1]},{r[2]}`)
 	check(find(btn, "Caption").Text == "SPIN", `{tag}: caption`)

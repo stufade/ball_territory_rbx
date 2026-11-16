@@ -69,12 +69,17 @@ end
 
 -- T2.2: the profile came (it may come after Lobby.join): a finished tutorial goes straight to the plaza.
 function Lobby.loaded(r: Roster.Rec)
-	if not Config.TUTORIAL or not Tutorial.isDone(r.player) or r.session or not r.tutor then
+	if not Config.TUTORIAL or r.session or not r.tutor then
+		return
+	end
+	-- a failed load gives an empty temporary profile: no tutorial (it would play again), only the REJOIN window
+	local failed = Profiles.saveFailed(r.player)
+	if not failed and not Tutorial.isDone(r.player) then
 		return
 	end
 	r.tutor = nil
 	r.first = false
-	r.glow = if Profiles.played(r.player) then nil else "play"
+	r.glow = if failed or Profiles.played(r.player) then nil else "play"
 	Roster.lobby(r)
 	Party.refresh(r)
 end
@@ -293,7 +298,9 @@ function Lobby.tick(now: number)
 		end
 		-- the tutorial starts once the client listens (hello), so it sees the first scene from its start
 		local listening = r.readyAt ~= nil or now - r.joinedAt >= Config.TUT.helloWait
-		if r.tutor and not r.session and listening and Tutorial.ready(r.player) then
+		if r.tutor and not r.session and Profiles.saveFailed(r.player) then
+			Lobby.loaded(r)
+		elseif r.tutor and not r.session and listening and Tutorial.ready(r.player) then
 			local arena = Arenas.free("duel")[1]
 			if arena then
 				r.tutor = nil

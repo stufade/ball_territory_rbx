@@ -449,7 +449,8 @@ export type Reward = { balls: { number }, legend: number, pool: { number }, boos
 -- The tutorial is won: the reward once per profile (nil on a replay). Saved soon: it is the most valuable moment.
 function Profiles.tutorialDone(player: Player): Reward?
 	local p = Profiles.get(player)
-	if not p then
+	-- a temporary profile after a failed load grants nothing: it would be lost
+	if not p or p.loadFailed then
 		return nil
 	end
 	local r = Progress.tutorialReward(p.data, clock(), Config :: any, rand)
@@ -467,7 +468,8 @@ end
 -- Returns what the result screen shows.
 function Profiles.award(player: Player, info: Award.Info): Award.Result?
 	local p = Profiles.get(player)
-	if not p then
+	-- a temporary profile after a failed load grants nothing: it would be lost
+	if not p or p.loadFailed then
 		return nil
 	end
 	local log = {}
@@ -502,7 +504,8 @@ end
 -- Action daily: today's login reward (once per UTC day). Saved soon (VOID on the 7th day).
 function Profiles.claimDaily(player: Player)
 	local p = Profiles.get(player)
-	if not p then
+	-- a temporary profile after a failed load grants nothing: it would be lost
+	if not p or p.loadFailed then
 		return
 	end
 	local log = {}

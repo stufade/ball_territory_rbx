@@ -249,7 +249,7 @@ local function pill(p: Plaza, layer: Frame, st: Net.State)
 	local cv = p.ctx.canvas
 	-- between the Roblox buttons (top left) and the coins (top right)
 	local L = Theme.plaza(cv, p.ctx.topbar)
-	local x0, x1 = L.rowX, L.walletX - L.moneyW - 10
+	local x0, x1 = p.ctx.topbar.X + 6, L.walletX - L.moneyW - 10
 	local bw = math.min(470, x1 - x0)
 	local box = Theme.frame(layer, UDim2.fromOffset(bw, 64), UDim2.fromOffset((x0 + x1) / 2, 12), Theme.PANEL, TOP_MID)
 	box.BackgroundTransparency = 0.1

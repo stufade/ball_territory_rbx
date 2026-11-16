@@ -33,6 +33,15 @@ function Money.fmt(n: number): string
 	return out
 end
 
+-- Counter text: full with separators up to 9,999,999, then "12.3M" so the pill never clips a digit.
+function Money.pill(n: number): string
+	n = math.floor(n)
+	if n >= 10000000 then
+		return string.format("%.1fM", math.floor(n / 100000) / 10)
+	end
+	return Money.fmt(n)
+end
+
 -- A number that rolls from what it shows to its target (0.9 s, ease out) and pulses its box while it rolls.
 export type Roll = { shown: number, from: number, to: number, t: number, label: TextLabel?, box: GuiObject? }
 
@@ -62,7 +71,7 @@ function Money.step(r: Roll, dt: number): boolean
 	end
 	local l = r.label
 	if l and l.Parent then
-		l.Text = Money.fmt(r.shown + 0.5)
+		l.Text = Money.pill(r.shown + 0.5)
 	end
 	local b = r.box
 	local moving = r.t < DUR

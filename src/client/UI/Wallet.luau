@@ -78,9 +78,9 @@ local function pill(w: Wallet, layer: Frame, cur: string, y: number, roll: Money
 	Money.icon(box, cur, 40, UDim2.fromOffset(20, L.moneyH / 2)).ZIndex = 3
 	local t = Theme.label(
 		box,
-		Money.fmt(roll.shown + 0.5),
+		Money.pill(roll.shown + 0.5),
 		28,
-		UDim2.fromOffset(L.moneyW - 54, 30),
+		UDim2.fromOffset(L.moneyW - 54, 36),
 		UDim2.new(1, -14, 0.5, 0),
 		{
 			anchor = V2(1, 0.5),
@@ -248,7 +248,7 @@ function Wallet.render(w: Wallet)
 		local value = coinBox:FindFirstChild("Value") :: TextLabel?
 		if value then
 			value.Position = UDim2.new(1, -54, 0.5, 0)
-			value.Size = UDim2.fromOffset(L.moneyW - 98, 30)
+			value.Size = UDim2.fromOffset(L.moneyW - 98, 36)
 		end
 	end
 	local add = Instance.new("TextButton")
