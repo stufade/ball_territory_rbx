@@ -1,6 +1,5 @@
 --!strict
 -- Sounds of docs/audio.md. Cell paint stays silent. "hit" is ball bumps and KOs, at most 4 times a second.
--- rare / epic / legend reuse power, reaction and win (own Sound, own Volume and PlaybackSpeed).
 -- A seated player hears the match; a plaza viewer does not (Render passes a no-op while view == true).
 -- The music bed is separate: a viewer still hears it. Id 0 never creates or plays a Sound.
 local ContentProvider = game:GetService("ContentProvider")
@@ -13,21 +12,27 @@ type Cue = {
 	speed: number?,
 	looped: boolean?,
 	limit: number?,
+	cut: number?, -- seconds: fade out and stop here (library stings can be longer than the cue we want)
 }
 
 local IDS: { [string]: Cue } = {
-	-- capture asset, used as the collision / KO tick. Not a new upload.
-	hit = { id = 84349985737198, volume = 0.35, limit = 4 },
-	power = { id = 126093538007975, volume = 0.6 },
-	reaction = { id = 124991616061855, volume = 0.9 },
-	final = { id = 79742001226121, volume = 0.8 },
-	win = { id = 82466908590237, volume = 0.8 },
-	-- tier stops on the spin strip. Same uploads as power / reaction / win, different playback.
-	rare = { id = 126093538007975, volume = 0.42, speed = 1 },
-	epic = { id = 124991616061855, volume = 0.62, speed = 1.15 },
-	legend = { id = 82466908590237, volume = 0.74, speed = 1.2 },
+	-- All ids are free Roblox / APM Creator Store assets (docs/audio.md has candidates and fallbacks).
+	-- Not heard by the author: volumes and cuts are starting values, tune by ear.
+	hit = { id = 16480568432, volume = 0.5, limit = 4, cut = 0.5 }, -- Roblox_Pinball_Bumper_Soft_Click_03
+	power = { id = 1839901345, volume = 0.5, cut = 1.1 }, -- APM "Powered Up Chimes"
+	reaction = { id = 108306323478967, volume = 0.7, cut = 1.3 }, -- APM "Whoosh Magic Spell"
+	final = { id = 1837769225, volume = 0.7, cut = 2.4 }, -- APM "Retro Gamer (sting)", same album as the music
+	win = { id = 1836473422, volume = 0.75, cut = 3.5 }, -- APM "Victory Fanfare Sting"
+	-- tier stops on the spin strip
+	rare = { id = 16480578737, volume = 0.5, cut = 0.8 }, -- Roblox_Pinball_8Bit_Blip_07
+	epic = { id = 1846251193, volume = 0.6, cut = 2 }, -- APM Jackpot Mania "Win"
+	legend = { id = 1846251212, volume = 0.7, cut = 3.2 }, -- APM Jackpot Mania "Star Prize"
+	-- UI cues, ready for Gui to call Sfx.play (not wired yet)
+	click = { id = 15675059323, volume = 0.5, limit = 6 }, -- Roblox_UI_Bright_Click
+	tick = { id = 16480580213, volume = 0.45, limit = 12, cut = 0.25 }, -- Roblox_Pinball_8Bit_Blip_01
+	coin = { id = 127645268874265, volume = 0.55, limit = 6, cut = 1 }, -- Roblox CoinTransfer_01
 	-- Music from the Roblox Creator Store (APMOfficial, free for all experiences), see docs/audio.md.
-	-- Quieter than every effect (lowest effect cue is 0.35). Lobby = plaza track, match = own track.
+	-- Quieter than every effect (lowest effect cue is 0.45). Lobby = plaza track, match = own track.
 	music = { id = 1837768352, volume = 0.2, looped = true },
 	musicMatch = { id = 1837768494, volume = 0.14, looped = true },
 }
@@ -42,9 +47,28 @@ local battle = false
 local bed: Sound? = nil
 local musicGroup: SoundGroup? = nil
 local fades: { [Sound]: Tween } = {}
+local cuts: { [Sound]: number } = {}
 
-local function emit(s: Sound)
+local function emit(s: Sound, def: Cue)
 	s.TimePosition = 0
+	s.Volume = def.volume
+	local cut = def.cut
+	if cut then
+		-- fade out the tail and stop; a newer play of the same Sound makes the older timer a no-op
+		cuts[s] = (cuts[s] or 0) + 1
+		local stamp = cuts[s]
+		task.delay(math.max(cut - 0.12, 0.05), function()
+			if cuts[s] ~= stamp then
+				return
+			end
+			TweenService:Create(s, TweenInfo.new(0.12), { Volume = 0 }):Play()
+			task.delay(0.14, function()
+				if cuts[s] == stamp then
+					s:Stop()
+				end
+			end)
+		end)
+	end
 	-- Client Sounds under SoundService often stay silent on :Play() for an rbxassetid. PlayLocalSound is the
 	-- local 2D path. It no-ops until the asset is loaded, so play() retries from Loaded.
 	SoundService:PlayLocalSound(s)
@@ -121,6 +145,7 @@ function Sfx.stop()
 		tw:Cancel()
 	end
 	table.clear(fades)
+	table.clear(cuts)
 	musicGroup = nil
 	folder, sounds, waiting, recent = nil, {}, {}, {}
 	battle, bed = false, nil
@@ -217,7 +242,7 @@ function Sfx.play(name: string)
 		return
 	end
 	if s.IsLoaded then
-		emit(s)
+		emit(s, def)
 		return
 	end
 	if waiting[name] then
@@ -227,7 +252,7 @@ function Sfx.play(name: string)
 	s.Loaded:Once(function()
 		waiting[name] = nil
 		if sounds[name] == s then
-			emit(s)
+			emit(s, def)
 		end
 	end)
 end

@@ -1,21 +1,34 @@
-# Звуки M1 (T1.6)
+# Звуки (переподбор A-2, 2026-11-16)
 
-Все 5 звуков синтезированы из WebAudio-кода веб-прототипа (`ball_territory_web/public/index.html`, объект `snd`), портированного в Python: `assets/audio/src/synth.py`. Чужих файлов нет, лицензия — собственная работа проекта, ограничений нет. Файлы: моно, 44,1 кГц, пик −1,5 дБ, тишина обрезана. `.ogg` — Vorbis, `.wav` — PCM16.
+Пользователь: «звук такое говно». Самодельные синтезированные звуки (sfx_capture/power/reaction/final/win, id в старой таблице ниже, раздел «Прежние») заменены на бесплатные лицензированные звуки Creator Store (Audio → Sound Effects): Roblox (официальные) и APMOfficial (Courtesy of APM Music). Лицензия Creator Store: бесплатно во всех играх Roblox, загрузка в наш аккаунт не нужна и не делалась. Нормализации громкости под рукой нет (файлы не скачиваются без cookie Roblox), поэтому баланс задаётся `Volume` в `src/client/Render/Sfx.luau`, а длинные стинги обрезаются полем `cut` (затухание 0,12 с и Stop).
 
-| id | Файл | Источник (синтезатор в вебе) | Лицензия | Длина | Где играет | Volume в Roblox | asset id |
-|---|---|---|---|---|---|---|---|---|
-| hit | sfx_capture | `pop()` | своя | 0,05 с | столкновение шаров и KO, не чаще 4 раз в секунду. Закраска клетки молчит | 0.35 | 84349985737198 |
-| power | sfx_power | `power(e)`, e=8 (440 Гц) | своя | 0,18 с | срабатывание силы | 0.6 | 126093538007975 |
-| reaction | sfx_reaction | `reaction("WILDFIRE")` | своя | 0,63 с | любая реакция (самый яркий) | 0.9 | 124991616061855 |
-| final | sfx_final | `final()` | своя | 1,22 с | начало финала «FINAL!» | 0.8 | 79742001226121 |
-| win | sfx_win | `crown()` | своя | 1,30 с | победа | 0.8, PlaybackSpeed 1 | 82466908590237 |
-| rare | тот же sfx_power | собран из power, не новая загрузка | своя | 0,18 с | остановка ленты на rare (`Sfx.play("rare")`) | 0.42, PlaybackSpeed 1 | 126093538007975 |
-| epic | тот же sfx_reaction | собран из reaction, не новая загрузка | своя | 0,55 с (0,63 / 1,15) | остановка ленты на epic | 0.62, PlaybackSpeed 1.15 | 124991616061855 |
-| legend | тот же sfx_win | собран из win тише и короче, не новая загрузка | своя | 1,08 с (1,30 / 1,2) | остановка ленты на legend: громче и длиннее rare и epic, тише и короче win | 0.74, PlaybackSpeed 1.2 | 82466908590237 |
-| music | Roblox Creator Store, не наш аплоад | «Retro Gamer (a)», Skip Armstrong (APM Music), 2:12 | лицензия Creator Store (бесплатно во всех играх Roblox, APMOfficial) | 132 с | луп лобби/площадки (в том числе при просмотре чужого боя) | 0.20 | 1837768352 |
-| musicMatch | Roblox Creator Store | «Battle Hero (a)», Skip Armstrong (APM Music), 1:59 | то же | 119 с | луп своего матча, заменяет лобби-трек | 0.14 | 1837768494 |
+**НА СЛУХ НЕ ПРОВЕРЕНО.** Выбор по названию, описанию APM и жанру. Длины у большинства не указаны, `cut` страхует. Слушать в Play: hit, power, reaction, final, win, rare, epic, legend. Если ассет молчит, подставить запасной из таблицы (одна правка id).
 
-Загружено 2026-11-09 в аккаунт SUL_GOAT (ogg), статус модерации в Creator Hub не проверен.
+| Cue | Где играет | id | Название и источник | Лицензия | Запасной | Volume / cut |
+|---|---|---|---|---|---|---|
+| hit | столкновение шаров и KO, ≤4 в секунду | 16480568432 | Roblox_Pinball_Bumper_Soft_Click_03 (Roblox) | Creator Store, free | 16480567946 Bumper_Weighted_Click_01 | 0.5 / 0.5 с |
+| power | срабатывание силы | 1839901345 | «Powered Up Chimes», Juice Music, 5 с (APM) | Creator Store, free, APM | 16480579431 8Bit_Blip_05 | 0.5 / 1.1 с |
+| reaction | любая реакция | 108306323478967 | «Whoosh Magic Spell» (APM) | то же | 15675046931 Roblox_UI_Sweep | 0.7 / 1.3 с |
+| final | начало финала | 1837769225 | «Retro Gamer (sting)», Skip Armstrong, альбом CHIPTUNE, как музыка (APM) | то же | 1840000886 «End Game (sting)», 7 с | 0.7 / 2.4 с |
+| win | победа | 1836473422 | «Victory Fanfare Sting» (APM) | то же | 1844259840 «Glorious Victory Link 1» | 0.75 / 3.5 с |
+| rare | остановка ленты на rare | 16480578737 | Roblox_Pinball_8Bit_Blip_07 (Roblox) | Creator Store, free | 16480578302 8Bit_Blip_10 | 0.5 / 0.8 с |
+| epic | остановка ленты на epic | 1846251193 | Jackpot Mania «Win», 3 с (APM, Sonoton) | то же | 1844259840 | 0.6 / 2 с |
+| legend | остановка ленты на legend | 1846251212 | Jackpot Mania «Star Prize», 6 с (APM) | то же | 1837762472 «Victory Dance (sting a)» | 0.7 / 3.2 с |
+| click | клик UI (cue готов, Gui пока не вызывает) | 15675059323 | Roblox_UI_Bright_Click (Roblox) | Creator Store, free | 15675032796 Small_Click | 0.5 |
+| tick | тик рулетки (cue готов, Spin пока не вызывает; не на закраску) | 16480580213 | Roblox_Pinball_8Bit_Blip_01 (Roblox) | то же | 16480580064 Blip_02 | 0.45 / 0.25 с |
+| coin | монеты (cue готов, пока не вызывается) | 127645268874265 | CoinTransfer_01 (Roblox) | то же | 16480570986 Bumper_Low_Bells_02 | 0.55 / 1 с |
+| music | лобби | 1837768352 | «Retro Gamer (a)», Skip Armstrong (APM), 2:12 | то же | 1837351107 «Rainbow Road» | 0.20 |
+| musicMatch | свой матч | 1837768494 | «Battle Hero (a)», Skip Armstrong (APM), 1:59 | то же | 1837768323 «Final Boss (a)» | 0.14 |
+
+Музыку не менял: оба трека уже яркие chiptune APM из того же альбома, что и стинг final. Заметные альтернативы лобби при желании: «Rise to the Top (a 15)» 1837769983 (POP BREAKS, 15 с) не подходит как луп; других лучше найденных нет.
+
+Закраска клеток по-прежнему молчит (решение пользователя).
+
+Нашёл через `apis.roblox.com/toolbox-service/v1/marketplace/3` (поиск) и `economy.roblox.com/v2/assets/<id>/details` (автор, описание). Брал только создателей Roblox и APMOfficial: у остальных SoundEffect-загрузок лицензия сомнительна (например «retro coin pickup» с пометкой «credits to LilMati on freesound»). Своих CC0-загрузок не делал.
+
+## Прежние (до A-2, оставлены как запасной вариант)
+
+Синтез из WebAudio веба (`assets/audio/src/synth.py`), загружены 2026-11-09 в SUL_GOAT: hit/capture 84349985737198, power 126093538007975, reaction 124991616061855, final 79742001226121, win 82466908590237.
 
 **F1 (2026-11-10):** звук закраски клеток убран — он звучал до 8 раз в секунду и на слух «постоянно пукал». Закраска по-прежнему молчит. С 2026-11-11 тот же ассет `sfx_capture` играет как `hit`: столкновение шаров (`bump`) и KO, не чаще 4 раз в секунду. Урон оружием (`hit` в правилах) остаётся только картинкой. Сила, реакция, финал и победа не менялись.
 
