@@ -18,7 +18,7 @@ local Book = {}
 
 export type Ctx = { canvas: Vector2, frames: { (dt: number) -> () }, close: () -> () }
 
-local COLS, CW, CH, GAP = 6, 146, 52, 6
+local CH, GAP = 52, 6
 
 -- fresh: names found in the last match (they glow)
 function Book.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, fresh: { [string]: boolean })
@@ -32,10 +32,14 @@ function Book.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, fresh: { [strin
 	end
 	local bg = Theme.backdrop(parent, 0.18)
 	bg.Active = true
+	-- 6 x 7 on a big screen; a phone gets 7 x 6 (wider, shorter) so the window clears the Roblox buttons
+	local COLS = if Theme.phone then 7 else 6
+	local CW = math.min(146, math.floor((cv.X - 24 - 32 - (COLS - 1) * GAP) / COLS))
 	local rows = math.ceil(#names / COLS)
 	local w = COLS * CW + (COLS - 1) * GAP + 32
 	local h = 84 + rows * CH + (rows - 1) * GAP + 16
-	local panel = Theme.frame(parent, UDim2.fromOffset(w, h), UDim2.fromOffset(cv.X / 2, cv.Y / 2), Theme.PANEL, MID)
+	local panel =
+		Theme.frame(parent, UDim2.fromOffset(w, h), UDim2.fromOffset(cv.X / 2, Theme.windowY(cv, h)), Theme.PANEL, MID)
 	panel.Name = "BookPanel"
 	Theme.round(panel, 22)
 	Theme.stroke(panel, 4, Theme.INK)
@@ -50,7 +54,7 @@ function Book.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, fresh: { [strin
 		})
 	head.Name = "Head"
 	-- "+25 (coin) EACH NEW · EVERY 10: +200 · ALL: +1000"
-	local hint = Theme.clear(panel, UDim2.fromOffset(560, 26), UDim2.fromOffset(20, 52))
+	local hint = Theme.clear(panel, UDim2.fromOffset(660, 26), UDim2.fromOffset(20, 52))
 	local function piece(text: string, x: number, wd: number)
 		Theme.text(hint, text, 20, UDim2.fromOffset(wd, 26), UDim2.fromOffset(x, 0), {
 			anchor = V2(0, 0),
@@ -62,9 +66,9 @@ function Book.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, fresh: { [strin
 	local B = Economy.BOOK
 	piece(`+{B.coins}`, 0, 40)
 	Money.icon(hint, "coins", 22, UDim2.fromOffset(52, 13))
-	piece(`EACH NEW · EVERY {B.bonusEvery}: +{B.bonus} · ALL: +{B.allCoins}`, 68, 420)
+	piece(`EACH NEW · EVERY {B.bonusEvery}: +{B.bonus} · ALL: +{B.allCoins}`, 68, 520)
 	local close =
-		Theme.button(panel, "X", UDim2.fromOffset(56, 56), UDim2.new(1, -10, 0, 10), Theme.BAD, nil, 30, V2(1, 0))
+		Theme.button(panel, "X", UDim2.fromOffset(62, 62), UDim2.new(1, -10, 0, 10), Theme.BAD, nil, 30, V2(1, 0))
 	close.Name = "Close"
 	close.Activated:Connect(ctx.close)
 	local grid = Theme.clear(panel, UDim2.fromOffset(w - 32, h - 100), UDim2.fromOffset(16, 84))

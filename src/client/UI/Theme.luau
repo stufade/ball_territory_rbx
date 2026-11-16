@@ -46,6 +46,24 @@ Theme.BOLD = Look.BOLD
 Theme.BTN_H = 112
 Theme.MIN_TEXT = 20
 
+-- Phone rule (MOB-1): a screen under 500 real px tall (a phone in landscape) gets text never under 22 design px
+-- (15.8 px at scale 0.72 instead of 14.4), the plaza HUD in one row (no room kept for the Roblox player list,
+-- which a phone does not show) and windows placed under the Roblox buttons. UI/init calls setPhone on every fit;
+-- `topbar` is the corner to keep clear (design px), set there too.
+Theme.phone = false
+Theme.topbar = Vector2.new(354, 80)
+function Theme.setPhone(on: boolean)
+	Theme.phone = on
+	Theme.MIN_TEXT = if on then 22 else 20
+end
+
+-- Centre y of a window `h` tall on canvas `cv`: below the Roblox buttons when the screen has the room, never off
+-- the bottom edge (6 px margin); a window taller than that keeps as much of the topbar clear as it can.
+function Theme.windowY(cv: Vector2, h: number): number
+	local top = Theme.topbar.Y + 4
+	return math.max(math.min(math.max(cv.Y / 2, top + h / 2), cv.Y - 6 - h / 2), h / 2)
+end
+
 function Theme.reduced(): boolean
 	return GuiService.ReducedMotionEnabled
 end
@@ -439,7 +457,8 @@ function Theme.plaza(cv: Vector2, topbar: Vector2): PlazaLayout
 	end
 	return {
 		right = cv.X - 14,
-		walletX = cv.X - 14 - math.ceil(Theme.LIST_PX / math.max(Theme.scale, 0.1)),
+		-- a phone shows no player list in the corner: the coins take it and the icons fit one row
+		walletX = if Theme.phone then cv.X - 14 else cv.X - 14 - math.ceil(Theme.LIST_PX / math.max(Theme.scale, 0.1)),
 		playW = 230,
 		playY = playY,
 		playH = 104,

@@ -411,7 +411,13 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 	local cv = ctx.canvas
 	local bg = Theme.backdrop(parent, 0.18)
 	bg.Active = true
-	local panel = Theme.frame(parent, UDim2.fromOffset(PW, PH), UDim2.fromOffset(cv.X / 2, cv.Y / 2), Theme.PANEL, MID)
+	local panel = Theme.frame(
+		parent,
+		UDim2.fromOffset(PW, PH),
+		UDim2.fromOffset(cv.X / 2, Theme.windowY(cv, PH)),
+		Theme.PANEL,
+		MID
+	)
 	panel.Name = "DailyPanel"
 	Theme.round(panel, 22)
 	Theme.stroke(panel, 4, Theme.INK)

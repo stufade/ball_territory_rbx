@@ -751,7 +751,13 @@ local function draft(root: Frame, st: Net.State, ctx: Ctx)
 			nil,
 			36
 		)
-		local free = Theme.text(any, "FREE · ONCE", 20, UDim2.fromOffset(160, 24), UDim2.new(0.5, 0, 0, -14), {
+		-- "FREE · ONCE" sits inside the button under its word (above the top edge it ran into PICKS 1-2-2-1)
+		local word = any:FindFirstChild("Label") :: TextLabel?
+		if word then
+			word.Size = UDim2.new(1, -16, 0, 64)
+			word.Position = UDim2.new(0.5, 0, 0, 8)
+		end
+		local free = Theme.label(any, "FREE · ONCE", 24, UDim2.new(1, -16, 0, 28), UDim2.new(0.5, 0, 0, 66), {
 			anchor = TOP_MID,
 			color = Theme.YELLOW_TXT,
 			z = 4,

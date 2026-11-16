@@ -15,7 +15,7 @@ local Quests = {}
 
 export type Ctx = { frames: { (dt: number) -> () }, close: () -> () }
 
-local W, ROW = 430, 78
+local ROW = 78
 
 local function left(s: number): string
 	s = math.max(0, math.floor(s))
@@ -32,6 +32,8 @@ function Quests.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, right: number
 	if not q then
 		return
 	end
+	-- a phone draws text at 22 or more (Theme.setPhone): a wider card keeps the longest quest on one line
+	local W = if Theme.phone then 500 else 430
 	local h = 64 + #q.list * ROW + 56
 	local panel = Theme.frame(parent, UDim2.fromOffset(W, h), UDim2.fromOffset(right, top), Theme.PANEL, V2(1, 0))
 	panel.Name = "QuestPanel"
@@ -47,7 +49,7 @@ function Quests.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, right: number
 		stroke = 4,
 	})
 	local close =
-		Theme.button(panel, "X", UDim2.fromOffset(48, 48), UDim2.new(1, -8, 0, 8), Theme.BAD, nil, 26, V2(1, 0))
+		Theme.button(panel, "X", UDim2.fromOffset(62, 62), UDim2.new(1, -6, 0, 6), Theme.BAD, nil, 30, V2(1, 0))
 	close.Name = "Close"
 	close.Activated:Connect(ctx.close)
 	for i, r in q.list do
@@ -58,7 +60,7 @@ function Quests.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, right: number
 		if r.done then
 			row.BackgroundColor3 = Theme.SLOT:Lerp(Theme.GOOD, 0.25)
 		end
-		Theme.text(row, r.text, 22, UDim2.fromOffset(280, 26), UDim2.fromOffset(12, 7), {
+		Theme.text(row, r.text, 22, UDim2.fromOffset(W - 150, 26), UDim2.fromOffset(12, 7), {
 			anchor = V2(0, 0),
 			align = Enum.TextXAlignment.Left,
 			color = if r.done then Theme.GOOD_TXT else Theme.TEXT,

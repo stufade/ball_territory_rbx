@@ -187,7 +187,7 @@ function UI.start()
 		end
 	end
 
-	local function fit()
+	local function fit(): boolean
 		local off, size
 		if Screen.emulated() then
 			off, size = Screen.band()
@@ -195,10 +195,14 @@ function UI.start()
 			off, size = Vector2.zero, gui.AbsoluteSize
 		end
 		if size.X < 1 or size.Y < 1 then
-			return
+			return false
 		end
 		band.Position = UDim2.fromOffset(off.X, off.Y)
 		band.Size = UDim2.fromOffset(size.X, size.Y)
+		-- phone rule (Theme.setPhone): height in px of the device (of the emulated phone in Studio)
+		local phone = size.Y / Screen.k() < 500
+		local phoneChanged = phone ~= Theme.phone
+		Theme.setPhone(phone)
 		local s = math.min(size.X / Screen.DESIGN_W, size.Y / Screen.DESIGN_H)
 		scale.Scale = s
 		Theme.scale = s
@@ -207,10 +211,12 @@ function UI.start()
 		-- topbar in design px; with safe insets the canvas may start right of the screen edge
 		local tb = Screen.topbar()
 		ctx.topbar = Vector2.new(math.max(0, tb.X - gui.AbsolutePosition.X) / s + 8, tb.Y / s + 6)
+		Theme.topbar = ctx.topbar
 		overlay()
 		if hud then
 			Hud.layout(hud, ctx.canvas, ctx.topbar)
 		end
+		return phoneChanged
 	end
 	local pending = false
 	local function refit()
@@ -221,7 +227,10 @@ function UI.start()
 		task.defer(function()
 			pending = false
 			local before = ctx.canvas
-			fit()
+			-- a switch of the phone rule changes text sizes and the HUD row: rebuild like a new canvas
+			if fit() then
+				before = Vector2.zero
+			end
 			if before ~= ctx.canvas and menu.Visible then
 				rebuild()
 			elseif before ~= ctx.canvas then
