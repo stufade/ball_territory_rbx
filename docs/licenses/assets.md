@@ -7,6 +7,7 @@
 | HUD: книга (BOOK) | rbxassetid://107518731338758 | то же, `book.png` | своя, CC0 |
 | HUD: лавка (SHOP) | rbxassetid://115317288173478 | то же, `shop.png` | своя, CC0 |
 | HUD: кучка монет (счётчик) | rbxassetid://96009887810654 | то же, `coins.png` | своя, CC0 |
+| Шары: 27 3D-рендеров (`Art.ball[ИМЯ]`) | см. `src/shared/Art.luau` (`Art.ball`) | свой рендер Blender, `tools/art/blender/balls.py` → `assets/art/balls3d/ball_*.png`; эмблемы из своего атласа `assets/art/icons.png` и своих форм в скрипте | своя, CC0 |
 | Атласы шаров, земли, иконок (`src/shared/Art.luau`) | см. Art.luau | свой веб-билд ball_territory_web, `tools/art/export.mjs` | своя |
 
 ## Модели сцены (S-1, Creator Store, бесплатные; лежат в `ServerStorage.DecorKit`, копии в `Workspace.Decor`, вне Rojo)
