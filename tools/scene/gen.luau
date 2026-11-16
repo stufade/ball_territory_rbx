@@ -46,8 +46,8 @@ local NAVY_DARK = "#3a2c22" -- island dirt edge
 local BOARD = "#181e30"
 local GRASS = "#7ccf4e"
 local GRASS_DARK = "#5fae3c"
-local STONE = "#efe2c4"
-local STONE_DARK = "#c9b48c"
+local STONE = "#f2cf8f"
+local STONE_DARK = "#c98f52"
 local ROCK = "#8b6a4c"
 local ROCK_DARK = "#6b4f3a"
 local GOLD = "#ffc83d"
@@ -95,9 +95,9 @@ end
 local function stand(out: { Node }, i: number, x: number, z: number, top: number)
 	local h = top - 200
 	local w = 4.6
-	table.insert(out, part(`Stand{i}`, { w, h, w }, { x, 200 + h / 2, z }, PILLAR, "Limestone"))
+	table.insert(out, part(`Stand{i}`, { w, h, w }, { x, 200 + h / 2, z }, FRAME, "SmoothPlastic"))
 	table.insert(out, neon(`Glow{i}`, { w + 0.5, 0.45, w + 0.5 }, { x, top - 0.45, z }))
-	table.insert(out, part(`Base{i}`, { w + 1.6, 1.2, w + 1.6 }, { x, 200.6, z }, STONE_DARK, "Limestone", NOHIT))
+	table.insert(out, part(`Base{i}`, { w + 1.6, 1.2, w + 1.6 }, { x, 200.6, z }, STONE_DARK, "SmoothPlastic", NOHIT))
 	table.insert(out, deco(`Band{i}`, { w + 0.3, 0.5, w + 0.3 }, { x, 201.5, z }, GOLD, "SmoothPlastic"))
 	table.insert(out, deco(`Cap{i}`, { w + 0.8, 0.35, w + 0.8 }, { x, top - 0.95, z }, GOLD, "SmoothPlastic"))
 end
@@ -117,25 +117,19 @@ type ArenaSpec = {
 	el: string,
 }
 
--- Gate behind the board: two sandstone towers with element crystals and banners, a gold-trimmed beam on top.
--- Seen by the match camera in the side columns behind the stands and above the board.
+-- Two low sandstone obelisks beside the board with an element orb on top. Kept under the avatars, so the match camera
+-- shows sky and trees behind the players, like the reference.
 local function gate(kids: { Node }, cx: number, half: number, top: number, el: { main: string, light: string })
 	for _, sx in { -1, 1 } do
 		local x = cx + sx * half
 		local tag = if sx < 0 then "L" else "R"
-		table.insert(kids, deco(`Tower{tag}`, { 6, top - 200, 6 }, { x, (200 + top) / 2, -9 }, STONE, "Limestone"))
-		table.insert(kids, deco(`TowerFoot{tag}`, { 8, 2, 8 }, { x, 201, -9 }, STONE_DARK, "Limestone"))
-		table.insert(kids, deco(`TowerTrim{tag}`, { 6.6, 0.8, 6.6 }, { x, top - 1.6, -9 }, GOLD))
-		table.insert(kids, deco(`TowerTop{tag}`, { 7.4, 1.4, 7.4 }, { x, top + 0.7, -9 }, STONE_DARK, "Limestone"))
-		table.insert(kids, ball(`TowerOrb{tag}`, 4, { x, top + 3.6, -9 }, el.main))
-		table.insert(kids, deco(`Banner{tag}`, { 3.6, 12, 0.3 }, { x, top - 9, -5.85 }, el.main, "Fabric"))
-		table.insert(kids, deco(`BannerHem{tag}`, { 3.6, 0.6, 0.35 }, { x, top - 15, -5.85 }, GOLD))
-		table.insert(kids, deco(`BannerRod{tag}`, { 4.4, 0.4, 0.4 }, { x, top - 2.9, -5.8 }, GOLD))
-		table.insert(kids, ball(`BannerGem{tag}`, 1.6, { x, top - 6.5, -5.6 }, el.light))
+		local z = -6
+		table.insert(kids, deco(`Tower{tag}`, { 4, top - 200, 4 }, { x, (200 + top) / 2, z }, STONE))
+		table.insert(kids, deco(`TowerFoot{tag}`, { 6, 2, 6 }, { x, 201, z }, STONE_DARK))
+		table.insert(kids, deco(`TowerTrim{tag}`, { 4.6, 0.7, 4.6 }, { x, top - 1.2, z }, GOLD))
+		table.insert(kids, deco(`TowerTop{tag}`, { 5.4, 1.2, 5.4 }, { x, top + 0.6, z }, STONE_DARK))
+		table.insert(kids, ball(`TowerOrb{tag}`, 3.6, { x, top + 3.1, z }, el.main))
 	end
-	table.insert(kids, deco("GateBeam", { half * 2 + 6, 3, 4 }, { cx, top - 1.5, -9 }, STONE, "Limestone"))
-	table.insert(kids, deco("GateTrim", { half * 2 + 6.2, 0.6, 4.2 }, { cx, top - 3, -9 }, GOLD))
-	table.insert(kids, ball("GateGem", 3.2, { cx, top + 1.2, -8.5 }, el.main))
 end
 
 local function arena(a: ArenaSpec): Node
@@ -183,16 +177,16 @@ local function arena(a: ArenaSpec): Node
 			table.insert(kids, ball(`Gem{k}`, 1.9, { x, y, 0.5 }, corner[k]))
 		end
 	end
-	table.insert(kids, part("Pedestal", { bw * 0.7, 3, 4 }, { cx, 201.5, -0.5 }, STONE_DARK, "Limestone"))
+	table.insert(kids, part("Pedestal", { bw * 0.7, 3, 4 }, { cx, 201.5, -0.5 }, STONE_DARK, "SmoothPlastic"))
 	table.insert(kids, deco("PedestalTrim", { bw * 0.7 + 0.4, 0.5, 4.4 }, { cx, 202.8, -0.5 }, GOLD))
 	table.insert(
 		kids,
-		part("Field", { a.gw * a.cs, a.gh * a.cs, 0.1 }, { cx, by, 0.55 }, "#e2e5ec", nil, { CanCollide = false })
+		part("Field", { a.gw * a.cs, a.gh * a.cs, 0.1 }, { cx, by, 0.55 }, "#25305c", nil, { CanCollide = false })
 	)
 	for i, s in a.stands do
 		stand(kids, i, cx + s[1], s[2], s[3])
 	end
-	gate(kids, cx, fw / 2 - 5, by + bh / 2 + 9, el)
+	gate(kids, cx, bw / 2 + 8, 209, el)
 	table.insert(
 		kids,
 		part(
@@ -268,7 +262,7 @@ local lobbyKids: { Node } = {
 	part("PadEdge", { PW, 1.6, PD }, { PCX, 198.6, PCZ }, NAVY_DARK, "Ground"),
 	-- gold rail between the plaza and the arenas, on a sandstone curb
 	part("Rail", { PW, 0.5, 0.5 }, { PCX, 202.6, PZ0 + 0.4 }, GOLD, "SmoothPlastic"),
-	part("RailBase", { PW, 1.2, 1.2 }, { PCX, 200.6, PZ0 + 0.4 }, STONE, "Limestone"),
+	part("RailBase", { PW, 1.2, 1.2 }, { PCX, 200.6, PZ0 + 0.4 }, STONE, "SmoothPlastic"),
 	wall("WallFront", { PW, 16, 1 }, { PCX, 208, PZ0 }),
 	wall("WallBack", { PW, 16, 1 }, { PCX, 208, PZ1 + 0.5 }),
 	wall("WallW", { 1, 16, PD + 50 }, { PX0 - 0.5, 208, PCZ - 22 }),
@@ -287,10 +281,10 @@ local lobbyKids: { Node } = {
 	deco("LaneW", { 3, 0.1, 22 }, { -40, 200.04, 52 }, STONE, "Cobblestone"),
 	deco("LaneE", { 3, 0.1, 22 }, { 52, 200.04, 52 }, STONE, "Cobblestone"),
 	-- light towers at the back corners
-	deco("PylonW", { 4, 12, 4 }, { PX0 + 5, 206, PZ1 - 5 }, STONE, "Limestone"),
+	deco("PylonW", { 4, 12, 4 }, { PX0 + 5, 206, PZ1 - 5 }, STONE, "SmoothPlastic"),
 	deco("PylonWCap", { 5, 0.8, 5 }, { PX0 + 5, 212.4, PZ1 - 5 }, GOLD),
 	ball("PylonWTop", 3.4, { PX0 + 5, 214.6, PZ1 - 5 }, ELEMENTS.fire.main),
-	deco("PylonE", { 4, 12, 4 }, { PX1 - 5, 206, PZ1 - 5 }, STONE, "Limestone"),
+	deco("PylonE", { 4, 12, 4 }, { PX1 - 5, 206, PZ1 - 5 }, STONE, "SmoothPlastic"),
 	deco("PylonECap", { 5, 0.8, 5 }, { PX1 - 5, 212.4, PZ1 - 5 }, GOLD),
 	ball("PylonETop", 3.4, { PX1 - 5, 214.6, PZ1 - 5 }, ELEMENTS.air.main),
 }
@@ -458,8 +452,8 @@ local function arch(): Node
 		properties = { Tags = { "PlazaSpot" } },
 		attributes = { Kind = "play" },
 		children = {
-			part("PillarL", { 2, 8, 2 }, { x - 5, 204, z }, PILLAR, "Limestone"),
-			part("PillarR", { 2, 8, 2 }, { x + 5, 204, z }, PILLAR, "Limestone"),
+			part("PillarL", { 2, 8, 2 }, { x - 5, 204, z }, PILLAR, "SmoothPlastic"),
+			part("PillarR", { 2, 8, 2 }, { x + 5, 204, z }, PILLAR, "SmoothPlastic"),
 			neon("Beam", { 12, 1.2, 2 }, { x, 208.4, z }, GREEN),
 			board,
 			trigger,
@@ -473,7 +467,7 @@ table.insert(lobbyKids, arch())
 
 -- One landmark behind the spawn, plus a colored path so the pad is not one flat blue rectangle.
 local bx, bz = 0, 70
-local beacon = part("Beacon", { 3.2, 16, 3.2 }, { bx, 208, bz }, STONE, "Limestone")
+local beacon = part("Beacon", { 3.2, 16, 3.2 }, { bx, 208, bz }, STONE, "SmoothPlastic")
 local beaconLight = light("#fff1a8", 36)
 beaconLight.name = "BeaconLight"
 beacon.children = { beaconLight }
@@ -487,11 +481,11 @@ table.insert(lobbyKids, neon("PathPlayLine", { 48, 0.12, 0.4 }, { 36, 200.08, 60
 -- element medallions on the walk to the boards
 for i, e in { "fire", "water", "earth", "air" } do
 	local x = -78 + (i - 1) * 54
-	table.insert(lobbyKids, cyl(`Medal{i}`, 7, 0.14, { x, 200.07, 38 }, STONE_DARK, "Limestone"))
+	table.insert(lobbyKids, cyl(`Medal{i}`, 7, 0.14, { x, 200.07, 38 }, STONE_DARK, "SmoothPlastic"))
 	table.insert(lobbyKids, cyl(`MedalCore{i}`, 4, 0.2, { x, 200.1, 38 }, ELEMENTS[e].main, "Neon"))
 end
 -- Spawn: faces the arenas (-Z). Server sets Player.RespawnLocation to it (src/server/Avatars.luau).
-local spawn = part("Spawn", { 12, 1, 12 }, { 0, 199.6, 56 }, STONE_DARK, "Limestone")
+local spawn = part("Spawn", { 12, 1, 12 }, { 0, 199.6, 56 }, STONE_DARK, "SmoothPlastic")
 spawn.className = "SpawnLocation"
 spawn.properties.Neutral = true
 spawn.properties.Duration = 0
