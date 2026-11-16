@@ -1,6 +1,7 @@
 # Ball renders for the UI (own render, CC0 by this project).
 # blender -b --factory-startup -P tools/art/blender/balls.py -- --only FIRE,WATER --out assets/art/balls3d
-# One camera, one light rig for every ball; emblem = white icon(e) from assets/art/icons.png (8x4 of 128 px).
+# One camera, one light rig for every ball. Emblem = icon(e) from assets/art/icons.png (8x4 of 128 px) pressed into the
+# geometry as a raised relief with a recessed groove (real displacement, so it catches light and casts shade).
 import argparse, math, os, sys
 
 import bpy
@@ -112,7 +113,7 @@ area("Fill", (4.0, -3.0, 0.5), 4.0, 140, (0.85, 0.9, 1.0), glossy=False)
 area("RimL", (-3.5, 3.5, 1.8), 1.6, 650, (0.9, 0.95, 1.0))
 area("RimR", (3.5, 3.0, 2.4), 1.6, 650, (1.0, 0.95, 0.9))
 
-bpy.ops.mesh.primitive_uv_sphere_add(segments=96, ring_count=48, radius=1.0)
+bpy.ops.mesh.primitive_uv_sphere_add(segments=768, ring_count=384, radius=1.0)
 ball = bpy.context.active_object
 ball.name = "Ball"
 for p in ball.data.polygons:
@@ -143,41 +144,121 @@ hm.node_tree.links.new(em.outputs[0], mx.inputs[2])
 hm.node_tree.links.new(mx.outputs[0], ho.inputs["Surface"])
 hull.data.materials.append(hm)
 
-# ---------- emblem images ----------
+# ---------- emblem maps (256 px) ----------
 atlas = bpy.data.images.load(os.path.join(ROOT, "assets/art/icons.png"))
 AW, AH = atlas.size
 apx = np.empty(AW * AH * 4, dtype=np.float32)
 atlas.pixels.foreach_get(apx)
 apx = apx.reshape(AH, AW, 4)  # row 0 = bottom
+ER = 256  # emblem map resolution
 
 
-OUTLINES = {}
+def smooth(a, lo, hi):
+    t = np.clip((a - lo) / (hi - lo), 0, 1)
+    return t * t * (3 - 2 * t)
 
 
-def icon_image(e):
+def blur(a, sigma):
+    r = int(sigma * 3) + 1
+    k = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma) ** 2)
+    k /= k.sum()
+    p = np.pad(a, r, mode="edge")
+    p = np.apply_along_axis(lambda m: np.convolve(m, k, mode="valid"), 0, p)
+    return np.apply_along_axis(lambda m: np.convolve(m, k, mode="valid"), 1, p)
+
+
+def zoom2(t):
+    """128 -> 256 bilinear for an (h, w, c) array."""
+    n = t.shape[0]
+    x = (np.arange(ER) + 0.5) / 2 - 0.5
+    x0 = np.clip(np.floor(x).astype(int), 0, n - 1)
+    x1 = np.clip(x0 + 1, 0, n - 1)
+    f = np.clip(x - x0, 0, 1)
+    rows = t[x0] * (1 - f)[:, None, None] + t[x1] * f[:, None, None]
+    return rows[:, x0] * (1 - f)[None, :, None] + rows[:, x1] * f[None, :, None]
+
+
+def flame_mask():
+    """Symmetric stylised flame (the atlas fire icon is lopsided): round base, S-curved tip, inner cut tongue."""
+    y, x = (np.mgrid[0:ER, 0:ER] + 0.5) / ER  # y up (row 0 = bottom)
+    x = x - 0.5
+    yy = (y - 0.12) / 0.78  # 0 bottom .. 1 tip
+    cx = 0.1 * np.sin(np.clip(yy, 0, 1) * math.pi * 1.1) * np.clip(yy - 0.35, 0, 1) * 2.2
+    base_r = 0.26
+    w = np.where(yy < 0.33, base_r * np.sqrt(np.clip(1 - ((yy - 0.33) / 0.33) ** 2, 0, 1)),
+                 base_r * np.clip((1 - yy) / 0.67, 0, 1) ** 1.25)
+    outer = (np.abs(x - cx) < w) & (yy > 0) & (yy < 1)
+    # side tongues: small flames leaning out from the base, left taller
+    for sx, top, lean in ((-1, 0.66, -0.07), (1, 0.52, 0.05)):
+        ys = (y - 0.2) / (top - 0.2)
+        cxs = sx * 0.17 + lean * np.clip(ys, 0, 1) ** 2
+        ws = 0.085 * np.clip(1 - ys, 0, 1) ** 1.1 * np.clip(ys * 4, 0, 1)
+        outer |= (np.abs(x - cxs) < ws) & (ys > 0) & (ys < 1)
+    # inner tongue cut: small flame shape offset down
+    y2 = (y - 0.14) / 0.42
+    w2 = np.where(y2 < 0.4, 0.1 * np.sqrt(np.clip(1 - ((y2 - 0.4) / 0.4) ** 2, 0, 1)),
+                  0.1 * np.clip((1 - y2) / 0.6, 0, 1) ** 1.3)
+    inner = (np.abs(x + 0.01) < w2) & (y2 > 0) & (y2 < 1)
+    return blur(outer.astype(np.float32), 1.0), blur(inner.astype(np.float32), 1.0)
+
+
+def emblem(e):
+    """Returns (colour image, mask image, height array). mask: R fill, G groove, B inner (second colour level)."""
     col, row = e % 8, e // 8
     y0 = AH - (row + 1) * 128
-    tile = apx[y0:y0 + 128, col * 128:(col + 1) * 128].copy()
-    # outline mask: alpha dilated by 3 px, kept in the red channel of a second image
-    a = tile[:, :, 3]
-    d = a.copy()
-    for dy in range(-3, 4):
-        for dx in range(-3, 4):
-            if dx * dx + dy * dy <= 10:
-                d = np.maximum(d, np.roll(np.roll(a, dy, 0), dx, 1))
-    om = bpy.data.images.new(f"outline{e}", 128, 128, alpha=True)
-    o = np.zeros_like(tile)
-    o[:, :, 0] = o[:, :, 1] = o[:, :, 2] = d
-    o[:, :, 3] = 1.0
-    om.colorspace_settings.name = "Non-Color"
-    om.pixels.foreach_set(o.ravel())
-    om.pack()
-    OUTLINES[e] = om
-    im = bpy.data.images.new(f"icon{e}", 128, 128, alpha=True)
-    im.pixels.foreach_set(tile.ravel())
-    im.pack()
-    im.alpha_mode = "STRAIGHT"
-    return im
+    tile = zoom2(apx[y0:y0 + 128, col * 128:(col + 1) * 128].copy())
+    inner = np.zeros((ER, ER), np.float32)
+    if TITLE[e] == "FIRE":
+        a, inner = flame_mask()
+        tile[:, :, :3] = 1.0
+    else:
+        a = blur(smooth(tile[:, :, 3], 0.4, 0.6), 0.8)
+    hard = smooth(a, 0.45, 0.55)
+    fill = smooth(blur(hard, 0.8), 0.3, 0.7)
+    dil = smooth(blur(hard, 5.0), 0.04, 0.2)
+    groove = np.clip(dil - fill, 0, 1)
+    bevel = smooth(blur(hard, 3.0), 0.5, 0.97)
+    h = 0.042 * bevel - 0.014 * blur(groove, 1.5) - 0.02 * blur(inner, 1.2) * bevel
+    rgb = tile.copy()
+    rgb[:, :, 3] = 1.0
+    ci = bpy.data.images.new(f"emb{e}", ER, ER, alpha=True)
+    ci.pixels.foreach_set(rgb.astype(np.float32).ravel())
+    ci.pack()
+    mk = np.zeros((ER, ER, 4), np.float32)
+    mk[:, :, 0], mk[:, :, 1], mk[:, :, 2], mk[:, :, 3] = fill, groove, inner, 1.0
+    mi = bpy.data.images.new(f"mask{e}", ER, ER, alpha=True)
+    mi.colorspace_settings.name = "Non-Color"
+    mi.pixels.foreach_set(mk.astype(np.float32).ravel())
+    mi.pack()
+    return ci, mi, h
+
+
+# ---------- sphere: emblem UVs (angles of the normal around the front -Y axis) ----------
+A_HALF = 0.6  # emblem half-angle (rad)
+me = ball.data
+NV = len(me.vertices)
+CO0 = np.empty(NV * 3, np.float32)
+me.vertices.foreach_get("co", CO0)
+CO0 = CO0.reshape(NV, 3)
+U = 0.5 + np.arctan2(CO0[:, 0], -CO0[:, 1]) / (2 * A_HALF)
+V = 0.5 + np.arctan2(CO0[:, 2], -CO0[:, 1]) / (2 * A_HALF)
+uvl = me.uv_layers.new(name="EMB")
+li = np.empty(len(me.loops), np.int32)
+me.loops.foreach_get("vertex_index", li)
+uvl.data.foreach_set("uv", np.stack([U[li], V[li]], 1).astype(np.float32).ravel())
+
+
+def displace(h):
+    inside = (U >= 0) & (U <= 1) & (V >= 0) & (V <= 1) & (CO0[:, 1] < 0)
+    px = np.clip(U * ER - 0.5, 0, ER - 1.001)
+    py = np.clip(V * ER - 0.5, 0, ER - 1.001)
+    x0, y0 = px.astype(int), py.astype(int)
+    fx, fy = px - x0, py - y0
+    s = (h[y0, x0] * (1 - fx) * (1 - fy) + h[y0, x0 + 1] * fx * (1 - fy) + h[y0 + 1, x0] * (1 - fx) * fy
+         + h[y0 + 1, x0 + 1] * fx * fy)
+    s = np.where(inside, s, 0.0)
+    me.vertices.foreach_set("co", (CO0 * (1 + s)[:, None]).astype(np.float32).ravel())
+    me.update()
 
 
 # ---------- node helpers ----------
@@ -212,142 +293,345 @@ class NB:
             el.color = c if len(c) == 4 else tuple(c) + (1,)
         return r.outputs["Color"]
 
-    def mix(self, fac, a, b):
-        return self.n("ShaderNodeMix", {"Factor": fac, 6: a, 7: b}, data_type="RGBA").outputs[2]
+    def mix(self, fac, a, b, blend="MIX"):
+        return self.n("ShaderNodeMix", {"Factor": fac, 6: a, 7: b}, data_type="RGBA", blend_type=blend).outputs[2]
 
     def maprange(self, v, a, b, c=0.0, d=1.0):
         return self.n("ShaderNodeMapRange", {"Value": v, "From Min": a, "From Max": b, "To Min": c, "To Max": d}).outputs[0]
 
+    def noise(self, v, scale, detail=2.0, dist=0.0, rough=0.5):
+        return self.n("ShaderNodeTexNoise", {"Vector": v, "Scale": scale, "Detail": detail, "Distortion": dist,
+                                             "Roughness": rough}).outputs["Fac"]
+
+    def vor(self, v, scale, feature="F1", rand=1.0):
+        return self.n("ShaderNodeTexVoronoi", {"Vector": v, "Scale": scale, "Randomness": rand}, feature=feature)
+
+    def wave(self, v, scale, dist, kind="BANDS", direction="Z", detail=2.0):
+        w = self.n("ShaderNodeTexWave", {"Vector": v, "Scale": scale, "Distortion": dist, "Detail": detail},
+                   wave_type=kind)
+        if kind == "BANDS":
+            w.bands_direction = direction
+        else:
+            w.rings_direction = direction
+        return w.outputs["Fac"]
+
+    def z(self, v):
+        return self.n("ShaderNodeSeparateXYZ", {0: v}).outputs["Z"]
+
+    def rim(self, blend=0.35, power=3.0):
+        return self.math("POWER", self.n("ShaderNodeLayerWeight", {"Blend": blend}).outputs["Facing"], power)
+
+
+def C(r, g, bb):
+    return lin((r, g, bb))
+
+
+def grad(b, obj, c_lo, c_hi, k=0.35):
+    """Base colour lit from above: c_lo bottom -> c_hi top with soft noise."""
+    t = b.math("ADD", b.math("MULTIPLY", b.z(obj), k), b.math("MULTIPLY", b.noise(obj, 2.0, 2.0), 0.3))
+    return b.ramp(t, [(0.0, c_lo), (0.55, c_hi)])
+
 
 # ---------- per-element looks ----------
-# Each look returns dict: base, rough, metal, emit, emit_k, bump (height socket), bump_k, extra principled inputs.
+# dict: base, rough, metal, coat, emit, emit_k, bump, bump_k, sss, thin, trans; emblem: emb (tint), emb_k (glow),
+# emb_metal, emb_rough, emb_icon (use icon colours, e.g. yin yang)
 def look_plastic(b, e, obj):
     c = lin(RGB[e])
-    n = b.n("ShaderNodeTexNoise", {"Vector": obj, "Scale": 2.0, "Detail": 2.0}).outputs["Fac"]
-    base = b.ramp(n, [(0.3, mixc(c, (0, 0, 0), 0.12)), (0.7, c)])
-    return dict(base=base, rough=0.35)
+    return dict(base=grad(b, obj, lin(mixc(RGB[e], (0, 0, 0), 0.35)), c), rough=0.3)
 
 
 def look_fire(b, e, obj):
     m = b.n("ShaderNodeMapping", {"Vector": obj, "Scale": (1, 1, 0.6)})
-    n = b.n("ShaderNodeTexNoise", {"Vector": m.outputs[0], "Scale": 2.6, "Detail": 8.0, "Roughness": 0.6,
-                                   "Distortion": 1.6}).outputs["Fac"]
-    z = b.n("ShaderNodeSeparateXYZ", {0: obj}).outputs["Z"]
-    t = b.math("ADD", n, b.math("MULTIPLY", z, -0.22))
+    n = b.noise(m.outputs[0], 2.6, 8.0, 1.6, 0.6)
+    t = b.math("ADD", n, b.math("MULTIPLY", b.z(obj), -0.22))
     flame = b.ramp(t, [(0.32, (0.12, 0.0, 0.0)), (0.46, (0.6, 0.03, 0.0)), (0.58, (1.0, 0.2, 0.0)),
                        (0.7, (1.0, 0.6, 0.05)), (0.8, (1.0, 0.9, 0.4))])
     glow = b.maprange(t, 0.4, 0.8, 0.15, 1.6)
-    return dict(base=flame, rough=0.3, emit=flame, emit_k=glow, coat=0.8)
+    return dict(base=flame, rough=0.3, emit=flame, emit_k=glow, coat=0.8, emb=C(255, 214, 90), emb_k=0.9,
+                emb_inner=C(255, 120, 20))
+
+
+def look_ice(b, e, obj):
+    v = b.vor(obj, 2.6, "DISTANCE_TO_EDGE").outputs["Distance"]
+    crack = b.maprange(v, 0.035, 0.0)
+    n = b.noise(obj, 3.0, 6.0, 0.5)
+    base = b.ramp(n, [(0.3, C(70, 160, 225)), (0.7, C(170, 225, 255))])
+    base = b.mix(crack, base, C(235, 250, 255))
+    return dict(base=base, rough=0.08, bump=crack, bump_k=-0.4, sss=0.25, emit=C(150, 220, 255),
+                emit_k=b.math("MULTIPLY", crack, 0.5), emb=C(240, 252, 255))
+
+
+def look_plant(b, e, obj):
+    v = b.vor(obj, 3.5, "DISTANCE_TO_EDGE").outputs["Distance"]
+    vein = b.maprange(v, 0.03, 0.0)
+    base = grad(b, obj, C(10, 80, 30), C(70, 215, 100))
+    base = b.mix(b.math("MULTIPLY", vein, 0.6), base, C(190, 255, 150))
+    return dict(base=base, rough=0.35, bump=vein, bump_k=0.4, sss=0.1, emb=C(200, 255, 170))
+
+
+def look_lightning(b, e, obj):
+    n = b.noise(obj, 2.2, 4.0, 0.8)
+    bolt = b.maprange(b.math("ABSOLUTE", b.math("SUBTRACT", n, 0.5)), 0.03, 0.0)
+    base = grad(b, obj, C(200, 120, 0), C(255, 215, 40))
+    base = b.mix(bolt, base, C(255, 255, 230))
+    return dict(base=base, rough=0.25, emit=C(255, 245, 180), emit_k=b.math("MULTIPLY", bolt, 3.0),
+                emb=C(255, 255, 235), emb_k=0.5)
 
 
 def look_water(b, e, obj):
-    n = b.n("ShaderNodeTexNoise", {"Vector": obj, "Scale": 1.6, "Detail": 4.0, "Distortion": 1.0}).outputs["Fac"]
+    n = b.noise(obj, 1.6, 4.0, 1.0)
     deep = b.ramp(n, [(0.35, (0.0, 0.02, 0.2)), (0.65, (0.0, 0.12, 0.65))])
-    w = b.n("ShaderNodeTexWave", {"Vector": obj, "Scale": 1.3, "Distortion": 7.0, "Detail": 3.0, "Detail Scale": 1.0},
-            wave_type="BANDS", bands_direction="Z")
-    f = w.outputs["Fac"]
+    f = b.wave(obj, 1.3, 7.0, detail=3.0)
     crest = b.maprange(f, 0.86, 1.0)
     base = b.mix(b.math("MULTIPLY", crest, 0.75), deep, (0.35, 0.75, 1.0, 1))
-    z = b.n("ShaderNodeSeparateXYZ", {0: obj}).outputs["Z"]
-    base = b.mix(b.maprange(z, 0.2, 1.0, 0.0, 0.35), base, (0.3, 0.75, 1.0, 1))
-    return dict(base=base, rough=0.08, bump=f, bump_k=0.3, emit=base, emit_k=b.math("MULTIPLY", crest, 0.35))
+    base = b.mix(b.maprange(b.z(obj), 0.2, 1.0, 0.0, 0.35), base, (0.3, 0.75, 1.0, 1))
+    return dict(base=base, rough=0.08, bump=f, bump_k=0.3, emit=base, emit_k=b.math("MULTIPLY", crest, 0.35),
+                emb=C(150, 215, 255))
 
 
 def look_earth(b, e, obj):
-    v = b.n("ShaderNodeTexVoronoi", {"Vector": obj, "Scale": 3.2, "Randomness": 0.9})
-    edge = b.n("ShaderNodeTexVoronoi", {"Vector": obj, "Scale": 3.2, "Randomness": 0.9},
-               feature="DISTANCE_TO_EDGE").outputs["Distance"]
+    v = b.vor(obj, 3.2, rand=0.9)
+    edge = b.vor(obj, 3.2, "DISTANCE_TO_EDGE", 0.9).outputs["Distance"]
     cell = b.n("ShaderNodeSeparateColor", {0: v.outputs["Color"]}).outputs[0]
-    n = b.n("ShaderNodeTexNoise", {"Vector": obj, "Scale": 14.0, "Detail": 10.0, "Roughness": 0.65}).outputs["Fac"]
+    n = b.noise(obj, 14.0, 10.0, 0, 0.65)
     shade = b.math("ADD", b.math("MULTIPLY", cell, 0.6), b.math("MULTIPLY", n, 0.6))
     stone = b.ramp(shade, [(0.25, (0.05, 0.02, 0.008)), (0.6, (0.17, 0.07, 0.02)), (0.95, (0.36, 0.2, 0.08))])
     groove = b.maprange(edge, 0.0, 0.06)
     base = b.mix(groove, (0.05, 0.02, 0.01, 1), stone)
-    height = b.math("ADD", b.math("MULTIPLY", groove, 1.0), b.math("MULTIPLY", n, 0.35))
-    return dict(base=base, rough=0.55, bump=height, bump_k=0.5, coat=0.45)
+    height = b.math("ADD", groove, b.math("MULTIPLY", n, 0.35))
+    return dict(base=base, rough=0.55, bump=height, bump_k=0.5, coat=0.45, emb=C(215, 170, 110), emb_rough=0.5)
+
+
+def look_wind(b, e, obj):
+    m = b.n("ShaderNodeMapping", {"Vector": obj, "Rotation": (0.0, 0.5, 0.0)})
+    f = b.wave(m.outputs[0], 1.4, 5.0, detail=1.0)
+    base = b.ramp(f, [(0.2, C(40, 150, 125)), (0.6, C(120, 230, 195)), (0.9, C(225, 255, 245))])
+    return dict(base=base, rough=0.25, bump=f, bump_k=0.15, emb=C(235, 255, 248))
+
+
+def look_poison(b, e, obj):
+    base = grad(b, obj, C(45, 8, 80), C(150, 55, 220))
+    d = b.vor(obj, 6.0).outputs["Distance"]
+    blob = b.maprange(d, 0.22, 0.12)
+    base = b.mix(blob, base, C(120, 255, 60))
+    return dict(base=base, rough=0.2, emit=C(120, 255, 60), emit_k=b.math("MULTIPLY", blob, 1.2), bump=blob,
+                bump_k=0.6, emb=C(140, 255, 80), emb_k=0.35)
+
+
+def look_metal(b, e, obj):
+    n = b.noise(b.n("ShaderNodeMapping", {"Vector": obj, "Scale": (1, 1, 30)}).outputs[0], 4.0, 2.0)
+    base = b.ramp(n, [(0.3, C(120, 130, 150)), (0.7, C(200, 208, 222))])
+    # half-metal: a pure metal mirrors the dark studio and renders black
+    return dict(base=base, rough=0.3, metal=0.55, coat=0.8, bump=n, bump_k=0.05, emb=C(240, 242, 248),
+                emb_rough=0.12)
+
+
+def look_light(b, e, obj):
+    base = grad(b, obj, C(240, 200, 120), C(255, 250, 225))
+    return dict(base=base, rough=0.3, emit=C(255, 236, 170), emit_k=b.math("MULTIPLY", b.rim(0.4, 2.0), 1.6),
+                emb=C(255, 185, 40), emb_metal=0.35, emb_rough=0.2, emb_k=0.35)
+
+
+def look_sand(b, e, obj):
+    f = b.wave(obj, 2.0, 3.0, detail=2.0)
+    g = b.noise(obj, 60.0, 2.0)
+    base = b.ramp(b.math("ADD", b.math("MULTIPLY", f, 0.5), b.math("MULTIPLY", g, 0.4)),
+                  [(0.2, C(170, 105, 45)), (0.7, C(240, 190, 110))])
+    return dict(base=base, rough=0.6, coat=0.35, bump=b.math("ADD", f, b.math("MULTIPLY", g, 0.4)), bump_k=0.25,
+                emb=C(255, 225, 160), emb_rough=0.5)
+
+
+def look_lava(b, e, obj):
+    edge = b.vor(obj, 4.0, "DISTANCE_TO_EDGE").outputs["Distance"]
+    crack = b.maprange(edge, 0.07, 0.0)
+    n = b.noise(obj, 10.0, 8.0)
+    rock = b.ramp(n, [(0.3, C(20, 10, 12)), (0.7, C(60, 30, 30))])
+    hot = b.ramp(crack, [(0.0, C(200, 10, 20)), (0.6, C(255, 110, 20)), (1.0, C(255, 230, 120))])
+    base = b.mix(crack, rock, hot)
+    return dict(base=base, rough=0.5, coat=0.5, emit=hot, emit_k=b.math("MULTIPLY", crack, 4.0),
+                bump=b.math("SUBTRACT", n, crack), bump_k=0.4, emb=C(255, 120, 40), emb_k=1.2,
+                emb_inner=C(255, 220, 80))
+
+
+def look_slime(b, e, obj):
+    d = b.vor(obj, 3.0).outputs["Distance"]
+    base = grad(b, obj, C(190, 30, 120), C(255, 140, 215))
+    return dict(base=base, rough=0.05, sss=0.4, bump=b.maprange(d, 0.0, 0.5), bump_k=-0.35, emb=C(255, 200, 235))
 
 
 def look_void(b, e, obj):
-    m = b.n("ShaderNodeTexNoise", {"Vector": obj, "Scale": 1.8, "Detail": 8.0, "Roughness": 0.62,
-                                   "Distortion": 2.4}).outputs["Fac"]
+    m = b.noise(obj, 1.8, 8.0, 2.4, 0.62)
     neb = b.ramp(m, [(0.45, (0.0, 0.0, 0.0)), (0.6, (0.05, 0.0, 0.16)), (0.72, (0.3, 0.04, 0.75)),
                      (0.85, (0.9, 0.35, 1.0))])
-    st = b.n("ShaderNodeTexVoronoi", {"Vector": obj, "Scale": 26.0}).outputs["Distance"]
+    st = b.vor(obj, 26.0).outputs["Distance"]
     star = b.math("POWER", b.maprange(st, 0.09, 0.0), 3.0)
     emit = b.mix(star, neb, (1, 1, 1, 1))
-    lw = b.n("ShaderNodeLayerWeight", {"Blend": 0.35}).outputs["Facing"]
-    rim = b.math("POWER", lw, 3.0)
-    emit = b.mix(rim, emit, (0.5, 0.1, 1.0, 1))
-    return dict(base=(0.002, 0.0, 0.006, 1), rough=0.2, emit=emit, emit_k=1.4, coat=1.0)
+    emit = b.mix(b.rim(), emit, (0.5, 0.1, 1.0, 1))
+    return dict(base=(0.002, 0.0, 0.006, 1), rough=0.2, emit=emit, emit_k=1.4, coat=1.0, emb=C(150, 90, 255),
+                emb_k=0.8)
 
 
-LOOKS = {"FIRE": look_fire, "WATER": look_water, "EARTH": look_earth, "VOID": look_void}
+def look_crystal(b, e, obj):
+    v = b.vor(obj, 2.4, rand=1.0)
+    cell = b.n("ShaderNodeSeparateColor", {0: v.outputs["Color"]}).outputs[0]
+    edge = b.maprange(b.vor(obj, 2.4, "DISTANCE_TO_EDGE").outputs["Distance"], 0.02, 0.0)
+    base = b.ramp(cell, [(0.0, C(0, 80, 90)), (0.5, C(0, 170, 160)), (1.0, C(150, 255, 240))])
+    base = b.mix(edge, base, C(220, 255, 250))
+    return dict(base=base, rough=0.05, bump=cell, bump_k=0.6, emit=C(100, 255, 230),
+                emit_k=b.math("MULTIPLY", edge, 1.2), emb=C(200, 255, 248), emb_rough=0.05)
 
-A_HALF = 0.6  # emblem half-angle (rad)
+
+def look_mushroom(b, e, obj):
+    base = grad(b, obj, C(80, 120, 10), C(185, 230, 60))
+    d = b.vor(obj, 3.0, rand=0.7).outputs["Distance"]
+    dot = b.maprange(d, 0.24, 0.2)
+    base = b.mix(dot, base, C(255, 255, 235))
+    return dict(base=base, rough=0.35, bump=dot, bump_k=0.5, emb=C(255, 252, 230))
 
 
-def build(e):
+def look_smiley(b, e, obj):
+    return dict(base=grad(b, obj, C(220, 140, 0), C(255, 230, 50)), rough=0.2, emb=C(90, 50, 0), emb_rough=0.2)
+
+
+def look_67(b, e, obj):
+    return dict(base=grad(b, obj, C(190, 70, 0), C(255, 155, 20)), rough=0.25, emb=C(255, 245, 225))
+
+
+def look_gas(b, e, obj):
+    n = b.noise(obj, 2.0, 6.0, 1.5)
+    base = b.ramp(n, [(0.3, C(70, 80, 10)), (0.55, C(150, 170, 40)), (0.75, C(215, 230, 120))])
+    return dict(base=base, rough=0.4, emit=base, emit_k=b.maprange(n, 0.6, 0.8, 0.0, 0.3), emb=C(230, 245, 150))
+
+
+def look_sound(b, e, obj):
+    r = b.wave(obj, 2.5, 0.5, kind="RINGS", direction="Y", detail=0.0)
+    base = b.ramp(r, [(0.3, C(150, 10, 90)), (0.7, C(250, 70, 180))])
+    return dict(base=base, rough=0.2, bump=r, bump_k=0.15, emb=C(255, 210, 240))
+
+
+def look_yinyang(b, e, obj):
+    return dict(base=grad(b, obj, C(150, 150, 160), C(240, 240, 245)), rough=0.2, emb=C(255, 255, 255), emb_icon=1)
+
+
+def look_time(b, e, obj):
+    r = b.wave(obj, 1.5, 0.0, kind="RINGS", direction="Y", detail=0.0)
+    base = b.mix(b.math("MULTIPLY", r, 0.25), grad(b, obj, C(25, 15, 90), C(95, 85, 220)), C(150, 140, 255))
+    return dict(base=base, rough=0.2, emb=C(255, 200, 80), emb_metal=0.5, emb_rough=0.2)
+
+
+def look_ghost(b, e, obj):
+    n = b.noise(obj, 1.6, 4.0, 1.0)
+    base = b.ramp(n, [(0.3, C(150, 135, 230)), (0.7, C(235, 230, 255))])
+    return dict(base=base, rough=0.25, sss=0.5, emit=C(210, 200, 255), emit_k=b.math("MULTIPLY", b.rim(0.4, 2.0), 1.0),
+                emb=C(255, 255, 255), emb_icon=1)
+
+
+def look_bomb(b, e, obj):
+    base = grad(b, obj, C(12, 16, 10), C(70, 95, 50))
+    return dict(base=base, rough=0.18, coat=1.0, emb=C(230, 235, 220), emb_icon=1)
+
+
+def look_bubble(b, e, obj):
+    base = grad(b, obj, C(60, 170, 200), C(190, 245, 255))
+    return dict(base=base, rough=0.03, thin=520.0, emit=C(200, 250, 255), emit_k=b.math("MULTIPLY", b.rim(0.3, 2.0), 0.8),
+                emb=C(255, 255, 255))
+
+
+def look_glitch(b, e, obj):
+    snap = b.n("ShaderNodeVectorMath", {0: b.n("ShaderNodeVectorMath", {0: obj, 1: (7, 7, 7)},
+                                                operation="MULTIPLY").outputs[0]}, operation="FLOOR").outputs[0]
+    wn = b.n("ShaderNodeTexWhiteNoise", {"Vector": snap}).outputs["Value"]
+    base = b.ramp(wn, [(0.0, C(30, 10, 60)), (0.33, C(30, 10, 60)), (0.34, C(255, 43, 214)), (0.66, C(255, 43, 214)),
+                       (0.67, C(43, 240, 255))], "CONSTANT")
+    return dict(base=base, rough=0.2, emit=base, emit_k=0.35, emb=C(255, 255, 255), emb_k=0.4)
+
+
+def look_candy(b, e, obj):
+    m = b.n("ShaderNodeMapping", {"Vector": obj, "Rotation": (0.0, 0.7, 0.3)})
+    f = b.wave(m.outputs[0], 2.0, 0.0, detail=0.0)
+    stripe = b.maprange(f, 0.45, 0.55)
+    base = b.mix(stripe, C(225, 20, 55), C(255, 245, 245))
+    return dict(base=base, rough=0.12, emb=C(255, 255, 255), emb_icon=1)
+
+
+LOOKS = {"FIRE": look_fire, "ICE": look_ice, "PLANT": look_plant, "LIGHTNING": look_lightning, "WATER": look_water,
+         "EARTH": look_earth, "WIND": look_wind, "POISON": look_poison, "METAL": look_metal, "LIGHT": look_light,
+         "SAND": look_sand, "LAVA": look_lava, "SLIME": look_slime, "VOID": look_void, "CRYSTAL": look_crystal,
+         "MUSHROOM": look_mushroom, "SMILEY": look_smiley, "67": look_67, "GAS": look_gas, "SOUND": look_sound,
+         "YIN YANG": look_yinyang, "TIME": look_time, "GHOST": look_ghost, "BOMB": look_bomb, "BUBBLE": look_bubble,
+         "GLITCH": look_glitch, "CANDY": look_candy}
+
+
+def sock(b, v):
+    """Constant colour tuple -> RGB node output, so every input can be linked."""
+    if hasattr(v, "is_output"):
+        return v
+    return _rgb(b, v)
+
+
+def _rgb(b, v):
+    n = b.n("ShaderNodeRGB")
+    n.outputs[0].default_value = v if len(v) == 4 else tuple(v) + (1,)
+    return n.outputs[0]
+
+
+def build(e, ci, mi):
     name = TITLE[e]
     mat = bpy.data.materials.new(f"M_{name}")
     b = NB(mat)
     tc = b.n("ShaderNodeTexCoord")
-    obj, nrm = tc.outputs["Object"], tc.outputs["Normal"]
+    obj = tc.outputs["Object"]
     L = LOOKS.get(name, look_plastic)(b, e, obj)
     P = b.n("ShaderNodeBsdfPrincipled")
     out = b.n("ShaderNodeOutputMaterial")
     b.nt.links.new(P.outputs[0], out.inputs["Surface"])
 
-    # emblem coordinates: angles of the object normal around the front (-Y) axis, so the icon wraps the sphere
-    s = b.n("ShaderNodeSeparateXYZ", {0: nrm})
-    ny = b.math("MULTIPLY", s.outputs["Y"], -1.0)
-    u = b.math("ADD", b.math("DIVIDE", b.math("ARCTAN2", s.outputs["X"], ny), 2 * A_HALF), 0.5)
-    v = b.math("ADD", b.math("DIVIDE", b.math("ARCTAN2", s.outputs["Z"], ny), 2 * A_HALF), 0.5)
-    uv = b.n("ShaderNodeCombineXYZ", {0: u, 1: v}).outputs[0]
-    img = b.n("ShaderNodeTexImage", {"Vector": uv}, image=icon_image(e), extension="CLIP", interpolation="Cubic")
-    alpha = img.outputs["Alpha"]
-    fill = b.maprange(alpha, 0.35, 0.6)
-    oimg = b.n("ShaderNodeTexImage", {"Vector": uv}, image=OUTLINES[e], extension="CLIP", interpolation="Cubic")
-    ring = b.maprange(oimg.outputs["Color"], 0.3, 0.6)
-    dark = lin(mixc(RGB[e], (0, 0, 0), 0.7))
-    if name == "VOID":
-        dark = lin((70, 20, 140))
-    base_in = L["base"]
-    base_in = b.mix(ring, base_in, dark)
-    icon_rgb = b.n("ShaderNodeMix", {"Factor": 0.3, 6: img.outputs["Color"], 7: (0.55, 0.58, 0.72, 1)}, data_type="RGBA").outputs[2]
-    base_in = b.mix(fill, base_in, icon_rgb)
-    b.nt.links.new(base_in, P.inputs["Base Color"]) if hasattr(base_in, "is_output") else None
-    if not hasattr(base_in, "is_output"):
-        P.inputs["Base Color"].default_value = base_in
+    uv = b.n("ShaderNodeUVMap", uv_map="EMB").outputs[0]
+    cimg = b.n("ShaderNodeTexImage", {"Vector": uv}, image=ci, extension="CLIP", interpolation="Linear")
+    mimg = b.n("ShaderNodeTexImage", {"Vector": uv}, image=mi, extension="CLIP", interpolation="Linear")
+    sm = b.n("ShaderNodeSeparateColor", {0: mimg.outputs["Color"]})
+    fill, groove, inner = sm.outputs[0], sm.outputs[1], sm.outputs[2]
 
-    rough = L.get("rough", 0.35)
-    P.inputs["Roughness"].default_value = rough
-    P.inputs["Metallic"].default_value = L.get("metal", 0.0)
+    base = sock(b, L["base"])
+    # emblem = the ball's own material lifted to a lighter tone: tint * (0.75 + 0.25 * surface)
+    tint = sock(b, L.get("emb", (1, 1, 1, 1)))
+    if L.get("emb_icon"):
+        tint = b.mix(1.0, tint, cimg.outputs["Color"], "MULTIPLY")
+    if "emb_inner" in L:
+        tint = b.mix(inner, tint, sock(b, L["emb_inner"]))
+    embc = b.mix(0.18, tint, base)
+    shaded = b.mix(b.math("MULTIPLY", groove, 0.75), base, (0.0, 0.0, 0.0, 1))
+    b.nt.links.new(b.mix(fill, shaded, embc), P.inputs["Base Color"])
+
+    rough = L.get("rough", 0.3)
+    b.nt.links.new(b.n("ShaderNodeMix", {"Factor": fill, 2: rough, 3: L.get("emb_rough", min(rough, 0.25))},
+                       data_type="FLOAT").outputs[0], P.inputs["Roughness"])
+    b.nt.links.new(b.n("ShaderNodeMix", {"Factor": fill, 2: L.get("metal", 0.0), 3: L.get("emb_metal", 0.0)},
+                       data_type="FLOAT").outputs[0], P.inputs["Metallic"])
     P.inputs["Coat Weight"].default_value = L.get("coat", 1.0)
     P.inputs["Coat Roughness"].default_value = 0.04
-    if "trans" in L:
-        P.inputs["Transmission Weight"].default_value = L["trans"]
-        P.inputs["IOR"].default_value = L.get("ior", 1.45)
+    if L.get("sss"):
+        P.inputs["Subsurface Weight"].default_value = L["sss"]
+        P.inputs["Subsurface Radius"].default_value = (0.3, 0.3, 0.3)
+    if L.get("thin"):
+        P.inputs["Thin Film Thickness"].default_value = L["thin"]
+        P.inputs["Thin Film IOR"].default_value = 1.33
 
-    # emission: element glow everywhere but on the emblem; the emblem itself glows softly white
+    # emission: body glow outside the emblem; the emblem glows only for glowing elements (emb_k)
+    nofill = b.math("SUBTRACT", 1.0, b.math("MAXIMUM", fill, groove), clamp=True)
     em = L.get("emit")
     ek = L.get("emit_k", 0.0)
-    nofill = b.math("SUBTRACT", 1.0, b.math("MAXIMUM", fill, ring), clamp=True)
-    if em is not None:
-        emc = b.mix(fill, em, icon_rgb)
-        b.nt.links.new(emc, P.inputs["Emission Color"])
-        k = b.math("MULTIPLY", ek if hasattr(ek, "is_output") else float(ek), nofill)
-        k = b.math("ADD", k, b.math("MULTIPLY", fill, 0.9 if name == "VOID" else 0.06))
-        b.nt.links.new(k, P.inputs["Emission Strength"])
-    else:
-        b.nt.links.new(icon_rgb, P.inputs["Emission Color"])
-        b.nt.links.new(b.math("MULTIPLY", fill, 0.06), P.inputs["Emission Strength"])
+    emc = b.mix(fill, sock(b, em if em is not None else (0, 0, 0, 1)), embc)
+    b.nt.links.new(emc, P.inputs["Emission Color"])
+    k = b.math("MULTIPLY", ek, nofill) if em is not None else b.math("MULTIPLY", 0.0, nofill)
+    k = b.math("ADD", k, b.math("MULTIPLY", fill, L.get("emb_k", 0.0)))
+    b.nt.links.new(k, P.inputs["Emission Strength"])
 
-    # bump: surface relief + raised emblem (outline ring is the bevel)
-    h = b.math("ADD", ring, fill)
+    # micro relief of the body (the emblem relief is real geometry)
     if "bump" in L:
-        h = b.math("ADD", h, b.math("MULTIPLY", b.math("MULTIPLY", L["bump"], L.get("bump_k", 0.3)), nofill))
-    bump = b.n("ShaderNodeBump", {"Height": h, "Strength": 0.35, "Distance": 0.02})
-    b.nt.links.new(bump.outputs["Normal"], P.inputs["Normal"])
+        h = b.math("MULTIPLY", b.math("MULTIPLY", L["bump"], L.get("bump_k", 0.3)), nofill)
+        bump = b.n("ShaderNodeBump", {"Height": h, "Strength": 0.35, "Distance": 0.02})
+        b.nt.links.new(bump.outputs["Normal"], P.inputs["Normal"])
     return mat
 
 
@@ -356,8 +640,10 @@ os.makedirs(out_dir, exist_ok=True)
 names = [s.strip() for s in A.only.split(",") if s.strip()] if A.only != "ALL" else TITLE
 for name in names:
     e = TITLE.index(name)
+    ci, mi, h = emblem(e)
+    displace(h)
     ball.data.materials.clear()
-    ball.data.materials.append(build(e))
+    ball.data.materials.append(build(e, ci, mi))
     fn = name.lower().replace(" ", "_")
     sc.render.filepath = os.path.join(out_dir, f"ball_{fn}.png")
     bpy.ops.render.render(write_still=True)
