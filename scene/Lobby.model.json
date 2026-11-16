@@ -21,11 +21,11 @@
           1
         ],
         "Color": [
-          0.113725,
-          0.22745,
-          0.478431
+          0.486274,
+          0.811764,
+          0.305882
         ],
-        "Material": "SmoothPlastic",
+        "Material": "Grass",
         "Size": [
           220,
           1,
@@ -55,11 +55,11 @@
           1
         ],
         "Color": [
-          0.070588,
-          0.10196,
-          0.22745
+          0.22745,
+          0.172549,
+          0.133333
         ],
-        "Material": "SmoothPlastic",
+        "Material": "Ground",
         "Size": [
           220,
           1.6,
@@ -76,7 +76,7 @@
         "BottomSurface": "Smooth",
         "CFrame": [
           6,
-          202.2,
+          202.6,
           30.4,
           1,
           0,
@@ -88,16 +88,12 @@
           0,
           1
         ],
-        "CanCollide": false,
-        "CanQuery": false,
-        "CanTouch": false,
-        "CastShadow": false,
         "Color": [
-          0.211764,
-          0.839215,
-          1
+          1,
+          0.784313,
+          0.239215
         ],
-        "Material": "Neon",
+        "Material": "SmoothPlastic",
         "Size": [
           220,
           0.5,
@@ -114,7 +110,7 @@
         "BottomSurface": "Smooth",
         "CFrame": [
           6,
-          200.8,
+          200.6,
           30.4,
           1,
           0,
@@ -127,15 +123,15 @@
           1
         ],
         "Color": [
-          0.141176,
-          0.207843,
-          0.478431
+          0.937254,
+          0.886274,
+          0.768627
         ],
-        "Material": "SmoothPlastic",
+        "Material": "Limestone",
         "Size": [
           220,
-          1.6,
-          0.8
+          1.2,
+          1.2
         ],
         "TopSurface": "Smooth"
       }
@@ -300,8 +296,8 @@
         "BottomSurface": "Smooth",
         "CFrame": [
           6,
-          200.1,
-          73.6,
+          200.2,
+          73.2,
           1,
           0,
           0,
@@ -315,17 +311,16 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
-          1,
-          0.309803,
-          0.847058
+          0.788235,
+          0.705882,
+          0.549019
         ],
-        "Material": "Neon",
+        "Material": "Cobblestone",
         "Size": [
           220,
-          0.2,
-          0.8
+          0.6,
+          1.6
         ],
         "TopSurface": "Smooth"
       }
@@ -337,8 +332,8 @@
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          -103.6,
-          200.1,
+          -103.2,
+          200.2,
           52,
           1,
           0,
@@ -353,16 +348,15 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
-          0.211764,
-          0.839215,
-          1
+          0.788235,
+          0.705882,
+          0.549019
         ],
-        "Material": "Neon",
+        "Material": "Cobblestone",
         "Size": [
-          0.8,
-          0.2,
+          1.6,
+          0.6,
           44
         ],
         "TopSurface": "Smooth"
@@ -375,8 +369,8 @@
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          115.6,
-          200.1,
+          115.2,
+          200.2,
           52,
           1,
           0,
@@ -391,17 +385,53 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
-          0.211764,
-          0.839215,
+          0.788235,
+          0.705882,
+          0.549019
+        ],
+        "Material": "Cobblestone",
+        "Size": [
+          1.6,
+          0.6,
+          44
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "SpawnSquare",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          0,
+          200.03,
+          56,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
           1
         ],
-        "Material": "Neon",
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.937254,
+          0.886274,
+          0.768627
+        ],
+        "Material": "Cobblestone",
         "Size": [
-          0.8,
-          0.2,
-          44
+          22,
+          0.1,
+          22
         ],
         "TopSurface": "Smooth"
       }
@@ -560,13 +590,50 @@
     },
     {
       "className": "Part",
+      "name": "Promenade",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          6,
+          200.03,
+          35,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.937254,
+          0.886274,
+          0.768627
+        ],
+        "Material": "Cobblestone",
+        "Size": [
+          216,
+          0.1,
+          8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
       "name": "LaneW",
       "properties": {
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
           -40,
-          200.06,
+          200.04,
           52,
           1,
           0,
@@ -581,16 +648,15 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
-          0.211764,
-          0.839215,
-          1
+          0.937254,
+          0.886274,
+          0.768627
         ],
-        "Material": "Neon",
+        "Material": "Cobblestone",
         "Size": [
-          0.6,
-          0.12,
+          3,
+          0.1,
           22
         ],
         "TopSurface": "Smooth"
@@ -604,7 +670,7 @@
         "BottomSurface": "Smooth",
         "CFrame": [
           52,
-          200.06,
+          200.04,
           52,
           1,
           0,
@@ -619,16 +685,15 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
-          0.211764,
-          0.839215,
-          1
+          0.937254,
+          0.886274,
+          0.768627
         ],
-        "Material": "Neon",
+        "Material": "Cobblestone",
         "Size": [
-          0.6,
-          0.12,
+          3,
+          0.1,
           22
         ],
         "TopSurface": "Smooth"
@@ -641,9 +706,9 @@
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          -100,
-          205,
-          70,
+          -99,
+          206,
+          69,
           1,
           0,
           0,
@@ -654,16 +719,56 @@
           0,
           1
         ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
         "Color": [
-          0.141176,
-          0.207843,
-          0.478431
+          0.937254,
+          0.886274,
+          0.768627
+        ],
+        "Material": "Limestone",
+        "Size": [
+          4,
+          12,
+          4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PylonWCap",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -99,
+          212.4,
+          69,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          1,
+          0.784313,
+          0.239215
         ],
         "Material": "SmoothPlastic",
         "Size": [
-          3,
-          10,
-          3
+          5,
+          0.8,
+          5
         ],
         "TopSurface": "Smooth"
       }
@@ -675,9 +780,9 @@
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          -100,
-          210.2,
-          70,
+          -99,
+          214.6,
+          69,
           1,
           0,
           0,
@@ -694,13 +799,14 @@
         "CastShadow": false,
         "Color": [
           1,
-          0.309803,
-          0.847058
+          0.415686,
+          0.168627
         ],
         "Material": "Neon",
+        "Shape": "Ball",
         "Size": [
           3.4,
-          0.5,
+          3.4,
           3.4
         ],
         "TopSurface": "Smooth"
@@ -713,9 +819,9 @@
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          112,
-          205,
-          70,
+          111,
+          206,
+          69,
           1,
           0,
           0,
@@ -726,16 +832,56 @@
           0,
           1
         ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
         "Color": [
-          0.141176,
-          0.207843,
-          0.478431
+          0.937254,
+          0.886274,
+          0.768627
+        ],
+        "Material": "Limestone",
+        "Size": [
+          4,
+          12,
+          4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PylonECap",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          111,
+          212.4,
+          69,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          1,
+          0.784313,
+          0.239215
         ],
         "Material": "SmoothPlastic",
         "Size": [
-          3,
-          10,
-          3
+          5,
+          0.8,
+          5
         ],
         "TopSurface": "Smooth"
       }
@@ -747,9 +893,9 @@
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          112,
-          210.2,
-          70,
+          111,
+          214.6,
+          69,
           1,
           0,
           0,
@@ -765,15 +911,1686 @@
         "CanTouch": false,
         "CastShadow": false,
         "Color": [
-          0.211764,
-          0.839215,
+          0.498039,
+          0.909803,
           1
         ],
         "Material": "Neon",
+        "Shape": "Ball",
         "Size": [
           3.4,
-          0.5,
+          3.4,
           3.4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "IslandTop",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          6,
+          199.3,
+          25,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.372549,
+          0.682352,
+          0.235294
+        ],
+        "Material": "Grass",
+        "Size": [
+          312,
+          1,
+          170
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "IslandRim",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          6,
+          196.5,
+          25,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.22745,
+          0.172549,
+          0.133333
+        ],
+        "Material": "Ground",
+        "Size": [
+          314,
+          5,
+          172
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under1_1",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -98,
+          189,
+          -11,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          10,
+          90,
+          90
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under1_2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -96,
+          178,
+          -12,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          12,
+          72,
+          72
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under1_3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -94,
+          165,
+          -13,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          54,
+          54
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under1_4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -92,
+          150,
+          -14,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          16,
+          34.8,
+          34.8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under1_5",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -90,
+          133,
+          -15,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          18,
+          18,
+          18
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under1_6",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -88,
+          117,
+          -16,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          7.199999999999999,
+          7.199999999999999
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under2_1",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -38,
+          190,
+          39,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          8,
+          72,
+          72
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under2_2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -36,
+          181.2,
+          38,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          9.600000000000001,
+          57.599999999999994,
+          57.599999999999994
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under2_3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -34,
+          170.79999999999998,
+          37,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          11.200000000000001,
+          43.199999999999996,
+          43.199999999999996
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under2_4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -32,
+          158.79999999999998,
+          36,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          12.8,
+          27.840000000000003,
+          27.840000000000003
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under2_5",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -30,
+          145.2,
+          35,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14.4,
+          14.399999999999999,
+          14.399999999999999
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under2_6",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -28,
+          132.4,
+          34,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          11.200000000000001,
+          5.760000000000001,
+          5.760000000000001
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under3_1",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          22,
+          189,
+          -21,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          10,
+          90,
+          90
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under3_2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          24,
+          178,
+          -22,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          12,
+          72,
+          72
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under3_3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          26,
+          165,
+          -23,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          54,
+          54
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under3_4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          28,
+          150,
+          -24,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          16,
+          34.8,
+          34.8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under3_5",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          30,
+          133,
+          -25,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          18,
+          18,
+          18
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under3_6",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          32,
+          117,
+          -26,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          7.199999999999999,
+          7.199999999999999
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under4_1",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          82,
+          190,
+          49,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          8,
+          72,
+          72
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under4_2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          84,
+          181.2,
+          48,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          9.600000000000001,
+          57.599999999999994,
+          57.599999999999994
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under4_3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          86,
+          170.79999999999998,
+          47,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          11.200000000000001,
+          43.199999999999996,
+          43.199999999999996
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under4_4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          88,
+          158.79999999999998,
+          46,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          12.8,
+          27.840000000000003,
+          27.840000000000003
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under4_5",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          90,
+          145.2,
+          45,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14.4,
+          14.399999999999999,
+          14.399999999999999
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under4_6",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          92,
+          132.4,
+          44,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          11.200000000000001,
+          5.760000000000001,
+          5.760000000000001
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under5_1",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          122,
+          189,
+          -6,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          10,
+          90,
+          90
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under5_2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          124,
+          178,
+          -7,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          12,
+          72,
+          72
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under5_3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          126,
+          165,
+          -8,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          54,
+          54
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under5_4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          128,
+          150,
+          -9,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          16,
+          34.8,
+          34.8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under5_5",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          130,
+          133,
+          -10,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          18,
+          18,
+          18
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under5_6",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          132,
+          117,
+          -11,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          7.199999999999999,
+          7.199999999999999
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under6_1",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -108,
+          190,
+          69,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          8,
+          72,
+          72
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under6_2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -106,
+          181.2,
+          68,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          9.600000000000001,
+          57.599999999999994,
+          57.599999999999994
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under6_3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -104,
+          170.79999999999998,
+          67,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          11.200000000000001,
+          43.199999999999996,
+          43.199999999999996
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under6_4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -102,
+          158.79999999999998,
+          66,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          12.8,
+          27.840000000000003,
+          27.840000000000003
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under6_5",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -100,
+          145.2,
+          65,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14.4,
+          14.399999999999999,
+          14.399999999999999
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under6_6",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -98,
+          132.4,
+          64,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          11.200000000000001,
+          5.760000000000001,
+          5.760000000000001
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under7_1",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          32,
+          189,
+          84,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          10,
+          90,
+          90
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under7_2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          34,
+          178,
+          83,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.545098,
+          0.415686,
+          0.298039
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          12,
+          72,
+          72
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under7_3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          36,
+          165,
+          82,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          54,
+          54
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under7_4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          38,
+          150,
+          81,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          16,
+          34.8,
+          34.8
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under7_5",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          40,
+          133,
+          80,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          18,
+          18,
+          18
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Under7_6",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          42,
+          117,
+          79,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.419607,
+          0.309803,
+          0.22745
+        ],
+        "Material": "Rock",
+        "Shape": "Cylinder",
+        "Size": [
+          14,
+          7.199999999999999,
+          7.199999999999999
         ],
         "TopSurface": "Smooth"
       }
@@ -1096,11 +2913,11 @@
               1
             ],
             "Color": [
-              0.141176,
-              0.207843,
-              0.478431
+              0.937254,
+              0.886274,
+              0.768627
             ],
-            "Material": "SmoothPlastic",
+            "Material": "Limestone",
             "Size": [
               2,
               8,
@@ -1130,11 +2947,11 @@
               1
             ],
             "Color": [
-              0.141176,
-              0.207843,
-              0.478431
+              0.937254,
+              0.886274,
+              0.768627
             ],
-            "Material": "SmoothPlastic",
+            "Material": "Limestone",
             "Size": [
               2,
               8,
@@ -1475,11 +3292,11 @@
           1
         ],
         "Color": [
-          0.956862,
-          0.945098,
-          1
+          0.937254,
+          0.886274,
+          0.768627
         ],
-        "Material": "SmoothPlastic",
+        "Material": "Limestone",
         "Size": [
           3.2,
           16,
@@ -1572,6 +3389,43 @@
         "BottomSurface": "Smooth",
         "CFrame": [
           -32,
+          200.04,
+          60,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.937254,
+          0.886274,
+          0.768627
+        ],
+        "Material": "Cobblestone",
+        "Size": [
+          44,
+          0.1,
+          4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PathShopLine",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -32,
           200.08,
           60,
           1,
@@ -1597,7 +3451,7 @@
         "Size": [
           44,
           0.12,
-          2.2
+          0.4
         ],
         "TopSurface": "Smooth"
       }
@@ -1605,6 +3459,43 @@
     {
       "className": "Part",
       "name": "PathPlay",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          36,
+          200.04,
+          60,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.937254,
+          0.886274,
+          0.768627
+        ],
+        "Material": "Cobblestone",
+        "Size": [
+          48,
+          0.1,
+          4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "PathPlayLine",
       "properties": {
         "Anchored": true,
         "BottomSurface": "Smooth",
@@ -1635,26 +3526,26 @@
         "Size": [
           48,
           0.12,
-          2.2
+          0.4
         ],
         "TopSurface": "Smooth"
       }
     },
     {
       "className": "Part",
-      "name": "TileW",
+      "name": "Medal1",
       "properties": {
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          -16,
-          200.08,
-          46,
+          -78,
+          200.07,
+          38,
+          0,
+          -1,
+          0,
           1,
           0,
-          0,
-          0,
-          1,
           0,
           0,
           0,
@@ -1663,16 +3554,16 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
-          0.211764,
-          0.839215,
-          1
+          0.788235,
+          0.705882,
+          0.549019
         ],
-        "Material": "Neon",
+        "Material": "Limestone",
+        "Shape": "Cylinder",
         "Size": [
+          0.14,
           7,
-          0.12,
           7
         ],
         "TopSurface": "Smooth"
@@ -1680,19 +3571,19 @@
     },
     {
       "className": "Part",
-      "name": "TileE",
+      "name": "MedalCore1",
       "properties": {
         "Anchored": true,
         "BottomSurface": "Smooth",
         "CFrame": [
-          22,
-          200.08,
-          46,
+          -78,
+          200.1,
+          38,
+          0,
+          -1,
+          0,
           1,
           0,
-          0,
-          0,
-          1,
           0,
           0,
           0,
@@ -1701,36 +3592,36 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
           1,
-          0.309803,
-          0.847058
+          0.415686,
+          0.168627
         ],
         "Material": "Neon",
+        "Shape": "Cylinder",
         "Size": [
-          7,
-          0.12,
-          7
-        ],
-        "TopSurface": "Smooth"
-      }
-    },
-    {
-      "className": "Part",
-      "name": "TileC",
-      "properties": {
-        "Anchored": true,
-        "BottomSurface": "Smooth",
-        "CFrame": [
+          0.2,
           4,
-          200.08,
-          42,
+          4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Medal2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -24,
+          200.07,
+          38,
+          0,
+          -1,
+          0,
           1,
           0,
-          0,
-          0,
-          1,
           0,
           0,
           0,
@@ -1739,17 +3630,207 @@
         "CanCollide": false,
         "CanQuery": false,
         "CanTouch": false,
-        "CastShadow": false,
         "Color": [
+          0.788235,
+          0.705882,
+          0.549019
+        ],
+        "Material": "Limestone",
+        "Shape": "Cylinder",
+        "Size": [
+          0.14,
+          7,
+          7
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "MedalCore2",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          -24,
+          200.1,
+          38,
+          0,
+          -1,
+          0,
           1,
-          0.823529,
-          0.290196
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.184313,
+          0.658823,
+          1
         ],
         "Material": "Neon",
+        "Shape": "Cylinder",
         "Size": [
+          0.2,
+          4,
+          4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Medal3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          30,
+          200.07,
+          38,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.788235,
+          0.705882,
+          0.549019
+        ],
+        "Material": "Limestone",
+        "Shape": "Cylinder",
+        "Size": [
+          0.14,
           7,
-          0.12,
           7
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "MedalCore3",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          30,
+          200.1,
+          38,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.309803,
+          0.82745,
+          0.415686
+        ],
+        "Material": "Neon",
+        "Shape": "Cylinder",
+        "Size": [
+          0.2,
+          4,
+          4
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "Medal4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          84,
+          200.07,
+          38,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.788235,
+          0.705882,
+          0.549019
+        ],
+        "Material": "Limestone",
+        "Shape": "Cylinder",
+        "Size": [
+          0.14,
+          7,
+          7
+        ],
+        "TopSurface": "Smooth"
+      }
+    },
+    {
+      "className": "Part",
+      "name": "MedalCore4",
+      "properties": {
+        "Anchored": true,
+        "BottomSurface": "Smooth",
+        "CFrame": [
+          84,
+          200.1,
+          38,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "CanCollide": false,
+        "CanQuery": false,
+        "CanTouch": false,
+        "Color": [
+          0.498039,
+          0.909803,
+          1
+        ],
+        "Material": "Neon",
+        "Shape": "Cylinder",
+        "Size": [
+          0.2,
+          4,
+          4
         ],
         "TopSurface": "Smooth"
       }
@@ -1776,12 +3857,12 @@
         ],
         "CanCollide": true,
         "Color": [
-          0.164705,
-          0.309803,
-          0.658823
+          0.788235,
+          0.705882,
+          0.549019
         ],
         "Duration": 0,
-        "Material": "SmoothPlastic",
+        "Material": "Limestone",
         "Neutral": true,
         "Size": [
           12,

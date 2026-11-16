@@ -44,7 +44,9 @@
 			"$className": "Lighting",
 			"$ignoreUnknownInstances": true,
 			"$properties": {
-				"ClockTime": 14,
+				"ClockTime": 14.5,
+				"ColorShift_Top": [1, 0.92, 0.78],
+				"ExposureCompensation": 0.1,
 				"Brightness": 3,
 				"GeographicLatitude": 30,
 				"GlobalShadows": true,
@@ -54,9 +56,9 @@
 					0.607843
 				],
 				"OutdoorAmbient": [
-					0.588235,
-					0.607843,
-					0.647059
+					0.62,
+					0.6,
+					0.6
 				]
 			}
 		}

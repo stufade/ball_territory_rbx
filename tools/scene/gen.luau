@@ -40,30 +40,66 @@ end
 
 local NOHIT = { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }
 
--- Palette: dark navy arena like Ball vs Ball, cyan neon edges; stand glows take the ball colour in a match.
-local NAVY = "#1b2a5c"
-local NAVY_DARK = "#121a3a"
-local RIM = "#0d1124"
+-- Theme (S-1): a sky island of the elements. Grass and warm sandstone on a rock island under a blue sky, gold trim,
+-- one element per arena (Duel1 fire, Duel2 water, Duel3 earth, FFA air). Stand glows take the ball colour in a match.
+local NAVY_DARK = "#3a2c22" -- island dirt edge
 local BOARD = "#181e30"
-local PILLAR = "#24357a"
+local GRASS = "#7ccf4e"
+local GRASS_DARK = "#5fae3c"
+local STONE = "#efe2c4"
+local STONE_DARK = "#c9b48c"
+local ROCK = "#8b6a4c"
+local ROCK_DARK = "#6b4f3a"
+local GOLD = "#ffc83d"
+local FRAME = "#2c2552"
+local PILLAR = STONE
 local NEON = "#36d6ff"
 local NEON_PINK = "#ff4fd8"
+local ELEMENTS = {
+	fire = { main = "#ff6a2b", light = "#ffb347" },
+	water = { main = "#2fa8ff", light = "#8fdcff" },
+	earth = { main = "#4fd36a", light = "#b6f27a" },
+	air = { main = "#7fe8ff", light = "#ffffff" },
+}
 
 local function neon(name: string, size: { number }, pos: { number }, color: string?): Node
 	return part(name, size, pos, color or NEON, "Neon", NOHIT)
+end
+
+local function deco(name: string, size: { number }, pos: { number }, color: string, mat: string?, extra: Node?): Node
+	local e: Node = { CanCollide = false, CanQuery = false, CanTouch = false }
+	for k, v in extra or {} do
+		e[k] = v
+	end
+	return part(name, size, pos, color, mat, e)
+end
+
+local function ball(name: string, d: number, pos: { number }, color: string, mat: string?): Node
+	return deco(name, { d, d, d }, pos, color, mat or "Neon", { Shape = "Ball", CastShadow = false })
+end
+
+-- vertical cylinder (Roblox cylinders run along X, so roll 90 degrees)
+local function cyl(name: string, d: number, h: number, pos: { number }, color: string, mat: string?, solid: boolean?): Node
+	local p = if solid
+		then part(name, { h, d, d }, pos, color, mat, { Shape = "Cylinder" })
+		else deco(name, { h, d, d }, pos, color, mat, { Shape = "Cylinder" })
+	p.properties.CFrame = { pos[1], pos[2], pos[3], 0, -1, 0, 1, 0, 0, 0, 0, 1 }
+	return p
 end
 
 local function udim2(xs: number, xo: number, ys: number, yo: number): { any }
 	return { UDim2 = { { xs, xo }, { ys, yo } } }
 end
 
--- Stand pillar: top face at `top`, standing on the floor (y = 200). Glow ring just under the top face.
+-- Stand: a sandstone column with a gold cap band, top face at `top`, on a gold plinth. Glow ring under the top face.
 local function stand(out: { Node }, i: number, x: number, z: number, top: number)
 	local h = top - 200
 	local w = 4.6
-	table.insert(out, part(`Stand{i}`, { w, h, w }, { x, 200 + h / 2, z }, PILLAR))
+	table.insert(out, part(`Stand{i}`, { w, h, w }, { x, 200 + h / 2, z }, PILLAR, "Limestone"))
 	table.insert(out, neon(`Glow{i}`, { w + 0.5, 0.45, w + 0.5 }, { x, top - 0.45, z }))
-	table.insert(out, neon(`Base{i}`, { w + 1.2, 0.3, w + 1.2 }, { x, 200.15, z }))
+	table.insert(out, part(`Base{i}`, { w + 1.6, 1.2, w + 1.6 }, { x, 200.6, z }, STONE_DARK, "Limestone", NOHIT))
+	table.insert(out, deco(`Band{i}`, { w + 0.3, 0.5, w + 0.3 }, { x, 201.5, z }, GOLD, "SmoothPlastic"))
+	table.insert(out, deco(`Cap{i}`, { w + 0.8, 0.35, w + 0.8 }, { x, top - 0.95, z }, GOLD, "SmoothPlastic"))
 end
 
 type ArenaSpec = {
@@ -78,20 +114,45 @@ type ArenaSpec = {
 	fw: number,
 	-- stands: { x offset from cx, z, top y }
 	stands: { { number } },
+	el: string,
 }
+
+-- Gate behind the board: two sandstone towers with element crystals and banners, a gold-trimmed beam on top.
+-- Seen by the match camera in the side columns behind the stands and above the board.
+local function gate(kids: { Node }, cx: number, half: number, top: number, el: { main: string, light: string })
+	for _, sx in { -1, 1 } do
+		local x = cx + sx * half
+		local tag = if sx < 0 then "L" else "R"
+		table.insert(kids, deco(`Tower{tag}`, { 6, top - 200, 6 }, { x, (200 + top) / 2, -9 }, STONE, "Limestone"))
+		table.insert(kids, deco(`TowerFoot{tag}`, { 8, 2, 8 }, { x, 201, -9 }, STONE_DARK, "Limestone"))
+		table.insert(kids, deco(`TowerTrim{tag}`, { 6.6, 0.8, 6.6 }, { x, top - 1.6, -9 }, GOLD))
+		table.insert(kids, deco(`TowerTop{tag}`, { 7.4, 1.4, 7.4 }, { x, top + 0.7, -9 }, STONE_DARK, "Limestone"))
+		table.insert(kids, ball(`TowerOrb{tag}`, 4, { x, top + 3.6, -9 }, el.main))
+		table.insert(kids, deco(`Banner{tag}`, { 3.6, 12, 0.3 }, { x, top - 9, -5.85 }, el.main, "Fabric"))
+		table.insert(kids, deco(`BannerHem{tag}`, { 3.6, 0.6, 0.35 }, { x, top - 15, -5.85 }, GOLD))
+		table.insert(kids, deco(`BannerRod{tag}`, { 4.4, 0.4, 0.4 }, { x, top - 2.9, -5.8 }, GOLD))
+		table.insert(kids, ball(`BannerGem{tag}`, 1.6, { x, top - 6.5, -5.6 }, el.light))
+	end
+	table.insert(kids, deco("GateBeam", { half * 2 + 6, 3, 4 }, { cx, top - 1.5, -9 }, STONE, "Limestone"))
+	table.insert(kids, deco("GateTrim", { half * 2 + 6.2, 0.6, 4.2 }, { cx, top - 3, -9 }, GOLD))
+	table.insert(kids, ball("GateGem", 3.2, { cx, top + 1.2, -8.5 }, el.main))
+end
 
 local function arena(a: ArenaSpec): Node
 	local cx = a.cx
+	local el = ELEMENTS[a.el]
 	local bw, bh = a.gw * a.cs + 1.5, a.gh * a.cs + 1.5
 	local by = 203 + bh / 2
 	local kids: { Node } = {}
-	-- floor slot of the arena row (z -20..30) with neon lanes; the plaza continues it in front
+	-- floor slot of the arena row (z -20..30): grass with a sandstone stage; the plaza continues it in front
 	local fw = a.fw
-	table.insert(kids, part("Floor", { fw, 1, 50 }, { cx, 199.5, 5 }, NAVY))
-	table.insert(kids, neon("LaneFront", { fw, 0.2, 0.8 }, { cx, 200.1, 14 }))
-	table.insert(kids, neon("LaneBack", { fw, 0.2, 0.8 }, { cx, 200.1, -14 }, NEON_PINK))
-	table.insert(kids, part("Edge", { fw, 1.6, 51 }, { cx, 198.6, 4.5 }, NAVY_DARK))
-	-- board with a dark rim and neon edges, on a pedestal
+	table.insert(kids, part("Floor", { fw, 1, 50 }, { cx, 199.5, 5 }, GRASS, "Grass"))
+	table.insert(kids, deco("Stage", { fw - 6, 0.3, 22 }, { cx, 200.1, 6 }, STONE, "Cobblestone"))
+	table.insert(kids, deco("StageTrim", { fw - 5, 0.25, 23 }, { cx, 200.02, 6 }, STONE_DARK, "Cobblestone"))
+	table.insert(kids, neon("LaneFront", { fw - 6, 0.12, 0.5 }, { cx, 200.3, 16.8 }, el.light))
+	table.insert(kids, neon("LaneBack", { fw - 6, 0.12, 0.5 }, { cx, 200.3, -4.8 }, el.main))
+	table.insert(kids, part("Edge", { fw, 1.6, 51 }, { cx, 198.6, 4.5 }, NAVY_DARK, "Ground"))
+	-- board in a thick violet frame with gold trim and an element gem in each corner, on a stone pedestal
 	local board = part("Board", { bw, bh, 1 }, { cx, by, 0 }, BOARD)
 	board.children = {
 		{
@@ -101,13 +162,29 @@ local function arena(a: ArenaSpec): Node
 		},
 	}
 	table.insert(kids, board)
-	table.insert(kids, part("Rim", { bw + 2, bh + 2, 1 }, { cx, by, -0.6 }, RIM))
+	table.insert(kids, part("Rim", { bw + 3, bh + 3, 1 }, { cx, by, -0.6 }, FRAME))
+	local tx, ty = bw / 2 + 1.5, bh / 2 + 1.5
+	table.insert(kids, deco("TrimTop", { bw + 3.4, 0.5, 1.8 }, { cx, by + ty, -0.5 }, GOLD))
+	table.insert(kids, deco("TrimBottom", { bw + 3.4, 0.5, 1.8 }, { cx, by - ty, -0.5 }, GOLD))
+	table.insert(kids, deco("TrimLeft", { 0.5, bh + 3.4, 1.8 }, { cx - tx, by, -0.5 }, GOLD))
+	table.insert(kids, deco("TrimRight", { 0.5, bh + 3.4, 1.8 }, { cx + tx, by, -0.5 }, GOLD))
 	local ex, ey = bw / 2 + 0.45, bh / 2 + 0.45
-	table.insert(kids, neon("EdgeTop", { bw + 1.1, 0.18, 0.2 }, { cx, by + ey, 0.05 }))
-	table.insert(kids, neon("EdgeBottom", { bw + 1.1, 0.18, 0.2 }, { cx, by - ey, 0.05 }))
-	table.insert(kids, neon("EdgeLeft", { 0.18, bh + 1.1, 0.2 }, { cx - ex, by, 0.05 }))
-	table.insert(kids, neon("EdgeRight", { 0.18, bh + 1.1, 0.2 }, { cx + ex, by, 0.05 }))
-	table.insert(kids, part("Pedestal", { bw * 0.7, 3, 4 }, { cx, 201.5, -0.5 }, NAVY_DARK))
+	table.insert(kids, neon("EdgeTop", { bw + 1.1, 0.18, 0.2 }, { cx, by + ey, 0.05 }, el.light))
+	table.insert(kids, neon("EdgeBottom", { bw + 1.1, 0.18, 0.2 }, { cx, by - ey, 0.05 }, el.light))
+	table.insert(kids, neon("EdgeLeft", { 0.18, bh + 1.1, 0.2 }, { cx - ex, by, 0.05 }, el.light))
+	table.insert(kids, neon("EdgeRight", { 0.18, bh + 1.1, 0.2 }, { cx + ex, by, 0.05 }, el.light))
+	local corner = { ELEMENTS.fire.main, ELEMENTS.water.main, ELEMENTS.earth.main, ELEMENTS.air.main }
+	local k = 0
+	for _, sy in { 1, -1 } do
+		for _, sx in { -1, 1 } do
+			k += 1
+			local x, y = cx + sx * tx, by + sy * ty
+			table.insert(kids, deco(`GemMount{k}`, { 2.6, 2.6, 1.6 }, { x, y, -0.2 }, GOLD))
+			table.insert(kids, ball(`Gem{k}`, 1.9, { x, y, 0.5 }, corner[k]))
+		end
+	end
+	table.insert(kids, part("Pedestal", { bw * 0.7, 3, 4 }, { cx, 201.5, -0.5 }, STONE_DARK, "Limestone"))
+	table.insert(kids, deco("PedestalTrim", { bw * 0.7 + 0.4, 0.5, 4.4 }, { cx, 202.8, -0.5 }, GOLD))
 	table.insert(
 		kids,
 		part("Field", { a.gw * a.cs, a.gh * a.cs, 0.1 }, { cx, by, 0.55 }, "#e2e5ec", nil, { CanCollide = false })
@@ -115,6 +192,7 @@ local function arena(a: ArenaSpec): Node
 	for i, s in a.stands do
 		stand(kids, i, cx + s[1], s[2], s[3])
 	end
+	gate(kids, cx, fw / 2 - 5, by + bh / 2 + 9, el)
 	table.insert(
 		kids,
 		part(
@@ -156,6 +234,7 @@ for i = 1, 3 do
 			camZ = 22,
 			fw = 52,
 			stands = DUEL_STANDS,
+			el = ({ "fire", "water", "earth" })[i],
 		})
 	)
 end
@@ -171,6 +250,7 @@ table.insert(
 		camZ = 26,
 		fw = 64,
 		stands = FFA_STANDS,
+		el = "air",
 	})
 )
 
@@ -184,32 +264,58 @@ local function wall(name: string, size: { number }, pos: { number }): Node
 	return part(name, size, pos, "#ffffff", nil, WALL)
 end
 local lobbyKids: { Node } = {
-	part("Pad", { PW, 1, PD }, { PCX, 199.5, PCZ }, "#1d3a7a"),
-	part("PadEdge", { PW, 1.6, PD }, { PCX, 198.6, PCZ }, NAVY_DARK),
-	-- rail between the plaza and the arenas
-	neon("Rail", { PW, 0.5, 0.5 }, { PCX, 202.2, PZ0 + 0.4 }),
-	part("RailBase", { PW, 1.6, 0.8 }, { PCX, 200.8, PZ0 + 0.4 }, PILLAR),
+	part("Pad", { PW, 1, PD }, { PCX, 199.5, PCZ }, GRASS, "Grass"),
+	part("PadEdge", { PW, 1.6, PD }, { PCX, 198.6, PCZ }, NAVY_DARK, "Ground"),
+	-- gold rail between the plaza and the arenas, on a sandstone curb
+	part("Rail", { PW, 0.5, 0.5 }, { PCX, 202.6, PZ0 + 0.4 }, GOLD, "SmoothPlastic"),
+	part("RailBase", { PW, 1.2, 1.2 }, { PCX, 200.6, PZ0 + 0.4 }, STONE, "Limestone"),
 	wall("WallFront", { PW, 16, 1 }, { PCX, 208, PZ0 }),
 	wall("WallBack", { PW, 16, 1 }, { PCX, 208, PZ1 + 0.5 }),
 	wall("WallW", { 1, 16, PD + 50 }, { PX0 - 0.5, 208, PCZ - 22 }),
 	wall("WallE", { 1, 16, PD + 50 }, { PX1 + 0.5, 208, PCZ - 22 }),
-	neon("BorderS", { PW, 0.2, 0.8 }, { PCX, 200.1, PZ1 - 0.4 }, NEON_PINK),
-	neon("BorderW", { 0.8, 0.2, PD }, { PX0 + 0.4, 200.1, PCZ }),
-	neon("BorderE", { 0.8, 0.2, PD }, { PX1 - 0.4, 200.1, PCZ }),
-	-- a ring around the spawn and two lanes towards the arenas
-	-- thin square ring around the spawn
+	deco("BorderS", { PW, 0.6, 1.6 }, { PCX, 200.2, PZ1 - 0.8 }, STONE_DARK, "Cobblestone"),
+	deco("BorderW", { 1.6, 0.6, PD }, { PX0 + 0.8, 200.2, PCZ }, STONE_DARK, "Cobblestone"),
+	deco("BorderE", { 1.6, 0.6, PD }, { PX1 - 0.8, 200.2, PCZ }, STONE_DARK, "Cobblestone"),
+	-- sandstone square around the spawn with a thin pink ring
+	deco("SpawnSquare", { 22, 0.1, 22 }, { 0, 200.03, 56 }, STONE, "Cobblestone"),
 	neon("SpawnN", { 16, 0.12, 0.4 }, { 0, 200.06, 48 }, NEON_PINK),
 	neon("SpawnS", { 16, 0.12, 0.4 }, { 0, 200.06, 64 }, NEON_PINK),
 	neon("SpawnW", { 0.4, 0.12, 16 }, { -8, 200.06, 56 }, NEON_PINK),
 	neon("SpawnE", { 0.4, 0.12, 16 }, { 8, 200.06, 56 }, NEON_PINK),
-	neon("LaneW", { 0.6, 0.12, 22 }, { -40, 200.06, 52 }),
-	neon("LaneE", { 0.6, 0.12, 22 }, { 52, 200.06, 52 }),
-	-- light pylons at the back corners
-	part("PylonW", { 3, 10, 3 }, { PX0 + 4, 205, PZ1 - 4 }, PILLAR),
-	neon("PylonWTop", { 3.4, 0.5, 3.4 }, { PX0 + 4, 210.2, PZ1 - 4 }, NEON_PINK),
-	part("PylonE", { 3, 10, 3 }, { PX1 - 4, 205, PZ1 - 4 }, PILLAR),
-	neon("PylonETop", { 3.4, 0.5, 3.4 }, { PX1 - 4, 210.2, PZ1 - 4 }),
+	-- stone walk along the rail, so the boards are watched from a promenade
+	deco("Promenade", { PW - 4, 0.1, 8 }, { PCX, 200.03, PZ0 + 5 }, STONE, "Cobblestone"),
+	deco("LaneW", { 3, 0.1, 22 }, { -40, 200.04, 52 }, STONE, "Cobblestone"),
+	deco("LaneE", { 3, 0.1, 22 }, { 52, 200.04, 52 }, STONE, "Cobblestone"),
+	-- light towers at the back corners
+	deco("PylonW", { 4, 12, 4 }, { PX0 + 5, 206, PZ1 - 5 }, STONE, "Limestone"),
+	deco("PylonWCap", { 5, 0.8, 5 }, { PX0 + 5, 212.4, PZ1 - 5 }, GOLD),
+	ball("PylonWTop", 3.4, { PX0 + 5, 214.6, PZ1 - 5 }, ELEMENTS.fire.main),
+	deco("PylonE", { 4, 12, 4 }, { PX1 - 5, 206, PZ1 - 5 }, STONE, "Limestone"),
+	deco("PylonECap", { 5, 0.8, 5 }, { PX1 - 5, 212.4, PZ1 - 5 }, GOLD),
+	ball("PylonETop", 3.4, { PX1 - 5, 214.6, PZ1 - 5 }, ELEMENTS.air.main),
 }
+
+-- The island: grass beyond the plaza and behind the boards (decor, not walkable), a dirt rim and a rock underside of
+-- shrinking cylinders, so the whole place floats in the sky.
+local IX0, IX1, IZ0, IZ1 = -150, 162, -60, 110
+local ICX, ICZ = (IX0 + IX1) / 2, (IZ0 + IZ1) / 2
+table.insert(lobbyKids, deco("IslandTop", { IX1 - IX0, 1, IZ1 - IZ0 }, { ICX, 199.3, ICZ }, GRASS_DARK, "Grass"))
+table.insert(lobbyKids, deco("IslandRim", { IX1 - IX0 + 2, 5, IZ1 - IZ0 + 2 }, { ICX, 196.5, ICZ }, NAVY_DARK, "Ground"))
+do
+	local blobs = { { -100, -10 }, { -40, 40 }, { 20, -20 }, { 80, 50 }, { 120, -5 }, { -110, 70 }, { 30, 85 } }
+	local layers = { { 150, 10 }, { 120, 12 }, { 90, 14 }, { 58, 16 }, { 30, 18 }, { 12, 14 } }
+	for b, at in blobs do
+		local y = 194
+		local scale = if b % 2 == 0 then 0.8 else 1
+		for l, L in layers do
+			local d, h = L[1] * scale * 0.6, L[2] * scale
+			y -= h / 2
+			local col = if l <= 2 then ROCK else ROCK_DARK
+			table.insert(lobbyKids, cyl(`Under{b}_{l}`, d, h, { at[1] + l * 2, y, at[2] - l }, col, "Rock"))
+			y -= h / 2
+		end
+	end
+end
 
 -- Kiosks you walk to. Prompt range is 10 studs: from the spawn (0, 56) both are ~60 studs away.
 -- Tag PlazaSpot, attribute Kind "shop"|"play". Client: src/client/UI/init.luau.
@@ -352,8 +458,8 @@ local function arch(): Node
 		properties = { Tags = { "PlazaSpot" } },
 		attributes = { Kind = "play" },
 		children = {
-			part("PillarL", { 2, 8, 2 }, { x - 5, 204, z }, PILLAR),
-			part("PillarR", { 2, 8, 2 }, { x + 5, 204, z }, PILLAR),
+			part("PillarL", { 2, 8, 2 }, { x - 5, 204, z }, PILLAR, "Limestone"),
+			part("PillarR", { 2, 8, 2 }, { x + 5, 204, z }, PILLAR, "Limestone"),
 			neon("Beam", { 12, 1.2, 2 }, { x, 208.4, z }, GREEN),
 			board,
 			trigger,
@@ -367,20 +473,25 @@ table.insert(lobbyKids, arch())
 
 -- One landmark behind the spawn, plus a colored path so the pad is not one flat blue rectangle.
 local bx, bz = 0, 70
-local beacon = part("Beacon", { 3.2, 16, 3.2 }, { bx, 208, bz }, "#f4f1ff")
+local beacon = part("Beacon", { 3.2, 16, 3.2 }, { bx, 208, bz }, STONE, "Limestone")
 local beaconLight = light("#fff1a8", 36)
 beaconLight.name = "BeaconLight"
 beacon.children = { beaconLight }
 table.insert(lobbyKids, beacon)
 table.insert(lobbyKids, neon("BeaconCap", { 5, 1.2, 5 }, { bx, 216.4, bz }, YELLOW))
 table.insert(lobbyKids, neon("BeaconRing", { 8, 0.2, 8 }, { bx, 200.12, bz }, NEON_PINK))
-table.insert(lobbyKids, neon("PathShop", { 44, 0.12, 2.2 }, { -32, 200.08, 60 }, YELLOW))
-table.insert(lobbyKids, neon("PathPlay", { 48, 0.12, 2.2 }, { 36, 200.08, 60 }, GREEN))
-table.insert(lobbyKids, neon("TileW", { 7, 0.12, 7 }, { -16, 200.08, 46 }, NEON))
-table.insert(lobbyKids, neon("TileE", { 7, 0.12, 7 }, { 22, 200.08, 46 }, NEON_PINK))
-table.insert(lobbyKids, neon("TileC", { 7, 0.12, 7 }, { 4, 200.08, 42 }, YELLOW))
+table.insert(lobbyKids, deco("PathShop", { 44, 0.1, 4 }, { -32, 200.04, 60 }, STONE, "Cobblestone"))
+table.insert(lobbyKids, neon("PathShopLine", { 44, 0.12, 0.4 }, { -32, 200.08, 60 }, YELLOW))
+table.insert(lobbyKids, deco("PathPlay", { 48, 0.1, 4 }, { 36, 200.04, 60 }, STONE, "Cobblestone"))
+table.insert(lobbyKids, neon("PathPlayLine", { 48, 0.12, 0.4 }, { 36, 200.08, 60 }, GREEN))
+-- element medallions on the walk to the boards
+for i, e in { "fire", "water", "earth", "air" } do
+	local x = -78 + (i - 1) * 54
+	table.insert(lobbyKids, cyl(`Medal{i}`, 7, 0.14, { x, 200.07, 38 }, STONE_DARK, "Limestone"))
+	table.insert(lobbyKids, cyl(`MedalCore{i}`, 4, 0.2, { x, 200.1, 38 }, ELEMENTS[e].main, "Neon"))
+end
 -- Spawn: faces the arenas (-Z). Server sets Player.RespawnLocation to it (src/server/Avatars.luau).
-local spawn = part("Spawn", { 12, 1, 12 }, { 0, 199.6, 56 }, "#2a4fa8")
+local spawn = part("Spawn", { 12, 1, 12 }, { 0, 199.6, 56 }, STONE_DARK, "Limestone")
 spawn.className = "SpawnLocation"
 spawn.properties.Neutral = true
 spawn.properties.Duration = 0
