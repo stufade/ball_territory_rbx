@@ -215,7 +215,8 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 	Theme.pattern(window, Theme.GLOW:Lerp(WHITE, 0.25), 0.78, 44)
 
 	local tileH = reelH - 20
-	local tileW = math.floor(tileH * 0.86)
+	-- wide enough for LEGENDARY at the phone's minimum text
+	local tileW = math.max(math.floor(tileH * 0.86), math.ceil(9 * 0.7 * Theme.MIN_TEXT) + 16)
 	local slotW = tileW + 8
 	local viewW = innerW
 	local copies = 6
@@ -419,7 +420,7 @@ function Spin.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: numb
 			else `{if legend then "LEGENDARY" else "EPIC+"} IN {left}`
 		local tx = d + 14
 		local tw = pityW - tx - 10
-		local barH = math.floor(rowH * 0.32)
+		local barH = math.max(math.floor(rowH * 0.32), Theme.MIN_TEXT + 4)
 		local headH = rowH - barH - 14
 		Theme.label(
 			box,

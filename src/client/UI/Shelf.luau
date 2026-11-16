@@ -649,7 +649,7 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 		-- name and kind
 		local nameY = previewY + previewH + 4
 		local kind = kindOf(id)
-		local kindW = 64
+		local kindW = math.ceil(5 * 0.7 * Theme.MIN_TEXT) + 8 -- FRAME / TRAIL / FORCE at the minimum text
 		local nm = title(id)
 		Theme.label(
 			card,

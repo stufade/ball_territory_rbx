@@ -144,8 +144,16 @@ local function banner(
 	local sceneW = math.clamp(math.floor(w * 0.22), 170, 230)
 	local ballD = math.min(h - 34, 112)
 	local cx, cy = sceneW / 2 + 6, h / 2 - 4
-	local rays =
-		Theme.rays(card, 12, math.floor(sceneW * 1.7), 26, UDim2.fromOffset(cx, cy), Theme.YELLOW, Color3.new(1, 1, 1), 0.55)
+	local rays = Theme.rays(
+		card,
+		12,
+		math.floor(sceneW * 1.7),
+		26,
+		UDim2.fromOffset(cx, cy),
+		Theme.YELLOW,
+		Color3.new(1, 1, 1),
+		0.55
+	)
 	local glow =
 		Theme.glow(card, math.floor(ballD * 1.9), Theme.YELLOW:Lerp(el, 0.4), UDim2.fromOffset(cx, cy), 6, 0.82)
 	local shadow = Theme.shadow(card, math.floor(ballD * 0.8), UDim2.fromOffset(cx, cy + ballD / 2 + 4))
@@ -337,18 +345,24 @@ local function offer(
 	local bw = math.clamp(math.floor(w * 0.26), 80, 110)
 	local tx = 74 -- art (the epic ball, VIP, 2X) is 64 wide on the left
 	local tw = w - tx - bw - 18
-	Theme.label(tile, title, Theme.fit(title, 26, tw, 30), UDim2.fromOffset(tw, 28), UDim2.fromOffset(tx, 8), {
+	-- the line goes on two rows when one would not fit at the minimum text (a narrow PC tile)
+	local two0 = (utf8.len(line) or #line) * 0.62 * Theme.MIN_TEXT > tw
+	Theme.label(tile, title, Theme.fit(title, 26, tw, 30), UDim2.fromOffset(tw, 28), UDim2.fromOffset(tx, if two0 then 3 else 8), {
 		anchor = V2(0, 0),
 		align = Enum.TextXAlignment.Left,
 		color = Theme.YELLOW_TXT,
 		stroke = 3,
 	}).Name =
 		"Title"
-	Theme.label(tile, line, Theme.fit(line, 18, tw, 22), UDim2.fromOffset(tw, 22), UDim2.fromOffset(tx, 38), {
+	local two = two0 -- "EPIC +3K / COINS"
+	local ly = if two then 30 else 36
+	local lh = if two then h - ly - 2 else 22
+	Theme.label(tile, line, if two then Theme.MIN_TEXT else Theme.fit(line, 18, tw, 22), UDim2.fromOffset(tw, lh), UDim2.fromOffset(tx, ly), {
 		anchor = V2(0, 0),
 		align = Enum.TextXAlignment.Left,
 		color = Theme.TEXT,
 		bold = true,
+		wrap = two,
 	}).Name =
 		"Line"
 	local buy = Theme.button(
