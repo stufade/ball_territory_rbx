@@ -28,7 +28,7 @@ export type Ctx = {
 	busy: () -> boolean,
 }
 
-type Toast = { text: string, color: Color3 }
+type Toast = { text: string, color: Color3, n: number? }
 
 export type Wallet = {
 	root: Frame,
@@ -364,6 +364,27 @@ local function toast(w: Wallet, text: string, color: Color3)
 	table.insert(w.toasts, { text = text, color = color })
 end
 
+-- A run of equal level toasts ("LEVEL 122! +150 COINS" x5) becomes one: the last level, the coins summed.
+local function mergeLevels(w: Wallet)
+	local out: { Toast } = {}
+	for _, t in w.toasts do
+		local lvl, coins, rest = string.match(t.text, "^LEVEL (%d+)!  %+(%d+) COINS(.*)$")
+		local prev = out[#out]
+		if lvl and prev and (prev :: any).lvl and (prev :: any).rest == rest then
+			local pt = prev :: any
+			pt.coins += tonumber(coins) :: number
+			pt.lvl = lvl
+			pt.text = `LEVEL {lvl}!  +{pt.coins} COINS{rest}`
+		elseif lvl then
+			local nt: any = { text = t.text, color = t.color, lvl = lvl, coins = tonumber(coins), rest = rest }
+			table.insert(out, nt)
+		else
+			table.insert(out, t)
+		end
+	end
+	w.toasts = out
+end
+
 -- "+25" rising from a counter.
 local function float(w: Wallet, cur: string, n: number)
 	local L = layout(w)
@@ -465,7 +486,11 @@ function Wallet.step(w: Wallet, dt: number)
 		end
 	end
 	local st0 = w.st
-	if on and #w.toasts > 0 and #w.live < 3 then
+	-- With a window open the toasts wait (they would lie over the wheel); after it closes equal ones merge.
+	if on and not w.open and #w.toasts > 1 and #w.live == 0 then
+		mergeLevels(w)
+	end
+	if on and not w.open and #w.toasts > 0 and #w.live < 3 then
 		local t = table.remove(w.toasts, 1) :: Toast
 		local cv = w.ctx.canvas
 		local f = Theme.label(w.pop.Parent :: Instance, t.text, 26, UDim2.fromOffset(520, 32), nil, {

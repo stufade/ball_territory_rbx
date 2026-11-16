@@ -51,6 +51,7 @@ export type Profile = {
 
 local profiles: { [Player]: Profile } = {}
 local loadedFns: { (Player) -> () } = {}
+local LOAD_GIVE_UP = 45
 local store: Store.Store
 -- true when PolicyService said paid random is restricted. Nil until the first answer (a failed read stays allowed).
 local paidRandomBlocked: { [Player]: boolean } = {}
@@ -243,10 +244,39 @@ function Profiles.join(player: Player)
 	profiles[player] = p
 	task.spawn(function()
 		local ok, raw = true, nil
+		local t0 = clock()
+		local late = false
 		if fresh() then
 			p.temp = true
 		else
-			ok, raw = Store.load(store, p.key)
+			-- A hung or throttled DataStore must not freeze the join: after LOAD_GIVE_UP s the player plays on a
+			-- new profile that is not saved; a load that answers later only gives its lock back.
+			local answered = false
+			task.spawn(function()
+				local ok2, raw2 = Store.load(store, p.key)
+				answered = true
+				if late then
+					print(
+						`[BT] profiles: {player.Name} late load answered after {math.floor(clock() - t0)} s, lock released`
+					)
+					if ok2 then
+						Store.save(store, p.key, raw2, true)
+					end
+					return
+				end
+				ok, raw = ok2, raw2
+			end)
+			print(`[BT] profiles: {player.Name} loading profile {p.key}`)
+			while not answered and clock() - t0 < LOAD_GIVE_UP do
+				task.wait(0.25)
+			end
+			if not answered then
+				late = true
+				ok = false
+				warn(`[BT] profiles: {player.Name} load still pending after {LOAD_GIVE_UP} s, giving up`)
+			else
+				print(`[BT] profiles: {player.Name} profile answered in {string.format("%.1f", clock() - t0)} s`)
+			end
 		end
 		if p.gone then
 			-- left while loading: let the lock go

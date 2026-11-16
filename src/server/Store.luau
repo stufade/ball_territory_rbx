@@ -109,6 +109,7 @@ end
 -- Takes the lock and returns the stored data (nil for a new player). ok = false: DataStore failed after retries.
 function Store.load(st: Store, key: string): (boolean, any)
 	local deadline = st.now() + st.cfg.lockWait
+	local waited = false
 	while true do
 		local busy = false
 		local ok, res = update(st, key, function(old)
@@ -133,6 +134,12 @@ function Store.load(st: Store, key: string): (boolean, any)
 		end
 		if not busy then
 			return true, if type(res) == "table" then res.data else nil
+		end
+		if not waited then
+			waited = true
+			st.warn(
+				`[BT] profiles: {key} is locked by another session, waiting up to {st.cfg.lockWait} s for it to let go`
+			)
 		end
 		st.wait(2)
 	end
