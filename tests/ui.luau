@@ -115,7 +115,18 @@ local function buttonsFit(panel: any, cv: any, tag: string)
 		`{tag}: panel on screen`
 	)
 	for _, d in panel:GetDescendants() do
-		if d._p.ClassName == "TextButton" and d.Visible ~= false then
+		local par = d.Parent
+		if
+			d._p.ClassName == "TextButton"
+			and d.Visible ~= false
+			and par._p.ClassName == "ScrollingFrame"
+			and par.CanvasSize.X.Offset > 0
+		then
+			-- a sideways strip (shelf chips): inside its canvas, the strip itself inside the panel
+			local x = d.Position.X.Offset
+			check(x >= 0 and x + d.Size.X.Offset <= par.CanvasSize.X.Offset + 1, `{tag}: {d.Name} inside its strip`)
+			check(inside(par, panel), `{tag}: {par.Name} strip inside panel`)
+		elseif d._p.ClassName == "TextButton" and d.Visible ~= false then
 			check(inside(d, d.Parent), `{tag}: {d.Name} inside its parent`)
 			local r = rectOf(d)
 			check(r[1] >= pr[1] - 1 and r[1] + r[3] <= pr[1] + pr[3] + 1, `{tag}: {d.Name} x inside panel`)
@@ -528,7 +539,7 @@ do
 	local close = find(panel, "Close")
 	local cr = rectOf(close)
 	check(cr[3] >= 72 and cr[4] >= 72, `shop: close is large ({cr[3]}x{cr[4]})`)
-	check(not overlap(cr, rectOf(find(panel, "Head"))), "shop: close clear of the title")
+	check(not overlap(cr, rectOf(find(panel, "TabPacks"))), "shop: close clear of the tabs")
 	local rows = 0
 	for _, c in find(panel, "List"):GetChildren() do
 		if string.sub(c.Name, 1, 3) == "Row" then
@@ -545,8 +556,8 @@ do
 	check(find(today, "Name").Text == "WATER", "shop: day ball name")
 	check(find(find(today, "PayCoins"), "Label").Text == "700", "shop: day coin price is the discount")
 	check(find(today, "PayGems") == nil and find(today, "PayRobux") == nil, "shop: E4 one price on the deal")
-	check(rectOf(today)[1] + rectOf(today)[3] <= rectOf(find(panel, "Row5"))[1], "shop: the deal is first (left)")
-	check(rectOf(today)[4] > rectOf(find(panel, "Row5"))[4], "shop: the deal is larger than a shelf row")
+	check(rectOf(today)[2] + rectOf(today)[4] <= rectOf(find(panel, "Row5"))[2], "shop: the deal is first (a banner on top)")
+	check(rectOf(today)[3] > rectOf(find(panel, "Row5"))[3], "shop: the deal is wider than a card")
 	check(find(find(panel, "Row5"), "Deal") == nil, "shop: a normal ball is not marked")
 	check(
 		find(find(panel, "Row5"), "PayCoins").Text == ""
@@ -559,10 +570,7 @@ do
 	local coinBtn = rectOf(find(today, "PayCoins"))
 	check(coinBtn[4] >= 64, "shop: price button is a large tap")
 	check(inside(find(today, "PayCoins"), today), "shop: price inside the banner")
-	check(
-		coinBtn[2] >= rectOf(find(today, "Name"))[2] + rectOf(find(today, "Name"))[4],
-		"shop: price clear of the name (under it)"
-	)
+	check(not overlap(coinBtn, rectOf(find(today, "Name"))), "shop: price clear of the name")
 	check(find(find(panel, "Row5"), "Tier").Text == "COMMON", "shop: common tier is on the card")
 	check(find(find(panel, "Row11"), "Tier").Text == "RARE", "shop: rare tier is on the card")
 	-- E4: every card and the deal sell for coins only, one price
@@ -876,6 +884,36 @@ for _, cv in { V2(960, 540), V2(1168, 540) } do
 	check(c ~= nil and r[3] * 0.72 >= 44 and r[4] * 0.72 >= 44, `{cv.X} daily: Close is 44 px ({r[3]}x{r[4]})`)
 end
 
+-- M4-S5: on the phone (phone rule) the whole daily window sits under the Roblox buttons, CLAIM under the grid.
+do
+	local cv = V2(1168, 540)
+	Theme.setPhone(true)
+	local w = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	Wallet.setProfile(w, view(100, 0, true, 2))
+	find(w.root, "DailyBtn").Activated:Fire()
+	local panel = find(w.pop, "DailyPanel")
+	local pr = rectOf(panel)
+	check(pr[2] >= Theme.topbar.Y and pr[2] + pr[4] <= cv.Y, `phone daily: under the Roblox buttons ({pr[2]}, {pr[4]})`)
+	local claim = find(panel, "Claim")
+	for i = 1, 6 do
+		local day = find(panel, `Day{i}`)
+		check(day == nil or inside(day, panel), `phone daily: day {i} inside`)
+		if day and claim then
+			check(not overlap(rectOf(day), rectOf(claim)), `phone daily: day {i} clear of CLAIM`)
+		end
+		if day then
+			for _, d in day:GetDescendants() do
+				if d._p.ClassName == "TextLabel" and d.Visible ~= false and d.Text ~= "" then
+					check(inside(d, day), `phone daily: day {i} {d.Name} inside its card`)
+				end
+			end
+		end
+	end
+	buttonsFit(panel, cv, "phone daily")
+	Theme.setPhone(false)
+end
+
 -- M4-S4 Fast Spin: X10 only with the pass (sends "coins10"), the pass for R$ in its place when offered, neither
 -- when the server offers neither; inside the card, 44 px on the phone.
 for _, cv in { V2(960, 540), V2(1168, 540) } do
@@ -939,7 +977,7 @@ do
 		local looksBtn = find(shop, "TabSkins")
 		check(looksBtn ~= nil and find(looksBtn, "Label").Text == "SKINS", `{tag}: shop opens skins`)
 		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Close"))), `{tag}: SKINS clear of close`)
-		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "Head"))), `{tag}: SKINS clear of the title`)
+		check(not overlap(rectOf(looksBtn), rectOf(find(shop, "BalCoins"))), `{tag}: SKINS clear of the coins`)
 		looksBtn.Activated:Fire()
 		local panel = find(w.pop, "ShopPanel")
 		check(panel ~= nil and w.open == "shop" and panel:GetAttribute("Tab") == "skins", `{tag}: skins tab`)
@@ -1037,7 +1075,7 @@ do
 			#acts == before + 1 and acts[before + 1][1] == "look" and acts[before + 1][3] == "frame_wood",
 			`{tag}: five balls still send Action look`
 		)
-		check(not overlap(rectOf(find(panel, "Close")), rectOf(find(panel, "Head"))), `{tag}: close clear of the title`)
+		check(not overlap(rectOf(find(panel, "Close")), rectOf(find(panel, "BalCoins"))), `{tag}: close clear of the coins`)
 	end
 
 	local earlyW, _, earlyActs = make(V2(960, 540))
@@ -1173,6 +1211,59 @@ do
 	find(card, "PayCoins").Activated:Fire()
 	local last = acts[#acts]
 	check(#acts == before + 1 and last[1] == "look" and last[3] == "trail_dust", "E4: the look sells for coins")
+end
+
+
+-- M4-S5: every shop tab on the phone (1168x540 canvas, phone rule, scale 0.72) and the PC (960x540, 1280x720,
+-- scale 1.333): no button outside its card or the panel, every live button at least 44 real px both ways.
+for _, case in { { V2(1168, 540), 0.72, true }, { V2(960, 540), 720 / 540, false } } do
+	local cv, k = case[1], case[2]
+	Theme.setPhone(case[3])
+	local w = make(cv)
+	Wallet.setState(w, { ph = "lobby" })
+	local v = view(5000, 80, false, 1)
+	v.dailyBall = { e = 4, coins = 700, endsAt = 1e8 }
+	v.spin = spinBoard(3)
+	v.passOffer = { vip = true, coins2x = true, fastSpin = true }
+	v.shelf = {
+		n = 5,
+		need = 27,
+		owned = {},
+		on = { skin = "", trail = "", force = "", frame = "", podium = false, ko = false, ball = -1 },
+	}
+	Wallet.setProfile(w, v)
+	find(w.root, "ShopBtn").Activated:Fire()
+	for _, t in { "TabBalls", "TabSpin", "TabSkins", "TabPacks" } do
+		find(find(w.pop, "ShopPanel"), t).Activated:Fire()
+		local panel = find(w.pop, "ShopPanel")
+		local tag = `{cv.X} S5 {t}`
+		buttonsFit(panel, cv, tag)
+		local small, out = 0, 0
+		for _, d in panel:GetDescendants() do
+			if d._p.ClassName == "TextButton" and d.Visible ~= false then
+				local r = rectOf(d)
+				if math.min(r[3], r[4]) * k < 44 - 0.01 then
+					small += 1
+					print(`  {tag}: {d.Name} {r[3]}x{r[4]} = {math.floor(r[3] * k)}x{math.floor(r[4] * k)} px`)
+				end
+				if not inScroll(d) and not inside(d, panel) then
+					out += 1
+				end
+			end
+		end
+		check(small == 0, `{tag}: every button >= 44 px ({small} small)`)
+		check(out == 0, `{tag}: no button outside the panel ({out})`)
+	end
+	-- the phone keeps two big cards a row with the deal as a banner on top
+	find(find(w.pop, "ShopPanel"), "TabBalls").Activated:Fire()
+	local panel = find(w.pop, "ShopPanel")
+	local r5, r11 = rectOf(find(panel, "Row5")), rectOf(find(panel, "Today"))
+	if case[3] then
+		local list = rectOf(find(panel, "List"))
+		check(r5[3] > list[3] * 0.4, `{cv.X} S5: two cards a row on the phone ({r5[3]} of {list[3]})`)
+		check(r11[4] < list[4] * 0.5, `{cv.X} S5: the deal banner is under half the list ({r11[4]} of {list[4]})`)
+	end
+	Theme.setPhone(false)
 end
 
 print(`{passed} passed, {fails} failed`)

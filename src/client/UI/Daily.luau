@@ -37,6 +37,16 @@ local GRID_W = 3 * CW + 2 * GAP
 local BX = GX + GRID_W + 20
 local BW = PW - 20 - BX
 local BH = PH - 14 - GY
+
+-- Phone rule (MOB-1, M4-S5): the whole window goes under the Roblox buttons. A short screen gets a shorter
+-- panel: the header and the day cards close up, CLAIM stays under the grid, day 7 takes the full height.
+local function fitTo(cv: Vector2)
+	local room = cv.Y - 6 - (Theme.topbar.Y + 4)
+	PH = if Theme.phone then math.clamp(room, 420, 480) else 480
+	GY = if PH < 480 then 92 else 100
+	CH = math.min(134, math.floor((PH - 14 - 72 - 10 - GY - GAP) / 2))
+	BH = PH - 14 - GY
+end
 local VOID_E = 13
 local VOID_DEEP = Color3.fromHex("#14062a")
 local VOID_GLOW = Color3.fromHex("#8a3cff")
@@ -129,9 +139,11 @@ local function card(panel: Frame, c: Net.DayCard, i: number, fx: Cheer.Ctx): Fra
 		anchor = TOP_MID,
 		color = if c.today then Theme.YELLOW_TXT else Theme.DIM,
 	})
-	goods(f, c, CW, 56, 50, 26, 84)
+	-- a short card (phone) closes up: smaller coin, the amount and the trial line move up with it
+	local dy = math.min(0, CH - 134)
+	goods(f, c, CW, 56 + dy * 0.6, 50 + dy, 26, 84 + dy)
 	if c.trials then
-		Theme.label(f, "+1 TRIAL", 20, UDim2.new(1, -8, 0, 22), UDim2.new(0.5, 0, 0, 110), {
+		Theme.label(f, "+1 TRIAL", 20, UDim2.new(1, -8, 0, 22), UDim2.new(0.5, 0, 0, 110 + dy), {
 			anchor = TOP_MID,
 			color = Theme.GOOD_TXT,
 			bold = true,
@@ -409,6 +421,7 @@ function Daily.build(parent: Frame, v: Net.ProfileView, ctx: Ctx, claim: any?)
 	end
 	local intro = claim == nil
 	local cv = ctx.canvas
+	fitTo(cv)
 	local bg = Theme.backdrop(parent, 0.18)
 	bg.Active = true
 	local panel = Theme.frame(

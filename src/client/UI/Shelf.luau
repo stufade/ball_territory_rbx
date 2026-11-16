@@ -512,18 +512,32 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 	cap.MinTextSize = 20
 	cap.MaxTextSize = 28
 	cap.Parent = count
-	local chipW = math.floor((w - countW - 8 - GAP * (#CHIPS - 1)) / #CHIPS)
+	-- chips scroll sideways: each keeps a readable width (>= 140) on any screen
+	local chipsW = w - countW - 8
+	local chipW = math.max(140, math.floor((chipsW - GAP * (#CHIPS - 1)) / #CHIPS))
+	local strip = Instance.new("ScrollingFrame")
+	strip.Name = "Chips"
+	strip.BackgroundTransparency = 1
+	strip.BorderSizePixel = 0
+	strip.Position = UDim2.fromOffset(0, 0)
+	strip.Size = UDim2.fromOffset(chipsW, CHIP_H + 8)
+	strip.CanvasSize = UDim2.fromOffset(#CHIPS * (chipW + GAP) - GAP, CHIP_H)
+	strip.ScrollBarThickness = 4
+	strip.ScrollingDirection = Enum.ScrollingDirection.X
+	strip.ElasticBehavior = Enum.ElasticBehavior.Never
+	strip.Active = true
+	strip.Parent = host
 	for i, c in CHIPS do
 		local sel = filter == c.key
 		local col = if sel then Theme.PURPLE else Theme.PURPLE:Lerp(Theme.SLOT, 0.7)
 		local b = Theme.button(
-			host,
+			strip,
 			c.word,
 			UDim2.fromOffset(chipW, CHIP_H),
 			UDim2.fromOffset((i - 1) * (chipW + GAP), 0),
 			col,
 			nil,
-			22
+			Theme.fit(c.word, 26, chipW - 14, CHIP_H - 14)
 		)
 		b.Name = `Chip_{c.key}`
 		Theme.select(b, sel)
@@ -542,7 +556,7 @@ function Shelf.fill(host: Frame, v: Net.ProfileView, ctx: Ctx, w: number, h: num
 		end)
 	end
 
-	local listTop = CHIP_H + 8
+	local listTop = CHIP_H + 14
 	local listH = math.max(80, h - listTop)
 	local list = Instance.new("ScrollingFrame")
 	list.Name = "Looks"
